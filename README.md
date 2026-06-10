@@ -45,7 +45,39 @@
 
 ---
 
-## 三、技术栈
+## 三、给 Coding Agent 使用本项目 Skill
+
+仓库根目录提供了 [`nkg-ai-flow-skill/SKILL.md`](./nkg-ai-flow-skill/SKILL.md)，用于指导 Codex、Claude Code 等 coding agent 按本项目约定开发自定义 Flow。
+
+这个 skill 不是运行时依赖，而是给 AI Agent 的开发规范入口。它会约束 agent：
+
+- 优先使用 `FlowBuilder` 编写 TypeScript 构建逻辑，再导出合法 Flow JSON；
+- 优先组合内置节点，必要时再用 `defineNode` 开发自定义节点；
+- 显式设计控制边、数据边和累计 `context`，避免下游节点依赖隐式状态；
+- 正确编写 `anf.app.json`、app 目录结构、node pack 注册和验证命令；
+- 在需要写文件、执行命令或修复构建失败时使用内置 `agent` 节点。
+
+在本仓库内让 coding agent 开发 Flow 时，可以直接这样提示：
+
+```text
+请先读取并遵循 ./nkg-ai-flow-skill/SKILL.md，然后为这个项目开发一个自定义 Flow。
+要求：<写清楚 Flow 目标、输入、输出、需要使用的工具或节点、验收标准>。
+实现时使用 FlowBuilder，不要直接手写最终 Flow JSON；完成后运行对应 build/typecheck 验证。
+```
+
+如果本项目作为宿主项目的 submodule 放在 `nkg-ai-flow/` 目录下，可以这样提示宿主项目中的 coding agent：
+
+```text
+请先读取并遵循 ./nkg-ai-flow/nkg-ai-flow-skill/SKILL.md，然后在宿主项目中开发或接入自定义 Flow。
+优先复用 nkg-ai-flow/packages 下的 FlowBuilder、Runtime 和 node-sdk；如果需要新增业务节点，使用 defineNode。
+完成后更新宿主项目的 app manifest，并运行能证明 Flow 可构建和可调用的验证命令。
+```
+
+对于支持显式 skill 路径的工具，也可以把 `nkg-ai-flow-skill/` 作为本地 skill 目录提供给 agent；对于不支持 skill 机制的工具，让 agent 先读取该 `SKILL.md` 即可。
+
+---
+
+## 四、技术栈
 
 - **Language / Module**：TypeScript + ESM
 - **Package manager**：npm workspaces（`packages/*` / `packages/transports/*` / `apps/*`）
@@ -58,16 +90,16 @@
 
 ---
 
-## 四、环境要求
+## 五、环境要求
 
 - Node.js `>=20.11.0`（见 `package.json` 的 `engines`）
 - npm（使用 workspaces，无需额外安装 pnpm / yarn）
 
 ---
 
-## 五、安装与推荐集成方式
+## 六、安装与推荐集成方式
 
-### 5.1 直接开发本项目
+### 6.1 直接开发本项目
 
 直接修改 Runtime、Studio 或本项目自带 apps 时，在本仓库内安装依赖：
 
@@ -75,7 +107,7 @@
 npm install
 ```
 
-### 5.2 宿主项目推荐作为 submodule 使用
+### 6.2 宿主项目推荐作为 submodule 使用
 
 外部业务项目推荐把本项目作为 Git submodule 放在宿主仓库根目录，例如 `nkg-ai-flow/`：
 
@@ -108,7 +140,7 @@ npm install
 
 ---
 
-## 六、配置（内置环境变量模块）
+## 七、配置（内置环境变量模块）
 
 项目使用内置环境变量模块管理运行时配置，不把 `.env` / `.env.local` 作为运行期配置模型：
 
@@ -121,9 +153,9 @@ npm install
 
 ---
 
-## 七、运行示例
+## 八、运行示例
 
-### 7.1 Hello Agent
+### 8.1 Hello Agent
 
 构建一个最小 `text_input -> agent` Flow，用于展示 agent 对自然语言任务的意图理解，以及通过文件工具完成桌面文件写入的链路：
 
@@ -133,7 +165,7 @@ npm run app:helloagent
 
 对应入口为 [`apps/hello-agent/build.ts`](./apps/hello-agent/build.ts)，同目录的 `invoke.ts` 可运行一个自包含的 agent 文件写入示例。
 
-### 7.2 Studio Browser
+### 8.2 Studio Browser
 
 同时启动后端 sidecar（HTTP transport）和前端 Vite dev server：
 
@@ -151,7 +183,7 @@ npm run studio:dev:backend
 npm run studio:dev:frontend
 ```
 
-### 7.3 通用 HTTP 服务
+### 8.3 通用 HTTP 服务
 
 仓库内只需一条命令即可启动面向多 Flow 的通用 HTTP 服务：
 
@@ -228,7 +260,7 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 
 ---
 
-## 八、常用开发命令
+## 九、常用开发命令
 
 | 命令 | 说明 |
 |---|---|
@@ -241,7 +273,7 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 
 ---
 
-## 九、仓库结构导航
+## 十、仓库结构导航
 
 ```text
 .
@@ -265,7 +297,7 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 
 ---
 
-## 十、文档导航
+## 十一、文档导航
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md)：项目目标、核心原则、总体架构、模块边界
 - [docs/implementation/ai-implementation-guide.md](./docs/implementation/ai-implementation-guide.md)：默认技术栈、实现顺序、AI 禁止事项
@@ -275,15 +307,15 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 
 ---
 
-## 十一、发布状态
+## 十二、发布状态
 
 Private（`package.json` 中 `"private": true`），暂未对外发布。
 
 ---
 
-## 十二、推荐使用方式与 app 注册
+## 十三、推荐使用方式与 app 注册
 
-### 12.1 推荐：宿主项目通过 submodule 集成
+### 13.1 推荐：宿主项目通过 submodule 集成
 
 业务项目推荐参考 `kesmj` 的集成方式：
 
@@ -330,7 +362,7 @@ host-project/
 
 宿主项目如果使用 Builder 生成 Flow artifact，可在自己的脚本里调用 `@ai-native-flow/builder-runner`，把产物写到宿主自己的 `artifacts/flows` 或源码目录；本项目不要求宿主把业务 Flow 放进 submodule。
 
-### 12.2 直接使用本项目
+### 13.2 直接使用本项目
 
 直接在本仓库启动 Studio 或 HTTP runner 时，不需要根 `anf.apps.json`。loader 会自动扫描本项目自带的 `apps/*/anf.app.json`，有 `anf.app.json` 的 app 才参与注册。
 
