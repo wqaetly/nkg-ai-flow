@@ -1,4 +1,12 @@
-# AI Native Flow Runtime
+<p align="center">
+  <img src="./docs/assets/readme-cover.png" alt="NKG AI Flow cover" width="100%" />
+</p>
+
+<h1 align="center">NKG AI Flow</h1>
+
+<p align="center">
+  <a href="https://www.lfzxb.top/aigc-ai-native-flow/">技术博客：AI Native Flow</a>
+</p>
 
 > 面向 AI Agent 的可热更新 **Flow Runtime / Agent Harness**：让 AI 通过 `Flow Builder` 或
 > `Graph Operation` 生成、修改、调试和热更新可控的 Agent Flow。
