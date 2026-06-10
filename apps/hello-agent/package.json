@@ -1,0 +1,18 @@
+{
+  "name": "@ai-native-flow/hello-agent",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx build.ts"
+  },
+  "dependencies": {
+    "@ai-native-flow/flow-ir": "0.0.1",
+    "@ai-native-flow/flow-validator": "0.0.1",
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/builder-runner": "0.0.1",
+    "@ai-native-flow/runtime": "0.0.1",
+    "@ai-native-flow/event-bus": "0.0.1",
+    "@ai-native-flow/variable-store": "0.0.1"
+  }
+}

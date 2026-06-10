@@ -1,0 +1,18 @@
+{
+  "name": "@ai-native-flow/sandbox",
+  "version": "0.0.1",
+  "description": "SandboxAdapter abstraction and the trusted in-process adapter used by built-in nodes and first-party plugins.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-native-flow/flow-ir": "0.0.1"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@ai-native-flow/flow-ir",
+  "version": "0.0.1",
+  "description": "Flow Graph IR: types, Zod schemas, and stable ID utilities.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

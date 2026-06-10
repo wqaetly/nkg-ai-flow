@@ -1,0 +1,40 @@
+node_modules/
+dist/
+build/
+.cache/
+.bun/
+*.log
+*.tsbuildinfo
+.DS_Store
+artifacts/
+logs/
+.vscode/
+.idea/
+
+# Local environment overrides (may contain Secrets).
+.env
+.env.*.local
+*.local.env.json
+
+# TypeScript build artefacts: this monorepo runs .ts directly via Bun;
+# `tsc` is only used for type checking (`tsc --noEmit`). The patterns
+# below are belt-and-braces protection in case someone accidentally
+# runs a tsc invocation that emits — they keep the build artefacts out
+# of git even if the artefacts themselves leak onto disk.
+packages/**/src/**/*.js
+packages/**/src/**/*.js.map
+packages/**/src/**/*.d.ts
+!packages/studio/src/assets.d.ts
+packages/**/src/**/*.d.ts.map
+packages/**/test/**/*.js
+packages/**/test/**/*.js.map
+packages/**/test/**/*.d.ts
+packages/**/test/**/*.d.ts.map
+examples/**/*.js
+examples/**/*.js.map
+examples/**/*.d.ts
+examples/**/*.d.ts.map
+apps/**/*.js
+apps/**/*.js.map
+apps/**/*.d.ts
+apps/**/*.d.ts.map

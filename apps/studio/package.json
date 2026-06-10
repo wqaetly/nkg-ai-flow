@@ -1,0 +1,36 @@
+{
+  "name": "@ai-native-flow/studio-app",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3000 --strictPort",
+    "dev:frontend": "vite --host 127.0.0.1 --port 3000 --strictPort",
+    "dev:backend": "tsx watch src/sidecar.ts",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1 --port 3000 --strictPort"
+  },
+  "dependencies": {
+    "@ai-native-flow/event-bus": "0.0.1",
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/flow-ir": "0.0.1",
+    "@ai-native-flow/flow-validator": "0.0.1",
+    "@ai-native-flow/node-sdk": "0.0.1",
+    "@ai-native-flow/runtime": "0.0.1",
+    "@ai-native-flow/studio": "0.0.1",
+    "@ai-native-flow/transport-http": "0.0.1",
+    "@ai-native-flow/variable-store": "0.0.1",
+    "@ai-native-flow/workspace-manifest": "0.0.1",
+    "@xyflow/react": "^12.8.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tsx": "^4.20.4",
+    "typescript": "^5.5.4",
+    "vite": "^6.0.7"
+  }
+}

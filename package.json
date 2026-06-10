@@ -1,0 +1,42 @@
+{
+  "name": "ai-native-flow",
+  "private": true,
+  "version": "0.0.0",
+  "description": "AI Native Flow Runtime monorepo (Phase 0: Graph Contract & Builder)",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "packages/transports/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p .",
+    "app:helloagent": "tsx apps/hello-agent/build.ts",
+    "dev:studio": "npm run studio:dev",
+    "dev:sidecar": "npm run studio:dev:backend",
+    "dev:web": "npm run studio:dev:frontend",
+    "studio:dev": "concurrently -k -n backend,frontend -c blue,green \"npm run studio:dev:backend\" \"npm run studio:dev:frontend\"",
+    "studio:dev:frontend": "npm run dev:frontend -w @ai-native-flow/studio-app",
+    "studio:dev:backend": "npm run dev:backend -w @ai-native-flow/studio-app"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.7",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "concurrently": "^9.2.1",
+    "tsx": "^4.20.4",
+    "typescript": "^5.5.4",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "overrides": {
+    "shell-quote": "1.8.4"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

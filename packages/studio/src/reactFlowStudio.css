@@ -1,0 +1,3179 @@
+/* AI Native Flow Studio – React Flow canvas styles.
+ * Inspired by Langflow's GenericNode visuals: light surface, soft borders,
+ * rounded cards, port chips, and color-coded handles.
+ */
+
+:root {
+  color-scheme: light;
+  --anf-bg: #f5f7fb;
+  --anf-canvas-bg: #f8f9fc;
+  --anf-surface: #ffffff;
+  --anf-surface-soft: #f3f5fa;
+  --anf-surface-muted: #eef1f7;
+  --anf-border: #e1e5ee;
+  --anf-border-strong: #c8cfdd;
+  --anf-text: #0f172a;
+  --anf-text-soft: #475569;
+  --anf-text-muted: #94a3b8;
+  --anf-primary: #6d4dff;
+  --anf-primary-soft: rgba(109, 77, 255, 0.12);
+  --anf-accent: #0ea5e9;
+
+  /* Port kind palette (mirrors Langflow input-color buckets). */
+  --anf-kind-control: #6d4dff;
+  --anf-kind-data: #0ea5e9;
+  --anf-kind-stream: #d946ef;
+  --anf-kind-event: #f59e0b;
+  --anf-kind-error: #ef4444;
+  --anf-kind-unknown: #94a3b8;
+
+  --anf-shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.06);
+  --anf-shadow-card-hover: 0 1px 2px rgba(15, 23, 42, 0.05), 0 12px 30px rgba(15, 23, 42, 0.10);
+
+  /* Override xyflow built-in tokens so its internal :focus / .selected
+   * selectors paint with our brand color instead of the default dark gray. */
+  --xy-edge-stroke: #94a3b8;
+  --xy-edge-stroke-selected: var(--anf-primary);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: var(--anf-bg);
+}
+
+.anf-studio-root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 18px;
+  box-sizing: border-box;
+  background: var(--anf-bg);
+  color: var(--anf-text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden;
+}
+
+/* ---------- header ---------- */
+
+.anf-studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--anf-border);
+  border-radius: 14px;
+  background: var(--anf-surface);
+  box-shadow: var(--anf-shadow-card);
+}
+
+.anf-studio-header-text {
+  min-width: 0;
+}
+
+.anf-studio-header h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--anf-text);
+}
+
+.anf-studio-subtitle {
+  margin: 4px 0 0;
+  color: var(--anf-text-soft);
+  font-size: 13px;
+}
+
+.anf-studio-kicker {
+  margin: 0 0 2px;
+  color: var(--anf-primary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.anf-studio-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  background: var(--anf-surface-soft);
+  color: var(--anf-text-soft);
+}
+
+.anf-studio-pill-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.anf-studio-pill.ok {
+  border-color: rgba(34, 197, 94, 0.25);
+  background: rgba(34, 197, 94, 0.10);
+  color: #15803d;
+}
+
+.anf-studio-pill.error {
+  border-color: rgba(239, 68, 68, 0.30);
+  background: rgba(239, 68, 68, 0.10);
+  color: #b91c1c;
+}
+
+/* ---------- canvas frame ---------- */
+
+.anf-studio-canvas {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  border: 1px solid var(--anf-border);
+  border-radius: 14px;
+  background: var(--anf-canvas-bg);
+  overflow: hidden;
+  box-shadow: var(--anf-shadow-card);
+}
+
+.anf-studio-canvas .react-flow {
+  background: var(--anf-canvas-bg);
+}
+
+/* ---------- node card (Langflow-inspired) ---------- */
+
+.anf-node {
+  width: 280px;
+  padding: 0;
+  border: 1px solid var(--anf-border);
+  /* Tighter 3px corner so the card reads as a precise UE-blueprint
+   * tile rather than a soft Material card. The same radius is shared
+   * by every interactive child (inputs, env-picker button, status
+   * chips) for a cohesive boxy look. */
+  border-radius: 3px;
+  background: var(--anf-surface);
+  color: var(--anf-text);
+  box-shadow: var(--anf-shadow-card);
+  font-size: 13px;
+  line-height: 1.4;
+  transition: box-shadow 120ms ease, border-color 120ms ease, transform 120ms ease;
+  /* Provide an explicit positioning context so absolute-positioned
+   * children (the right-top status badge, the ms-level runtime timer)
+   * resolve against the card itself rather than React Flow's outer
+   * `.react-flow__node` wrapper. */
+  position: relative;
+}
+
+.anf-node:hover {
+  box-shadow: var(--anf-shadow-card-hover);
+  border-color: var(--anf-border-strong);
+}
+
+/* Selected wins over hover: pair the class with :hover so its specificity
+ * matches `.anf-node:hover` (0,0,2,0) and the later source order ensures
+ * the brand color always paints, even while the cursor is still on the node. */
+.anf-node--selected,
+.anf-node--selected:hover {
+  border-color: var(--anf-primary);
+  box-shadow: 0 0 0 3px var(--anf-primary-soft), var(--anf-shadow-card-hover);
+}
+
+.anf-node--running,
+.anf-node--streaming {
+  border-color: var(--anf-accent);
+}
+
+.anf-node--succeeded {
+  border-color: #22c55e;
+}
+
+.anf-node--failed {
+  border-color: var(--anf-kind-error);
+}
+
+/* head
+ *
+ * Compact single-row layout: icon, label and type@version all sit on
+ * one line. We keep `padding-right: 56px` so the absolutely-positioned
+ * `.anf-node-corner` (status dot + ms timer) on the top-right never
+ * collides with the type label — the longest realistic timer string
+ * (~"99999ms" ≈ 44px) plus a small breathing margin fits inside that
+ * reserved gutter. */
+
+.anf-node-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 14px;
+  padding-right: 56px;
+  border-bottom: 1px solid var(--anf-border);
+}
+
+.anf-node-icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 11px;
+  color: #ffffff;
+  background: linear-gradient(135deg, #6d4dff, #8b5cf6);
+}
+
+.anf-node-icon--start {
+  background: linear-gradient(135deg, #10b981, #34d399);
+}
+
+.anf-node-icon--end {
+  background: linear-gradient(135deg, #475569, #94a3b8);
+}
+
+.anf-node-icon--model {
+  background: linear-gradient(135deg, #6d4dff, #d946ef);
+}
+
+.anf-node-icon--transform {
+  background: linear-gradient(135deg, #0ea5e9, #38bdf8);
+}
+
+.anf-node-icon--tool {
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+}
+
+.anf-node-icon--io {
+  background: linear-gradient(135deg, #6366f1, #818cf8);
+}
+
+/* The label takes whatever space is left after the type@version pill
+ * has measured itself; both ellide if the card gets very narrow. */
+.anf-node-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--anf-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Right-top corner stack on every node card. Hosts the status dot
+ * and the ms-level runtime timer in a single column so the timer can
+ * grow horizontally (e.g. "12345ms") without ever overlapping the dot.
+ * Absolutely positioned so the title row's flex layout stays free of
+ * size-dependent siblings. */
+.anf-node-corner {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.anf-node-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--anf-text-muted);
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.15);
+}
+
+/* Tiny ms-level execution timer, now stacked directly under the
+ * status dot inside `.anf-node-corner`. Kept as a static (not
+ * absolutely-positioned) element so the corner container can grow
+ * downward as the digit count changes — no more right-edge
+ * overlap with the dot. */
+.anf-node-runtime-timer {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 10px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--anf-text-muted);
+  user-select: none;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.anf-node-runtime-timer--running,
+.anf-node-runtime-timer--streaming {
+  color: #38bdf8;
+}
+
+.anf-node-runtime-timer--succeeded {
+  color: #22c55e;
+}
+
+.anf-node-runtime-timer--failed {
+  color: #ef4444;
+}
+
+.anf-node-status--running {
+  background: var(--anf-accent);
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.20);
+  animation: anf-pulse 1.4s ease-in-out infinite;
+}
+
+.anf-node-status--streaming {
+  background: #a855f7;
+  box-shadow: 0 0 0 3px rgba(168, 85, 247, 0.20);
+  animation: anf-pulse 1.4s ease-in-out infinite;
+}
+
+.anf-node-status--succeeded {
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.20);
+}
+
+.anf-node-status--failed {
+  background: var(--anf-kind-error);
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.20);
+}
+
+@keyframes anf-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+/* ---------- ports area (UE blueprint style) ---------- */
+
+.anf-node-ports {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--anf-border);
+}
+
+.anf-node-ports:last-child {
+  border-bottom: none;
+}
+
+.anf-port-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 12px;
+  min-height: 22px;
+}
+
+.anf-port-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.anf-port-cell--input {
+  justify-content: flex-start;
+}
+
+.anf-port-cell--output {
+  justify-content: flex-end;
+}
+
+.anf-port {
+  /* `.anf-port` stretches to fill its grid cell so its left/right
+   * border edges coincide with the node's outer edges. The inline
+   * `<Handle>` then anchors at `left: 0` / `right: 0` flush with the
+   * card border, half-on / half-off in classic UE blueprint style.
+   * No horizontal padding here — padding would push the absolute
+   * handle inward; we use a margin on the label instead. */
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 0;
+  cursor: default;
+}
+
+/* Pull the label away from the pin without shifting the pin itself.
+ * `margin-{left|right}: auto` also handles the side-alignment because
+ * `<Handle>` is `position: absolute` and therefore not a flex item. */
+.anf-port--input > .anf-port-label {
+  margin-left: 14px;
+  margin-right: auto;
+}
+
+.anf-port--output > .anf-port-label {
+  margin-left: auto;
+  margin-right: 14px;
+}
+
+.anf-port--output {
+  flex-direction: row-reverse;
+}
+
+.anf-port-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--anf-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 110px;
+}
+
+.anf-port-required {
+  margin-left: 2px;
+  color: var(--anf-kind-error);
+  font-weight: 700;
+}
+
+.anf-node-empty {
+  padding: 12px 14px 14px;
+  color: var(--anf-text-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* ---------- inline parameter previews ---------- */
+
+.anf-node-params {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 14px 10px;
+  background: var(--anf-surface-soft);
+}
+
+.anf-param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 11.5px;
+  min-width: 0;
+}
+
+.anf-param-name {
+  flex: 0 0 auto;
+  color: var(--anf-text-soft);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40%;
+}
+
+.anf-param-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: right;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--anf-text);
+  background: var(--anf-surface);
+  border: 1px solid var(--anf-border);
+  border-radius: 3px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- inline text-input editor (text_input node) ---------- */
+
+.anf-node-text-input {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 14px 12px;
+  background: var(--anf-surface-soft);
+}
+
+.anf-node-text-input-label {
+  font-size: 11px;
+  color: var(--anf-text-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.anf-node-text-input-area {
+  width: 100%;
+  box-sizing: border-box;
+  resize: vertical;
+  min-height: 56px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--anf-text);
+  background: var(--anf-surface);
+  border: 1px solid var(--anf-border);
+  border-radius: 3px;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.anf-node-text-input-area:focus {
+  border-color: var(--anf-accent, #6ea8ff);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.18);
+}
+
+.anf-node-text-input-area:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- node field inspector (Odin-style reflective fields) ---------- */
+
+.anf-node-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* No horizontal padding here — every `.anf-field-row` provides its
+   * own inner padding. This keeps each row flush with the node's left
+   * and right edges so the inline `<Handle>` (which xyflow positions
+   * at `left: 0` / `right: 0` of its nearest positioned ancestor) sits
+   * exactly on the card border, UE-blueprint-style. */
+  padding: 8px 0 10px;
+  border-top: 1px solid var(--anf-border);
+  border-bottom: 1px solid var(--anf-border);
+  background: var(--anf-surface-soft);
+}
+
+.anf-node-fields-error {
+  padding: 8px 12px;
+  color: var(--anf-kind-error, #ff6b6b);
+  font-size: 11.5px;
+  font-style: italic;
+}
+
+.anf-field-row {
+  display: grid;
+  /* Layout columns: [left gutter][label][input cell].
+   *   - The left gutter (12px) keeps the label off the card border so
+   *     the inline `<Handle>` (anchored at `left: 0` of the row) has
+   *     room to half-overflow. The 12px is just slightly larger than
+   *     the handle's visible radius (10px) so the pin's right edge
+   *     ends ~2px before the label begins — visually tight, no longer
+   *     a wide "24px void" between the pin and the label text.
+   *   - The input cell (1fr) extends to the row's right edge but with
+   *     a small `padding-right` (6px) inside the cell, so the env
+   *     chevron has a ~6px breathing gap from the card border instead
+   *     of welding into it.
+   *   - `gap: 0` because the inter-column rhythm is now driven by
+   *     each cell's own internal padding, giving us tighter control
+   *     over the handle→label distance specifically. */
+  grid-template-columns: 12px minmax(80px, 36%) 1fr;
+  align-items: center;
+  gap: 0;
+  min-width: 0;
+  position: relative;
+}
+
+/* The 1st column is a pure gutter occupied only by the inline
+ * `<Handle>`. We force the label/cell into columns 2/3 so author
+ * order (handle → label → cell) maps deterministically regardless
+ * of how the grid auto-placement algorithm treats abs items. */
+.anf-field-row > .anf-field-label {
+  grid-column: 2;
+  /* Tiny left padding compensates for `gap: 0` and gives the label a
+   * couple of pixels of breathing room from the handle. */
+  padding-left: 2px;
+}
+
+.anf-field-row > .anf-field-cell {
+  grid-column: 3;
+  /* Restore a small right gutter inside the cell so the env-picker
+   * chevron (rightmost element in the cell) doesn't kiss the card
+   * border. 6px matches the user-requested breathing room. */
+  padding-right: 6px;
+  /* Spacing from the label column. Replaces the old grid `gap: 8px`
+   * which used to apply on both sides of the cell; we only want it
+   * on the left here so the right edge stays under our control. */
+  padding-left: 8px;
+}
+
+/* Pin the inline `<Handle>` to the gutter column. Even though it is
+ * `position: absolute` (and therefore doesn't participate in flex /
+ * grid sizing), browsers still assign abs grid items an *implicit*
+ * grid area and use it as the inset-modified containing block for
+ * `top/right/bottom/left`. Without this rule, `<Handle>` lands in the
+ * first auto-placement slot — which can be column 2 (the label) once
+ * `<span class="anf-field-label">` has been forced to column 2 — and
+ * its `left: 0` then anchors to the *label*'s left edge instead of
+ * the row's left edge. Forcing column 1 makes the containing block
+ * the 14px gutter, whose left edge is exactly the row's border edge
+ * (== card padding-edge), so `left: 0` snaps to the card border. */
+.anf-field-row > .react-flow__handle {
+  grid-column: 1;
+  /* Belt-and-braces: also pin via inset so containing-block
+   * differences across engines don't bite us. The negative inline
+   * offset matches the global `.anf-handle.react-flow__handle-left`
+   * rule below, kept here as well for selectors that would otherwise
+   * lose the cascade fight to xyflow's own per-side defaults. */
+  align-self: center;
+}
+
+.anf-field-label {
+  font-size: 11px;
+  color: var(--anf-text-soft);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.anf-field-required {
+  margin-left: 2px;
+  color: var(--anf-kind-error, #ff6b6b);
+  font-weight: 700;
+}
+
+.anf-field-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.anf-field-control {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--anf-text);
+  background: var(--anf-surface);
+  border: 1px solid var(--anf-border);
+  border-radius: 3px;
+  padding: 4px 8px;
+  outline: none;
+}
+
+.anf-field-control:focus,
+.anf-field-control:focus-within {
+  border-color: var(--anf-accent, #6ea8ff);
+  box-shadow: 0 0 0 2px rgba(110, 168, 255, 0.18);
+}
+
+.anf-field-control:disabled,
+.anf-field-control[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.anf-field--invalid {
+  border-color: var(--anf-kind-error, #ff6b6b) !important;
+  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.2) !important;
+}
+
+.anf-field-control--textarea {
+  resize: none;
+  overflow: hidden;
+  min-height: 56px;
+  line-height: 1.4;
+  padding: 0;
+}
+
+.anf-field-control--number {
+  appearance: textfield;
+  -moz-appearance: textfield;
+  font-family: inherit;
+}
+
+.anf-field-control--number::-webkit-outer-spin-button,
+.anf-field-control--number::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.anf-field-control--enum {
+  appearance: auto;
+}
+
+.anf-field-control--boolean {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  cursor: pointer;
+  width: auto;
+}
+
+.anf-field-control--boolean:focus,
+.anf-field-control--boolean:focus-within {
+  border: none;
+  box-shadow: none;
+}
+
+.anf-field-control--boolean input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  flex: 0 0 auto;
+  width: 13px;
+  height: 13px;
+  margin: 0;
+  border: 1px solid var(--anf-border-strong);
+  border-radius: 3px;
+  background: var(--anf-surface-muted);
+  cursor: pointer;
+}
+
+.anf-field-control--boolean input[type="checkbox"]:hover:not(:disabled) {
+  border-color: var(--anf-accent);
+  background: var(--anf-surface-soft);
+}
+
+.anf-field-control--boolean input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(78, 161, 255, 0.24);
+}
+
+.anf-field-control--boolean input[type="checkbox"]:checked {
+  border-color: var(--anf-accent);
+  background: var(--anf-accent);
+}
+
+.anf-field-control--boolean input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 4px;
+  height: 7px;
+  border: solid #ffffff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.anf-field-control--boolean input[type="checkbox"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.anf-field-boolean-label {
+  font-size: 11.5px;
+  color: var(--anf-text);
+}
+
+.anf-field-boolean-state {
+  font-size: 11px;
+  color: var(--anf-text-soft);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ---------- field control wrapper + env-var picker trigger ---------- *
+ *
+ * Every field row uses a flexbox wrapper so the renderer's primary
+ * control sits flush with a small chevron button on the right edge.
+ * Clicking the chevron pops the EnvVarPicker at the cursor (see
+ * `.anf-env-picker` below). The wrapper itself stays unstyled so the
+ * existing `.anf-field-control` chrome keeps its rounded border.
+ */
+.anf-field-control-wrap {
+  display: flex;
+  align-items: stretch;
+  /* No gap between the control and the env-picker chevron — their
+   * borders intentionally touch so the trio (input → chevron → node
+   * right edge) reads as a single fused widget. The chevron is the
+   * rightmost element in the row and its right border merges visually
+   * with the card's right border, eliminating the empty strip the
+   * user reported. */
+  gap: 0;
+  width: 100%;
+  min-width: 0;
+}
+
+/* When the input control sits next to the chevron we shave the input's
+ * right radius/border so the two pieces feel welded together. */
+.anf-field-control-wrap > .anf-field-control + .anf-field-env-button,
+.anf-field-control-wrap > .anf-field-ref-chip + .anf-field-env-button {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  border-left: 0;
+}
+
+.anf-field-control-wrap > .anf-field-control:not(:last-child),
+.anf-field-control-wrap > .anf-field-ref-chip:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.anf-field-control-wrap > .anf-field-control,
+.anf-field-control-wrap > .anf-field-ref-chip {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.anf-field-control-wrap > .anf-field-control--textarea {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.anf-field-control-wrap--textarea {
+  align-items: flex-start;
+}
+
+.anf-field-control-wrap--textarea > .anf-field-env-button {
+  min-height: 68px;
+}
+
+.anf-field-control--textarea-shell {
+  position: relative;
+  display: block;
+  min-height: 68px;
+}
+
+.anf-field-textarea-preview {
+  display: block;
+  width: 100%;
+  min-height: 68px;
+  height: 68px;
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  padding: 7px 28px 7px 8px;
+}
+
+.anf-field-textarea-preview:disabled {
+  cursor: not-allowed;
+}
+
+.anf-textarea-expand-button,
+.anf-textarea-icon-button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--anf-text-soft);
+  cursor: pointer;
+}
+
+.anf-textarea-expand-button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+}
+
+.anf-textarea-expand-button:hover,
+.anf-textarea-icon-button:hover {
+  background: transparent;
+  color: var(--anf-text);
+}
+
+.anf-textarea-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483646;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.58);
+}
+
+.anf-textarea-modal {
+  --anf-textarea-modal-bg: #1e1e1e;
+  --anf-textarea-modal-bg-head: #252526;
+  --anf-textarea-modal-bg-editor: #1b1b1b;
+  --anf-textarea-modal-border: #3a3a3a;
+  --anf-textarea-modal-fg: #cccccc;
+  --anf-textarea-modal-fg-strong: #ffffff;
+  --anf-textarea-modal-fg-muted: #8a8a8a;
+  --anf-textarea-modal-accent: #4ea1ff;
+
+  width: min(1120px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--anf-textarea-modal-border);
+  border-radius: 6px;
+  background: var(--anf-textarea-modal-bg);
+  color: var(--anf-textarea-modal-fg);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+}
+
+.anf-textarea-modal-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 38px;
+  padding: 7px 8px 7px 12px;
+  border-bottom: 1px solid var(--anf-textarea-modal-border);
+  background: var(--anf-textarea-modal-bg-head);
+  box-sizing: border-box;
+}
+
+.anf-textarea-modal-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--anf-textarea-modal-fg-strong);
+}
+
+.anf-textarea-modal-editor {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  overflow: auto;
+  border: 0;
+  outline: 0;
+  padding: 14px;
+  background: var(--anf-textarea-modal-bg-editor);
+  color: var(--anf-textarea-modal-fg);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 121, 121, 0.40) transparent;
+}
+
+.anf-textarea-modal-editor::placeholder {
+  color: var(--anf-textarea-modal-fg-muted);
+}
+
+.anf-textarea-modal-editor:focus {
+  box-shadow: inset 0 0 0 1px rgba(78, 161, 255, 0.45);
+}
+
+.anf-textarea-modal-editor:disabled {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.anf-textarea-modal .anf-textarea-icon-button {
+  color: var(--anf-textarea-modal-fg-muted);
+}
+
+.anf-textarea-modal .anf-textarea-icon-button:hover {
+  color: var(--anf-textarea-modal-fg-strong);
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-track {
+  background: transparent;
+  border: none;
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-thumb {
+  background-color: rgba(121, 121, 121, 0.40);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  min-height: 24px;
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(160, 160, 160, 0.55);
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-thumb:active {
+  background-color: rgba(191, 191, 191, 0.70);
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.anf-textarea-modal-editor::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.anf-field-env-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* Slightly wider so the bigger chevron glyph reads cleanly without
+   * crowding the button frame. The button welds into the card's
+   * right border thanks to `.anf-field-control-wrap` removing the
+   * gap between control and chevron. */
+  width: 26px;
+  padding: 0;
+  border: 1px solid var(--anf-border);
+  border-radius: 3px;
+  background: var(--anf-surface-soft);
+  color: var(--anf-text-soft);
+  cursor: pointer;
+  /* The chevron span overrides this with its own larger font-size so
+   * the glyph reads clearly inside the compact 26×control-height
+   * button. */
+  font-size: 13px;
+  line-height: 1;
+  transition: background 100ms, color 100ms, border-color 100ms;
+}
+
+.anf-field-env-button:hover:not(:disabled) {
+  background: var(--anf-surface);
+  border-color: var(--anf-accent, #6ea8ff);
+  color: var(--anf-text);
+}
+
+.anf-field-env-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.anf-field-env-button-chevron {
+  display: inline-block;
+  pointer-events: none;
+  /* Chevron must read clearly even at low DPR. We push to 24px (was
+   * 20px) and keep the heavy weight so the outline stays crisp
+   * without anti-alias mush. The button's 26px width gives this
+   * glyph the breathing room it needs. */
+  font-size: 24px;
+  line-height: 1;
+  font-weight: 800;
+  /* The glyph has a tiny intrinsic top-bias; nudge up a hair so it
+   * sits visually centred in the button. Tuned for the 24px size. */
+  margin-top: -4px;
+}
+
+/* Inline chip used when a field already references a $var/$secret. */
+.anf-field-ref-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-sizing: border-box;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--anf-kind-data) 18%, transparent);
+  color: var(--anf-kind-data);
+  border: 1px solid color-mix(in srgb, var(--anf-kind-data) 45%, transparent);
+  line-height: 16px;
+}
+
+.anf-field-ref-chip-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.anf-field-ref-chip-clear {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  line-height: 16px;
+  color: color-mix(in srgb, var(--anf-kind-data) 70%, var(--anf-text-soft));
+  cursor: pointer;
+}
+
+.anf-field-ref-chip-clear:hover:not(:disabled) {
+  color: var(--anf-kind-data);
+}
+
+.anf-field-ref-chip-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.anf-field-control--secret {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.anf-field-secret-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--anf-text);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 8px;
+}
+
+.anf-field-secret-toggle {
+  flex: 0 0 auto;
+  border: none;
+  border-left: 1px solid var(--anf-border);
+  background: var(--anf-surface-soft);
+  color: var(--anf-text-soft);
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.anf-field-secret-toggle:hover:not(:disabled) {
+  color: var(--anf-text);
+}
+
+.anf-field-control--json {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.anf-field-json-input,
+.anf-field-json-textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--anf-text);
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 4px 8px;
+  resize: vertical;
+}
+
+.anf-field-json-toggle {
+  flex: 0 0 auto;
+  border: none;
+  border-left: 1px solid var(--anf-border);
+  background: var(--anf-surface-soft);
+  color: var(--anf-text-soft);
+  cursor: pointer;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.anf-field-control--array {
+  font-family: inherit;
+}
+
+/* keep the inspector tight on the workbench canvas variant */
+.anf-workbench-canvas .anf-node-fields {
+  /* Match the canvas variant: zero horizontal padding so the
+   * absolutely-positioned `<Handle>` inside `.anf-field-row` lines up
+   * with the card's border edge. The vertical padding is kept tight
+   * for the more compact workbench scale. */
+  padding: 6px 0 8px;
+  gap: 4px;
+}
+
+.anf-workbench-canvas .anf-field-row {
+  /* Mirror the canvas variant's 3-column structure with the same
+   * tight handle\u2192label distance. The smaller label minimum (70px)
+   * is kept since the workbench overlay renders nodes at a more
+   * compact scale. `gap: 0` because spacing is now driven by per-cell
+   * padding (see the canvas rules above). */
+  grid-template-columns: 12px minmax(70px, 40%) 1fr;
+  gap: 0;
+}
+/* ---------- React Flow handles (triangle pins) ----------
+ *
+ * xyflow positions handles via `transform: translate(-50%, -50%)` on
+ * `.react-flow__handle-left/right`. We must NOT override that transform,
+ * otherwise the pin shifts on hover. Keep the handle as the hit/anchor box
+ * and render the visible triangle through ::before so we can scale ::before
+ * independently without affecting the handle's positioning transform.
+ */
+
+.anf-node .react-flow__handle.anf-handle {
+  /* Hit/anchor box matched to the visible 20×20 pin shape. xyflow
+   * derives an edge's `Position.Left` endpoint from the handle
+   * element's *bbox left* (not its centre), so any extra padding
+   * around the visible circle/triangle would push the line away
+   * from the pin and leave a visible gap. Keeping the box tight
+   * around the rendered shape lets the smoothstep edge terminate
+   * right at the circle's left tangent. */
+  width: 20px;
+  height: 20px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  /* Keep xyflow's translate(-50%, -50%); do not add a transform here. */
+}
+
+/* Push each handle outward by half the card's 1px border so its
+ * geometric center coincides with the *middle* of the border line
+ * (instead of the inner padding edge, which would leave the pin a
+ * pixel shy of "half-out, half-in" against the visible stroke). The
+ * negative offset is small but the difference is what the user
+ * perceives as the pin "riding" the border. */
+.anf-node .react-flow__handle.anf-handle.react-flow__handle-left {
+  left: -1px;
+}
+
+.anf-node .react-flow__handle.anf-handle.react-flow__handle-right {
+  right: -1px;
+}
+
+.anf-node .react-flow__handle.anf-handle::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  /* Visible pin shape fills the entire handle box (now 20×20) so the
+   * rendered circle/triangle and the bbox xyflow uses for edge
+   * endpoints are one and the same: smoothstep edges terminate at
+   * the shape's left/right tangent with no visible gap. */
+  width: 20px;
+  height: 20px;
+  background: var(--anf-handle-color, var(--anf-kind-unknown));
+  /* Right-pointing rounded triangle via SVG mask. The path is both filled
+   * and stroked with stroke-linejoin=round so all three vertices are
+   * softened. */
+  --anf-pin-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2 2 L10 6 L2 10 Z' fill='black' stroke='black' stroke-width='2.4' stroke-linejoin='round' stroke-linecap='round'/></svg>");
+  -webkit-mask: var(--anf-pin-mask) center / contain no-repeat;
+          mask: var(--anf-pin-mask) center / contain no-repeat;
+  transform: translate(-50%, -50%);
+  transition: transform 120ms ease, filter 120ms ease;
+  filter: drop-shadow(0 1px 1px rgba(15, 23, 42, 0.18));
+}
+
+/* Hover only the visible triangle (preserve xyflow's positioning transform). */
+.anf-node .react-flow__handle.anf-handle:hover::before {
+  transform: translate(-50%, -50%) scale(1.25);
+  filter: drop-shadow(0 0 6px var(--anf-handle-color, var(--anf-primary)));
+}
+
+/* Color the triangle by port kind. */
+.anf-node .anf-handle--control { --anf-handle-color: var(--anf-kind-control); }
+.anf-node .anf-handle--data    { --anf-handle-color: var(--anf-kind-data); }
+.anf-node .anf-handle--stream  { --anf-handle-color: var(--anf-kind-stream); }
+.anf-node .anf-handle--event   { --anf-handle-color: var(--anf-kind-event); }
+.anf-node .anf-handle--error   { --anf-handle-color: var(--anf-kind-error); }
+
+/* ---------- UE blueprint-style pin shapes ----------
+ *
+ * The pin's silhouette is driven by the `--anf-pin-mask` SVG (an arrow
+ * for control kinds, a circle for data / event / stream / error). The
+ * `--connected` modifier swaps the SVG for a filled shape that carries
+ * an inner notch, mirroring UE's "wired" pin look:
+ *   - `free`      — outline only (hollow)
+ *   - `connected` — filled with an inner gap (UE-style)
+ * The default `::before` mask declared above is overridden per modifier
+ * so the visual contract stays consistent across the canvas.
+ */
+
+/* Right-pointing arrow used for `control` kind ports (flow / exec). */
+.anf-node .anf-handle--control.anf-handle--free::before {
+  --anf-pin-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3 2.5 L11 7 L3 11.5 Z' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/></svg>");
+  -webkit-mask: var(--anf-pin-mask) center / contain no-repeat;
+          mask: var(--anf-pin-mask) center / contain no-repeat;
+}
+.anf-node .anf-handle--control.anf-handle--connected::before {
+  /* Hollow outer triangle wrapping a smaller filled triangle, with a
+   * visible gap between them — mirrors UE's wired exec pin where the
+   * outline stays visible and a solid inner shape signals the
+   * connection. The two paths share the SVG so both contribute to the
+   * mask alpha; we deliberately keep stroke-only on the outer triangle
+   * (no fill) so a transparent ring shows through between the shapes.
+   */
+  --anf-pin-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><path d='M3 2 L11 7 L3 12 Z' fill='none' stroke='black' stroke-width='1.6' stroke-linejoin='round' stroke-linecap='round'/><path d='M4.6 5 L7.6 7 L4.6 9 Z' fill='black' stroke='black' stroke-width='0.6' stroke-linejoin='round' stroke-linecap='round'/></svg>");
+  -webkit-mask: var(--anf-pin-mask) center / contain no-repeat;
+          mask: var(--anf-pin-mask) center / contain no-repeat;
+}
+
+/* Circle pin used for data / event / stream / error kinds. */
+.anf-node .anf-handle--data.anf-handle--free::before,
+.anf-node .anf-handle--event.anf-handle--free::before,
+.anf-node .anf-handle--stream.anf-handle--free::before,
+.anf-node .anf-handle--error.anf-handle--free::before {
+  --anf-pin-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><circle cx='7' cy='7' r='4.4' fill='none' stroke='black' stroke-width='1.7'/></svg>");
+  -webkit-mask: var(--anf-pin-mask) center / contain no-repeat;
+          mask: var(--anf-pin-mask) center / contain no-repeat;
+}
+.anf-node .anf-handle--data.anf-handle--connected::before,
+.anf-node .anf-handle--event.anf-handle--connected::before,
+.anf-node .anf-handle--stream.anf-handle--connected::before,
+.anf-node .anf-handle--error.anf-handle--connected::before {
+  /* Hollow outer ring with an inner filled disc and a transparent gap
+   * between them — the circular twin of the wired control triangle.
+   * Two shapes share the same SVG mask: the outer circle is stroke
+   * only so the gap to the inner disc reads as a clean ring of node
+   * background.
+   */
+  --anf-pin-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'><circle cx='7' cy='7' r='4.4' fill='none' stroke='black' stroke-width='1.7'/><circle cx='7' cy='7' r='2' fill='black'/></svg>");
+  -webkit-mask: var(--anf-pin-mask) center / contain no-repeat;
+          mask: var(--anf-pin-mask) center / contain no-repeat;
+}
+
+/* ---------- flow (control) port row pinned to the top of the node ----- */
+
+.anf-node-flow-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--anf-border);
+  background: var(--anf-surface-soft);
+}
+
+.anf-flow-cell {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 22px;
+  min-width: 0;
+}
+
+.anf-flow-cell--input {
+  align-items: flex-start;
+}
+
+.anf-flow-cell--output {
+  align-items: flex-end;
+}
+
+/* The flow pin is bigger and styled like UE's exec pin. */
+.anf-port--flow .anf-port-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--anf-text-soft);
+  font-weight: 700;
+}
+
+/* ---------- inline handle on field rows (data + same-named field) ---- */
+
+/* ---------- inline handle on field rows (data + same-named field) ---- */
+
+/* Pin every Studio handle so its geometric centre lands on the *middle*
+ * of the node's border, mirroring the UE-blueprint look: half outside,
+ * half inside the card.
+ *
+ * xyflow's defaults give us:
+ *   .react-flow__handle-left  { left: 0;  transform: translate(-50%, -50%); }
+ *   .react-flow__handle-right { right: 0; transform: translate( 50%, -50%); }
+ * That places the handle centre on the containing block's padding-edge,
+ * which equals the node's content-edge (since `.anf-node-fields`,
+ * `.anf-node-flow-row`, `.anf-node-ports` and `.anf-node` all use zero
+ * horizontal padding) \u2014 i.e. the *inside* of the 1px border. To get a
+ * true half-overflow look we shift the handle outward by 1px so its
+ * centre coincides with the border's mid-line.
+ *
+ * The rule applies to *every* `.anf-handle` (input field, RUN/NEXT,
+ * Result/Error) so the four port styles share the exact same overhang
+ * and read as a single visual language. The `!important` is
+ * unfortunate but xyflow's own per-side selectors carry the same
+ * specificity, and we want this offset to win deterministically. */
+.anf-node .react-flow__handle.anf-handle.react-flow__handle-left {
+  left: -1px !important;
+}
+.anf-node .react-flow__handle.anf-handle.react-flow__handle-right {
+  right: -1px !important;
+}
+
+.anf-field-row--has-port {
+  position: relative;
+  /* The inline handle is anchored to `left: 0` of this row, which —
+   * thanks to the parent `.anf-node-fields` no longer adding any
+   * horizontal padding — coincides with the node's left border.
+   * No extra indent needed; the label/control column already starts
+   * after the row's own `padding-left`. */
+}
+
+.anf-field-row--wired .anf-field-label {
+  color: var(--anf-text);
+}
+
+.anf-field-wired-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--anf-kind-data) 18%, transparent);
+  color: var(--anf-kind-data);
+  border: 1px solid color-mix(in srgb, var(--anf-kind-data) 45%, transparent);
+}
+
+.anf-field-wired-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--anf-kind-data);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--anf-kind-data) 60%, transparent);
+}
+
+/* ---------- React Flow chrome ---------- */
+
+/* Edge stroke: keep specificity at least as high as xyflow's
+ * `.react-flow__edge.selectable:focus .react-flow__edge-path` (0,0,4,0)
+ * by chaining `.react-flow` ancestor, so selected/hover paint with our
+ * brand color regardless of focus state. */
+
+.react-flow .react-flow__edge .react-flow__edge-path {
+  stroke: #94a3b8;
+  stroke-width: 1.6;
+}
+
+.react-flow .react-flow__edge .anf-edge-hit {
+  stroke: transparent !important;
+  stroke-width: 18 !important;
+  filter: none !important;
+  opacity: 1;
+  pointer-events: stroke;
+}
+
+.react-flow .react-flow__edge .anf-edge-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 2px rgba(148, 163, 184, 0.22));
+}
+
+.react-flow .react-flow__edge .anf-edge--control .anf-edge-path {
+  stroke: var(--anf-kind-control);
+}
+
+.react-flow .react-flow__edge .anf-edge--data .anf-edge-path {
+  stroke: var(--anf-kind-data);
+}
+
+.react-flow .react-flow__edge .anf-edge--stream .anf-edge-path {
+  stroke: var(--anf-kind-stream);
+}
+
+.react-flow .react-flow__edge .anf-edge--event .anf-edge-path {
+  stroke: var(--anf-kind-event);
+}
+
+.react-flow .react-flow__edge .anf-edge--error .anf-edge-path {
+  stroke: var(--anf-kind-error);
+}
+
+.react-flow .react-flow__edge .anf-edge--active .anf-edge-path {
+  stroke-width: 2.8;
+  filter: drop-shadow(0 0 7px color-mix(in srgb, currentColor 60%, transparent));
+}
+
+.react-flow .react-flow__edge .anf-edge--dimmed .anf-edge-path {
+  opacity: 0.24;
+}
+
+.react-flow .react-flow__edge:hover .react-flow__edge-path {
+  stroke: var(--anf-primary);
+  stroke-width: 2;
+}
+
+.react-flow .react-flow__edge.selected .react-flow__edge-path,
+.react-flow .react-flow__edge.selectable:focus .react-flow__edge-path,
+.react-flow .react-flow__edge.selectable:focus-visible .react-flow__edge-path,
+.react-flow .react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--anf-primary);
+  stroke-width: 2.2;
+}
+
+.react-flow__connection-path {
+  stroke: var(--anf-primary);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.react-flow__controls {
+  border: 1px solid var(--anf-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--anf-surface);
+  box-shadow: var(--anf-shadow-card);
+}
+
+.react-flow__controls-button {
+  background: var(--anf-surface);
+  border-bottom: 1px solid var(--anf-border);
+  color: var(--anf-text-soft);
+}
+
+.react-flow__controls-button:hover {
+  background: var(--anf-surface-soft);
+  color: var(--anf-text);
+}
+
+.react-flow__minimap {
+  border: 1px solid var(--anf-border);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--anf-shadow-card);
+}
+
+.react-flow__attribution {
+  display: none;
+}
+
+/* ---------- validation overlay ---------- */
+
+.anf-validation-overlay {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 5;
+  max-width: 320px;
+  padding: 10px 12px;
+  border: 1px solid rgba(239, 68, 68, 0.30);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--anf-shadow-card);
+  font-size: 12px;
+  color: var(--anf-text);
+  pointer-events: none;
+}
+
+.anf-validation-overlay-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #b91c1c;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.anf-validation-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--anf-kind-error);
+}
+
+.anf-validation-overlay ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.anf-validation-overlay li {
+  display: grid;
+  gap: 1px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.anf-validation-overlay li strong {
+  font-size: 11px;
+  color: #b91c1c;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.anf-validation-overlay li span {
+  color: var(--anf-text-soft);
+  font-size: 12px;
+}
+
+.anf-validation-more {
+  background: transparent !important;
+  color: var(--anf-text-muted) !important;
+  font-style: italic;
+}
+
+/* ---------- responsive ---------- */
+
+@media (max-width: 720px) {
+  .anf-studio-root {
+    padding: 12px;
+  }
+  .anf-studio-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .anf-node {
+    width: 240px;
+  }
+}
+
+/* =====================================================================
+ * Studio Workbench – VSCode-like IDE shell
+ *
+ * Dark theme that wraps the React Flow canvas with an Explorer (left),
+ * tab bar (top), canvas (center) and Console (bottom). Both the explorer
+ * and the console can collapse independently to maximise the canvas.
+ * ===================================================================== */
+
+.anf-workbench {
+  --vsc-bg: #1e1e1e;
+  --vsc-bg-elev: #252526;
+  --vsc-bg-deep: #1b1b1b;
+  --vsc-bg-side: #252526;
+  --vsc-bg-titlebar: #3c3c3c;
+  --vsc-bg-tabs: #2d2d2d;
+  --vsc-bg-tab-active: #1e1e1e;
+  --vsc-bg-status: #007acc;
+  --vsc-bg-hover: rgba(255, 255, 255, 0.07);
+  --vsc-bg-active: rgba(255, 255, 255, 0.12);
+  --vsc-fg: #cccccc;
+  --vsc-fg-soft: #a0a0a0;
+  --vsc-fg-muted: #6a6a6a;
+  --vsc-fg-strong: #ffffff;
+  --vsc-border: #3a3a3a;
+  --vsc-border-soft: #2a2a2a;
+  --vsc-accent: #4ea1ff;
+  --vsc-accent-soft: rgba(78, 161, 255, 0.18);
+  --vsc-warn: #d7ba7d;
+  --vsc-error: #f48771;
+  --vsc-info: #75beff;
+  --vsc-debug: #b388ff;
+
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background: var(--vsc-bg);
+  color: var(--vsc-fg);
+  font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+/* Title bar */
+.anf-workbench-titlebar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 36px;
+  flex: 0 0 36px;
+  padding: 0 12px;
+  background: var(--vsc-bg-titlebar);
+  border-bottom: 1px solid var(--vsc-border-soft);
+  user-select: none;
+  -webkit-app-region: no-drag;
+  position: relative;
+  z-index: 100;
+}
+
+.anf-workbench-logo {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  object-fit: contain;
+  display: inline-block;
+  user-select: none;
+  pointer-events: none;
+}
+
+.anf-workbench-title {
+  font-size: 12px;
+  color: var(--vsc-fg-soft);
+  letter-spacing: 0.02em;
+}
+.anf-workbench-spacer {
+  flex: 1 1 auto;
+  align-self: stretch;
+}
+
+.anf-workbench-toggle {
+  -webkit-app-region: no-drag;
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--vsc-fg-soft);
+  width: 28px;
+  height: 26px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.anf-workbench-toggle:hover {
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-strong);
+}
+.anf-workbench-toggle.is-active {
+  color: var(--vsc-accent);
+  background: var(--vsc-accent-soft);
+}
+
+/* Body lays out: [explorer] | [splitter] | [main] */
+.anf-workbench-body {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+/* Explorer */
+.anf-explorer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--vsc-bg-side);
+  border-right: 1px solid var(--vsc-border-soft);
+  min-width: 180px;
+  max-width: 520px;
+  overflow: hidden;
+}
+
+/* The FLOWS section header doubles as the explorer toolbar:
+ *   [ FLOWS ──────────────  ↑ Import ]
+ * It replaces the previous standalone EXPLORER header so the panel stays
+ * compact and the action button is visually attached to the file tree it
+ * controls — same idea as VSCode's per-section action toolbar. */
+.anf-explorer-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Match the Console header height (30px) so the workbench has a single,
+   * consistent toolbar rhythm across the left panel, the editor tabs and
+   * the bottom console. */
+  padding: 0 10px 0 12px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-bottom: 1px solid var(--vsc-border-soft);
+}
+.anf-explorer-spacer { flex: 1 1 auto; }
+.anf-explorer-action {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--vsc-border);
+  color: var(--vsc-fg-soft);
+  padding: 2px 8px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 120ms, color 120ms, border-color 120ms;
+}
+.anf-explorer-action:hover {
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-strong);
+  border-color: var(--vsc-accent);
+}
+.anf-explorer-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--vsc-fg-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.anf-explorer-tree {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding-bottom: 12px;
+}
+
+.anf-tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.anf-tree-row {
+  width: 100%;
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--vsc-fg);
+  text-align: left;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding-right: 8px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.anf-tree-row:hover {
+  background: var(--vsc-bg-hover);
+}
+.anf-tree-row.is-active {
+  background: var(--vsc-accent-soft);
+  color: var(--vsc-fg-strong);
+}
+.anf-tree-row--folder {
+  color: var(--vsc-fg-soft);
+}
+.anf-tree-row--leaf svg {
+  color: var(--vsc-fg-muted);
+}
+.anf-tree-row--leaf.is-active svg {
+  color: var(--vsc-accent);
+}
+.anf-tree-name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Splitters */
+.anf-splitter {
+  background: transparent;
+  flex: 0 0 auto;
+  position: relative;
+  z-index: 1;
+}
+.anf-splitter--vertical {
+  width: 4px;
+  cursor: col-resize;
+  margin: 0 -2px;
+}
+.anf-splitter--horizontal {
+  height: 4px;
+  cursor: row-resize;
+  margin: -2px 0;
+}
+.anf-splitter:hover,
+.anf-splitter:active {
+  background: var(--vsc-accent);
+}
+
+/* Main column: [tabs] / [canvas] / [splitter] / [console] */
+.anf-workbench-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--vsc-bg);
+}
+
+/* Tabs — height locked to the Console header (30px) so the three
+ * toolbars (FLOWS header / editor tabs / Console header) line up to the
+ * same horizontal rhythm. */
+.anf-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  height: 30px;
+  flex: 0 0 30px;
+  background: var(--vsc-bg-tabs);
+  border-bottom: 1px solid var(--vsc-border-soft);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.anf-tabs-empty {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--vsc-fg-muted);
+  font-size: 12px;
+  font-style: italic;
+}
+.anf-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 8px 0 12px;
+  border-right: 1px solid var(--vsc-border-soft);
+  background: var(--vsc-bg-tabs);
+  color: var(--vsc-fg-soft);
+  cursor: pointer;
+  font-size: 12.5px;
+  white-space: nowrap;
+  position: relative;
+  transition: background 120ms, color 120ms;
+}
+.anf-tab:hover {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--vsc-fg);
+}
+.anf-tab.is-active {
+  background: var(--vsc-bg-tab-active);
+  color: var(--vsc-fg-strong);
+}
+.anf-tab.is-active::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--vsc-accent);
+}
+.anf-tab-icon { color: var(--vsc-fg-muted); display: inline-flex; }
+.anf-tab.is-active .anf-tab-icon { color: var(--vsc-accent); }
+.anf-tab-label { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.anf-tab-close {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--vsc-fg-muted);
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.anf-tab-close:hover {
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-strong);
+}
+
+/* Canvas wrapper inside workbench: strip the standalone padding/header. */
+.anf-workbench-canvas {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  background: var(--vsc-bg);
+}
+.anf-workbench-canvas .anf-studio-root {
+  padding: 0;
+  background: var(--vsc-bg);
+  color: var(--vsc-fg);
+  height: 100%;
+}
+.anf-workbench-canvas .anf-studio-header {
+  display: none; /* The tab bar already names the active flow. */
+}
+.anf-workbench-canvas .anf-studio-canvas {
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: var(--vsc-bg);
+}
+/* Adapt the dotted background to dark mode for better contrast. */
+.anf-workbench-canvas .react-flow__background {
+  background: var(--vsc-bg);
+}
+.anf-workbench-canvas .react-flow__background pattern circle {
+  fill: rgba(255, 255, 255, 0.07);
+}
+.anf-workbench-canvas .react-flow__minimap {
+  background: var(--vsc-bg-elev) !important;
+  border: 1px solid var(--vsc-border) !important;
+}
+.anf-workbench-canvas .react-flow__controls {
+  background: var(--vsc-bg-elev);
+  border: 1px solid var(--vsc-border);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  overflow: hidden;
+  border-radius: 6px;
+}
+.anf-workbench-canvas .react-flow__controls-button {
+  background: var(--vsc-bg-elev);
+  border-bottom: 1px solid var(--vsc-border-soft);
+  color: var(--vsc-fg);
+  fill: currentColor;
+}
+.anf-workbench-canvas .react-flow__controls-button:hover {
+  background: var(--vsc-bg-hover);
+}
+
+/* Empty canvas placeholder */
+.anf-canvas-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+.anf-canvas-empty-card {
+  max-width: 420px;
+  padding: 28px 30px;
+  text-align: center;
+  background: var(--vsc-bg-elev);
+  border: 1px solid var(--vsc-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.45);
+}
+.anf-canvas-empty-card h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--vsc-fg-strong);
+}
+.anf-canvas-empty-card p {
+  margin: 0 0 18px;
+  color: var(--vsc-fg-soft);
+}
+.anf-canvas-empty-card button {
+  appearance: none;
+  background: var(--vsc-accent);
+  color: white;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.anf-canvas-empty-card button:hover {
+  background: #1e88f0;
+}
+
+/* Console */
+.anf-console {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--vsc-bg-deep);
+  border-top: 1px solid var(--vsc-border-soft);
+  min-height: 80px;
+  max-height: 480px;
+  overflow: hidden;
+}
+.anf-console-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 12px;
+  height: 30px;
+  flex: 0 0 30px;
+  background: var(--vsc-bg-tabs);
+  border-bottom: 1px solid var(--vsc-border-soft);
+}
+.anf-console-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.anf-console-tab {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--vsc-fg-soft);
+  text-transform: uppercase;
+  padding: 6px 0;
+  position: relative;
+}
+.anf-console-tab.is-active {
+  color: var(--vsc-fg-strong);
+}
+.anf-console-tab.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 1px;
+  background: var(--vsc-accent);
+}
+.anf-console-counter {
+  font-size: 10px;
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-soft);
+  padding: 1px 6px;
+  border-radius: 8px;
+}
+.anf-console-action {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--vsc-fg-soft);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+.anf-console-action:hover {
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-strong);
+}
+.anf-console-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 6px 0;
+  font-family: "Cascadia Code", "Fira Code", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.anf-console-empty {
+  padding: 12px 16px;
+  color: var(--vsc-fg-muted);
+  font-style: italic;
+}
+.anf-console-line {
+  display: grid;
+  grid-template-columns: 70px 56px 1fr;
+  gap: 10px;
+  padding: 1px 16px;
+  align-items: baseline;
+}
+.anf-console-line:hover {
+  background: var(--vsc-bg-hover);
+}
+.anf-console-time {
+  color: var(--vsc-fg-muted);
+  font-variant-numeric: tabular-nums;
+}
+.anf-console-level {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+.anf-console-level--log    { color: var(--vsc-fg-soft);   background: rgba(255,255,255,0.05); }
+.anf-console-level--info   { color: var(--vsc-info);      background: rgba(117,190,255,0.10); }
+.anf-console-level--warn   { color: var(--vsc-warn);      background: rgba(215,186,125,0.12); }
+.anf-console-level--error  { color: var(--vsc-error);     background: rgba(244,135,113,0.14); }
+.anf-console-level--debug  { color: var(--vsc-debug);     background: rgba(179,136,255,0.12); }
+.anf-console-message {
+  color: var(--vsc-fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.anf-console-line--warn  .anf-console-message { color: var(--vsc-warn); }
+.anf-console-line--error .anf-console-message { color: var(--vsc-error); }
+.anf-console-line--debug .anf-console-message { color: var(--vsc-debug); }
+
+/* When the canvas is hosted inside the workbench, the React Flow attribution
+ * and minimap need a darker palette to look at home with the IDE chrome. */
+.anf-workbench-canvas .react-flow__edge-path {
+  stroke: #d4d4d4;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .react-flow__edge-path {
+  stroke: #b9b9b9;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge:hover .react-flow__edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge.selected .react-flow__edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge.selectable:focus .react-flow__edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge.selectable:focus-visible .react-flow__edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge.animated .react-flow__edge-path {
+  stroke: var(--vsc-accent);
+}
+
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--control .anf-edge-path {
+  stroke: #a78bfa;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--data .anf-edge-path {
+  stroke: #38bdf8;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--stream .anf-edge-path {
+  stroke: #e879f9;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--event .anf-edge-path {
+  stroke: #fbbf24;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--error .anf-edge-path {
+  stroke: #f87171;
+}
+.anf-workbench-canvas .react-flow .react-flow__edge .anf-edge--active .anf-edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge:hover .anf-edge-path,
+.anf-workbench-canvas .react-flow .react-flow__edge.selected .anf-edge-path {
+  stroke: var(--vsc-accent);
+}
+
+/* =====================================================================
+ * Workbench dark theme — node card overrides
+ *
+ * `.anf-node` consumes Studio CSS variables (`--anf-surface`, `--anf-border`,
+ * `--anf-text`, …). We rebind those tokens inside `.anf-workbench-canvas`
+ * so every existing rule (head, ports, params, status pills) automatically
+ * picks up the dark palette without us having to duplicate them.
+ * ===================================================================== */
+
+.anf-workbench-canvas .anf-studio-root {
+  --anf-bg:            #1e1e1e;
+  --anf-canvas-bg:     #1e1e1e;
+  --anf-surface:       #2a2a2c;
+  --anf-surface-soft:  #232326;
+  --anf-surface-muted: #1f1f21;
+  --anf-border:        #3a3a3a;
+  --anf-border-strong: #4a4a4a;
+  --anf-text:          #e6e6e6;
+  --anf-text-soft:     #b8b8b8;
+  --anf-text-muted:    #8a8a8a;
+  --anf-primary:       #4ea1ff;
+  --anf-primary-soft:  rgba(78, 161, 255, 0.18);
+  --anf-accent:        #4ea1ff;
+  --anf-shadow-card:        0 2px 6px rgba(0, 0, 0, 0.35), 0 12px 28px rgba(0, 0, 0, 0.45);
+  --anf-shadow-card-hover:  0 2px 8px rgba(0, 0, 0, 0.40), 0 18px 38px rgba(0, 0, 0, 0.55);
+
+  --xy-edge-stroke: #888a90;
+  --xy-edge-stroke-selected: var(--vsc-accent);
+}
+
+/* Slightly stronger top divider on the head so the icon block doesn't merge
+ * into the body when surfaces are this close in luminance. */
+.anf-workbench-canvas .anf-node-head {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+.anf-workbench-canvas .anf-node-ports {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+/* The inline parameter strip uses --anf-surface-soft as its background; in
+ * dark mode we want it just a hair darker than the card so it reads as a
+ * recessed footer, plus matching dark border for the value pill. */
+.anf-workbench-canvas .anf-node-params {
+  background: rgba(255, 255, 255, 0.03);
+}
+.anf-workbench-canvas .anf-param-value {
+  background: #1b1b1d;
+  border-color: #3a3a3a;
+  color: #e6e6e6;
+}
+
+/* Required-marker red is fine; just brighten port-required for contrast. */
+.anf-workbench-canvas .anf-port-required {
+  color: #ff6b6b;
+}
+
+/* Empty-state text inside a node ("No declared ports.") */
+.anf-workbench-canvas .anf-node-empty {
+  color: var(--anf-text-muted);
+}
+
+/* Status dot's halo uses solid surface tones — recolor for dark backgrounds. */
+.anf-workbench-canvas .anf-node-status {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.06);
+}
+
+/* Selected node ring: brighten so it pops against #1e1e1e canvas. */
+.anf-workbench-canvas .anf-node--selected,
+.anf-workbench-canvas .anf-node--selected:hover {
+  border-color: var(--vsc-accent);
+  box-shadow: 0 0 0 2px rgba(78, 161, 255, 0.35), var(--anf-shadow-card-hover);
+}
+
+/* Validation overlay — the existing rule uses light surface tokens; rebind. */
+.anf-workbench-canvas .anf-validation-overlay {
+  background: rgba(35, 35, 38, 0.95);
+  border-color: rgba(244, 135, 113, 0.35);
+  color: var(--anf-text);
+}
+.anf-workbench-canvas .anf-validation-overlay-title {
+  color: #f48771;
+}
+
+/* Dotted background: lighter dots on a dark canvas. We override the
+ * `--anf-bg-dot` we now feed to <Background color={…}>. */
+.anf-workbench-canvas {
+  --anf-bg-dot: rgba(255, 255, 255, 0.10);
+}
+
+/* React Flow MiniMap — full dark treatment.
+ * !important is required because xyflow ships inline `style` attributes on
+ * the <svg> root that would otherwise win against our cascade. */
+.anf-workbench-canvas .react-flow__minimap {
+  background: #232326 !important;
+  border: 1px solid #3a3a3a !important;
+  border-radius: 8px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+.anf-workbench-canvas .react-flow__minimap svg {
+  background: #1f1f21;
+}
+/* xyflow paints a translucent overlay outside the visible viewport; tint it
+ * dark so it reads as "outside the workspace" rather than a faint white wash. */
+.anf-workbench-canvas .react-flow__minimap-mask {
+  fill: rgba(15, 15, 17, 0.55);
+}
+.anf-workbench-canvas .react-flow__minimap-node {
+  stroke: transparent;
+}
+
+/* Background pattern container — make sure the dotted layer can show through. */
+.anf-workbench-canvas .react-flow__background path {
+  stroke: rgba(255, 255, 255, 0.08);
+}
+
+/* =====================================================================
+ * Workbench scrollbars — VSCode-flavored slim dark scrollbar.
+ *
+ * Browsers default to the OS-native scrollbar (light gray on Windows),
+ * which clashes with the dark IDE chrome. We theme every scroll surface
+ * inside `.anf-workbench`:
+ *   - WebKit/Blink (Chrome, Edge, Safari) via ::-webkit-scrollbar pseudos.
+ *   - Firefox via the standard `scrollbar-width` / `scrollbar-color`.
+ *
+ * The thumb is intentionally translucent so it floats over whatever
+ * content is behind it and only becomes solid on hover/active — matches
+ * VSCode's overlay-scrollbar feel.
+ * ===================================================================== */
+
+.anf-workbench,
+.anf-workbench *,
+.anf-workbench *::before,
+.anf-workbench *::after {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 121, 121, 0.40) transparent;
+}
+
+.anf-workbench *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+
+.anf-workbench *::-webkit-scrollbar-track {
+  background: transparent;
+  border: none;
+}
+
+.anf-workbench *::-webkit-scrollbar-thumb {
+  background-color: rgba(121, 121, 121, 0.40);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  min-height: 24px;
+}
+
+.anf-workbench *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(160, 160, 160, 0.55);
+}
+
+.anf-workbench *::-webkit-scrollbar-thumb:active {
+  background-color: rgba(191, 191, 191, 0.70);
+}
+
+/* Hide the little arrow buttons at the ends — VSCode doesn't show them. */
+.anf-workbench *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* When two scrollbars meet, paint the corner the same as the track. */
+.anf-workbench *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* =====================================================================
+ * Shared popover / menu chrome.
+ *
+ * Several popups (`.anf-env-popover`, `.anf-add-node-menu`,
+ * `.anf-node-menu`, and the env-var picker which reuses
+ * `.anf-add-node-menu`) live at the workbench top-level OR are
+ * portaled to `document.body` (see envContext.tsx). When portaled,
+ * they escape the `.anf-workbench` ancestor, so they would otherwise
+ * fall back to the browser-default serif font and the OS-native
+ * (light) scrollbar — visibly out of step with the rest of the IDE.
+ *
+ * The rules below pin them to a single font stack + base size, and
+ * re-apply the slim dark scrollbar regardless of mount location, so
+ * every popup feels like part of the same surface.
+ * ===================================================================== */
+.anf-env-popover,
+.anf-add-node-menu,
+.anf-node-menu {
+  font-family: "Segoe WPC", "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-size: 13px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 121, 121, 0.40) transparent;
+}
+.anf-env-popover *,
+.anf-add-node-menu *,
+.anf-node-menu * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(121, 121, 121, 0.40) transparent;
+}
+/* Form controls (`<button>`, `<input>`, `<select>`, `<textarea>`,
+ * `<optgroup>`, `<option>`) do NOT inherit `font-family` / `font-size`
+ * from their parent by default — every browser ships UA-defined
+ * defaults (Arial / Tahoma / "MS Shell Dlg" on Windows, etc.). That's
+ * why some popover buttons (×, delete, scope tabs, the search input)
+ * looked subtly different from the surrounding popover body even
+ * though the popover itself was already set to Segoe UI.
+ *
+ * Force them to inherit so the entire popover surface speaks the
+ * same font. Individual rules can still opt back into monospace by
+ * setting an explicit `font-family` (e.g. `.anf-env-picker-key`,
+ * `.anf-add-node-item-type`) — since those are more specific
+ * declarations on the element itself, they win the cascade. */
+.anf-env-popover button,
+.anf-env-popover input,
+.anf-env-popover select,
+.anf-env-popover textarea,
+.anf-env-popover optgroup,
+.anf-env-popover option,
+.anf-add-node-menu button,
+.anf-add-node-menu input,
+.anf-add-node-menu select,
+.anf-add-node-menu textarea,
+.anf-add-node-menu optgroup,
+.anf-add-node-menu option,
+.anf-node-menu button,
+.anf-node-menu input,
+.anf-node-menu select,
+.anf-node-menu textarea,
+.anf-node-menu optgroup,
+.anf-node-menu option {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  font-style: inherit;
+  line-height: inherit;
+  letter-spacing: inherit;
+}
+.anf-env-popover::-webkit-scrollbar,
+.anf-env-popover *::-webkit-scrollbar,
+.anf-add-node-menu::-webkit-scrollbar,
+.anf-add-node-menu *::-webkit-scrollbar,
+.anf-node-menu::-webkit-scrollbar,
+.anf-node-menu *::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+  background: transparent;
+}
+.anf-env-popover::-webkit-scrollbar-track,
+.anf-env-popover *::-webkit-scrollbar-track,
+.anf-add-node-menu::-webkit-scrollbar-track,
+.anf-add-node-menu *::-webkit-scrollbar-track,
+.anf-node-menu::-webkit-scrollbar-track,
+.anf-node-menu *::-webkit-scrollbar-track {
+  background: transparent;
+  border: none;
+}
+.anf-env-popover::-webkit-scrollbar-thumb,
+.anf-env-popover *::-webkit-scrollbar-thumb,
+.anf-add-node-menu::-webkit-scrollbar-thumb,
+.anf-add-node-menu *::-webkit-scrollbar-thumb,
+.anf-node-menu::-webkit-scrollbar-thumb,
+.anf-node-menu *::-webkit-scrollbar-thumb {
+  background-color: rgba(121, 121, 121, 0.40);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: 8px;
+  min-height: 24px;
+}
+.anf-env-popover::-webkit-scrollbar-thumb:hover,
+.anf-env-popover *::-webkit-scrollbar-thumb:hover,
+.anf-add-node-menu::-webkit-scrollbar-thumb:hover,
+.anf-add-node-menu *::-webkit-scrollbar-thumb:hover,
+.anf-node-menu::-webkit-scrollbar-thumb:hover,
+.anf-node-menu *::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(160, 160, 160, 0.55);
+}
+.anf-env-popover::-webkit-scrollbar-thumb:active,
+.anf-env-popover *::-webkit-scrollbar-thumb:active,
+.anf-add-node-menu::-webkit-scrollbar-thumb:active,
+.anf-add-node-menu *::-webkit-scrollbar-thumb:active,
+.anf-node-menu::-webkit-scrollbar-thumb:active,
+.anf-node-menu *::-webkit-scrollbar-thumb:active {
+  background-color: rgba(191, 191, 191, 0.70);
+}
+.anf-env-popover::-webkit-scrollbar-button,
+.anf-env-popover *::-webkit-scrollbar-button,
+.anf-add-node-menu::-webkit-scrollbar-button,
+.anf-add-node-menu *::-webkit-scrollbar-button,
+.anf-node-menu::-webkit-scrollbar-button,
+.anf-node-menu *::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+.anf-env-popover::-webkit-scrollbar-corner,
+.anf-env-popover *::-webkit-scrollbar-corner,
+.anf-add-node-menu::-webkit-scrollbar-corner,
+.anf-add-node-menu *::-webkit-scrollbar-corner,
+.anf-node-menu::-webkit-scrollbar-corner,
+.anf-node-menu *::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* =====================================================================
+ * Sidecar URL field in the workbench title bar (replaces the old
+ * Sidebar / Console toggle buttons; those moved into the floating
+ * run-toolbar on the canvas).
+ * ===================================================================== */
+.anf-workbench-sidecar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 0 8px;
+  margin-right: 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.anf-workbench-sidecar:focus-within {
+  border-color: rgba(99, 161, 255, 0.55);
+  background: rgba(99, 161, 255, 0.08);
+}
+.anf-workbench-sidecar-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.anf-workbench-sidecar-input {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  color: inherit;
+  font: inherit;
+  width: 160px;
+  padding: 0;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.anf-workbench-sidecar-input::placeholder {
+  color: rgba(255, 255, 255, 0.32);
+}
+
+.anf-env-config {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.anf-env-config *,
+.anf-env-button,
+.anf-env-popover,
+.anf-env-popover * {
+  -webkit-app-region: no-drag;
+  pointer-events: auto;
+}
+.anf-env-button {
+  appearance: none;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.72);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.anf-env-button:hover,
+.anf-env-button.is-active {
+  border-color: rgba(99, 161, 255, 0.55);
+  background: rgba(99, 161, 255, 0.1);
+  color: rgba(255, 255, 255, 0.9);
+}
+.anf-env-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: rgba(99, 161, 255, 0.22);
+  color: #cfe3ff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+}
+.anf-env-popover {
+  position: fixed;
+  top: 38px;
+  right: 12px;
+  z-index: 2147483647;
+  width: min(640px, calc(100vw - 24px));
+  max-height: calc(100vh - 50px);
+  overflow: auto;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(30, 32, 40, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.86);
+  -webkit-app-region: no-drag;
+}
+.anf-env-popover-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.anf-env-popover-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.anf-env-popover-subtitle {
+  margin-top: 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.48);
+}
+/* Scope tab strip — Global + current-flow buckets. Sits between the
+   popover header and the editable rows table. Mirrors the pill
+   styling of `.anf-tabs` so the workbench feels consistent. */
+.anf-env-scope-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 0 0 8px 0;
+  margin: 8px 0 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.anf-env-scope-tab {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.18);
+  color: rgba(255, 255, 255, 0.62);
+  border-radius: 999px;
+  height: 22px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.anf-env-scope-tab:hover {
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.06);
+}
+.anf-env-scope-tab.is-active {
+  border-color: rgba(99, 161, 255, 0.6);
+  background: rgba(99, 161, 255, 0.16);
+  color: #d7e8ff;
+}
+.anf-env-scope-tab.is-current:not(.is-active) {
+  /* Subtle ring around the active flow's app to disambiguate from
+     other apps the user has previously edited. */
+  border-color: rgba(120, 220, 160, 0.45);
+  color: rgba(210, 245, 220, 0.8);
+}
+.anf-env-scope-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.7;
+}
+.anf-env-close,
+.anf-env-delete {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  border-radius: 4px;
+}
+.anf-env-close {
+  width: 24px;
+  height: 24px;
+  font-size: 18px;
+  line-height: 1;
+}
+.anf-env-close:hover,
+.anf-env-delete:hover {
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+.anf-env-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.anf-env-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.9fr) minmax(220px, 1.3fr) 56px 28px;
+  gap: 8px;
+  align-items: center;
+}
+.anf-env-row--head {
+  color: rgba(255, 255, 255, 0.42);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 2px;
+}
+.anf-env-input {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.22);
+  color: rgba(255, 255, 255, 0.86);
+  outline: 0;
+  font: inherit;
+  font-size: 12px;
+}
+.anf-env-input:focus {
+  border-color: rgba(99, 161, 255, 0.55);
+  background: rgba(99, 161, 255, 0.08);
+}
+.anf-env-input::placeholder {
+  color: rgba(255, 255, 255, 0.28);
+}
+.anf-env-secret-toggle {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+.anf-env-delete {
+  height: 26px;
+  width: 26px;
+  font-size: 16px;
+}
+.anf-env-empty {
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+}
+.anf-env-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+.anf-env-add {
+  appearance: none;
+  border: 1px solid rgba(99, 161, 255, 0.38);
+  background: rgba(99, 161, 255, 0.12);
+  color: #d7e8ff;
+  border-radius: 5px;
+  height: 26px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.anf-env-add:hover {
+  background: rgba(99, 161, 255, 0.2);
+}
+
+/* =====================================================================
+ * Floating run-toolbar (top-left of each flow canvas). Lives inside
+ * the per-tab ReactFlowStudio header so it overlays the canvas and
+ * is independent per flow tab.
+ * ===================================================================== */
+.anf-run-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(28, 30, 38, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.32);
+  backdrop-filter: saturate(140%) blur(8px);
+  -webkit-backdrop-filter: saturate(140%) blur(8px);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  user-select: none;
+}
+.anf-run-toolbar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: background 100ms ease, color 100ms ease;
+}
+.anf-run-toolbar-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+.anf-run-toolbar-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.anf-run-toolbar-btn.is-active {
+  background: rgba(99, 161, 255, 0.18);
+  color: #cfe1ff;
+}
+.anf-run-toolbar-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+/* The studio header that hosts the floating toolbar must be a relative
+ * positioning context so `position: absolute` resolves to the canvas
+ * and not the entire workbench. */
+.anf-studio-canvas {
+  position: relative;
+}
+
+/* =====================================================================
+ * Right-click node context menu.
+ * ===================================================================== */
+.anf-node-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(24, 26, 33, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.48);
+  color: rgba(255, 255, 255, 0.88);
+  /* font-size unified by the shared popover/menu chrome rule above. */
+  user-select: none;
+}
+.anf-node-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.anf-node-menu-item:hover:not(:disabled) {
+  background: rgba(99, 161, 255, 0.18);
+  color: #fff;
+}
+.anf-node-menu-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* =====================================================================
+ * Explorer search box (FLOWS panel filter).
+ * ===================================================================== */
+.anf-explorer-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 6px 8px 4px 8px;
+  padding: 0 6px 0 24px;
+  height: 24px;
+  border: 1px solid var(--vsc-border);
+  border-radius: 4px;
+  background: var(--vsc-bg);
+  transition: border-color 120ms;
+}
+.anf-explorer-search:focus-within {
+  border-color: var(--vsc-accent);
+}
+.anf-explorer-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--vsc-fg-muted);
+  display: inline-flex;
+}
+.anf-explorer-search-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--vsc-fg);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 0;
+}
+.anf-explorer-search-input::placeholder {
+  color: var(--vsc-fg-muted);
+}
+/* Hide the native search clear "x" so our own button is the single source of truth. */
+.anf-explorer-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.anf-explorer-search-clear {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: var(--vsc-fg-muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  border-radius: 3px;
+}
+.anf-explorer-search-clear:hover {
+  background: var(--vsc-bg-hover);
+  color: var(--vsc-fg-strong);
+}
+.anf-explorer-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--vsc-fg-muted);
+  font-style: italic;
+}
+
+/* =====================================================================
+ * Pane right-click "Add node" menu (UE-blueprint style).
+ * Lives at the canvas level so it stacks above the floating run toolbar.
+ * ===================================================================== */
+.anf-add-node-menu {
+  position: fixed;
+  z-index: 1100;
+  width: 280px;
+  max-height: 360px;
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  background: rgba(20, 22, 28, 0.98);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.92);
+  /* font-size unified by the shared popover/menu chrome rule above. */
+  user-select: none;
+  overflow: hidden;
+}
+.anf-add-node-menu-search {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.anf-add-node-menu-search input {
+  width: 100%;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  font: inherit;
+  outline: 0;
+  box-sizing: border-box;
+}
+.anf-add-node-menu-search input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+.anf-add-node-menu-search input:focus {
+  border-color: rgba(99, 161, 255, 0.6);
+}
+.anf-add-node-menu-search input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+.anf-add-node-menu-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  /* Hard-cap horizontal overflow so a long row never produces a
+   * stray horizontal scrollbar at the bottom of the popover. */
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+.anf-add-node-menu-empty {
+  padding: 14px 12px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+  text-align: center;
+}
+.anf-add-node-group {
+  display: block;
+}
+.anf-add-node-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 10px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.anf-add-node-group-header:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.anf-add-node-group-chevron {
+  display: inline-block;
+  width: 10px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  transition: transform 120ms ease;
+}
+.anf-add-node-group-name {
+  flex: 1 1 auto;
+}
+.anf-add-node-group-count {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: 500;
+  font-size: 10px;
+}
+.anf-add-node-group-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 0 4px 0;
+}
+.anf-add-node-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 5px 10px 5px 24px;
+  appearance: none;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.88);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0;
+}
+.anf-add-node-item:hover {
+  background: rgba(99, 161, 255, 0.18);
+  color: #fff;
+}
+.anf-add-node-item-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.anf-add-node-item-dot--start { background: #22c55e; }
+.anf-add-node-item-dot--end { background: #ef4444; }
+.anf-add-node-item-dot--model { background: #a855f7; }
+.anf-add-node-item-dot--transform { background: #38bdf8; }
+.anf-add-node-item-dot--tool { background: #f59e0b; }
+.anf-add-node-item-dot--io { background: #06b6d4; }
+.anf-add-node-item-dot--default { background: #94a3b8; }
+.anf-add-node-item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.anf-add-node-item-title {
+  font-size: 12px;
+  color: inherit;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.anf-add-node-item-type {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+  /* font-family inherited from .anf-add-node-menu (Segoe UI) so the
+   * type-id subtitle matches the rest of the popover. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* =====================================================================
+ * In-node "Insert environment variable" picker.
+ * Reuses .anf-add-node-menu chrome with picker-specific row layout.
+ * ===================================================================== */
+.anf-env-picker-row {
+  display: grid;
+  /* Row 1: key (flex-fills) + kind badge (intrinsic).
+   * Row 2: value preview, spanning both columns via
+   * `grid-column: 1 / -1` on `.anf-env-picker-value`. */
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding-left: 16px;
+  padding-right: 12px;
+}
+.anf-env-picker-key {
+  /* font-family inherited from .anf-add-node-menu (Segoe UI) so env
+   * keys read in the same typeface as every other popover label. */
+  font-size: 11.5px;
+  color: rgba(255, 255, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Required so the 1fr track can actually shrink below the key's
+   * intrinsic min-content width; otherwise long keys push the row
+   * past the popover and trigger a horizontal scrollbar. */
+  min-width: 0;
+}
+.anf-env-picker-kind {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.10);
+  color: rgba(255, 255, 255, 0.7);
+}
+.anf-env-picker-kind--secret {
+  background: rgba(239, 68, 68, 0.18);
+  color: #fca5a5;
+}
+.anf-env-picker-kind--var {
+  background: rgba(99, 161, 255, 0.20);
+  color: #c4dafe;
+}
+.anf-env-picker-value {
+  font-size: 10.5px;
+  /* font-family inherited from .anf-add-node-menu (Segoe UI) so env
+   * sample values render in the same typeface as the picker key. */
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Span the whole 2-column grid on its own row. `min-width: 0` lets
+   * the ellipsis kick in instead of widening the row. We deliberately
+   * drop the previous fixed `max-width: 120px` cap because it could
+   * truncate values shorter than the popover is wide for no reason. */
+  grid-column: 1 / -1;
+  min-width: 0;
+  text-align: left;
+}

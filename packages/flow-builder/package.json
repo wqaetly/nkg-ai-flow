@@ -1,0 +1,19 @@
+{
+  "name": "@ai-native-flow/flow-builder",
+  "version": "0.0.1",
+  "description": "Typed Flow Builder, deterministic dump() and Graph Operation format.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-native-flow/flow-ir": "0.0.1",
+    "@ai-native-flow/flow-validator": "0.0.1"
+  }
+}

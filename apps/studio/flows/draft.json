@@ -1,0 +1,192 @@
+{
+  "id": "draft_flow",
+  "version": "0.1.0",
+  "schemaVersion": "flow.graph.v1",
+  "label": "Draft (Empty)",
+  "description": "An empty canvas to scribble on.",
+  "nodes": [
+    {
+      "id": "node_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "Start",
+      "position": {
+        "x": -515.5513102493577,
+        "y": 61.90836680869407
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Next"
+        }
+      ],
+      "config": {}
+    },
+    {
+      "id": "node_end",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "End",
+      "position": {
+        "x": 883.9589215072906,
+        "y": 81.30116998363968
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "Run"
+        }
+      ],
+      "config": {}
+    },
+    {
+      "id": "text_input_1",
+      "type": "text_input",
+      "typeVersion": "1.0.0",
+      "label": "Text Input",
+      "position": {
+        "x": -80,
+        "y": 60
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "Run"
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Next"
+        },
+        {
+          "id": "text",
+          "direction": "output",
+          "kind": "data",
+          "label": "Text",
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "config": {
+        "value": "你好"
+      }
+    },
+    {
+      "id": "llm_1",
+      "type": "llm",
+      "typeVersion": "1.0.0",
+      "label": "LLM",
+      "position": {
+        "x": 387.8399741240554,
+        "y": -48.99282716961764
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "Run"
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Next"
+        },
+        {
+          "id": "prompt",
+          "direction": "input",
+          "kind": "data",
+          "label": "Prompt",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "result",
+          "direction": "output",
+          "kind": "data",
+          "label": "Result",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "baseUrl": {
+          "$var": "daourl"
+        },
+        "apiKey": {
+          "$var": "daokey"
+        },
+        "model": {
+          "$var": "daomodel"
+        },
+        "temperature": 0,
+        "maxTokens": 4096,
+        "stream": true,
+        "prompt": ""
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "node_start__out__text_input_1__in",
+      "from": {
+        "nodeId": "node_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "text_input_1",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "text_input_1__out__llm_1__in",
+      "from": {
+        "nodeId": "text_input_1",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "llm_1",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "text_input_1__text__llm_1__prompt",
+      "from": {
+        "nodeId": "text_input_1",
+        "portId": "text"
+      },
+      "to": {
+        "nodeId": "llm_1",
+        "portId": "prompt"
+      }
+    },
+    {
+      "id": "llm_1__out__node_end__in",
+      "from": {
+        "nodeId": "llm_1",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "node_end",
+        "portId": "in"
+      }
+    }
+  ]
+}

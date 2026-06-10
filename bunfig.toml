@@ -1,0 +1,5 @@
+[install]
+exact = false
+
+[install.scopes]
+"@ai-native-flow" = { url = "file:./packages" }

@@ -1,0 +1,5 @@
+{
+  "name": "skill-to-flow",
+  "flowDirs": ["flows"],
+  "nodePacks": ["nodes/index.ts"]
+}

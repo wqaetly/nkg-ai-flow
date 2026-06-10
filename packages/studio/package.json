@@ -1,0 +1,25 @@
+{
+  "name": "@ai-native-flow/studio",
+  "version": "0.0.1",
+  "description": "Browser Studio view model, graph editing projections, and dark shell renderer for AI Native Flow.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./reactFlowStudio.css": "./src/reactFlowStudio.css"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-native-flow/event-bus": "0.0.1",
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/flow-ir": "0.0.1",
+    "@ai-native-flow/flow-validator": "0.0.1",
+    "@xyflow/react": "^12.8.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

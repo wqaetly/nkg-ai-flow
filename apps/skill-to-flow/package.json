@@ -1,0 +1,29 @@
+{
+  "name": "@ai-native-flow/skill-to-flow",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx build.ts",
+    "serve": "tsx ../../packages/transports/http-runner/src/bin.ts",
+    "flow:run": "tsx cli.ts run",
+    "flow:inspect": "tsx cli.ts inspect",
+    "flow:replay": "tsx cli.ts replay",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-native-flow/event-bus": "0.0.1",
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/flow-ir": "0.0.1",
+    "@ai-native-flow/flow-validator": "0.0.1",
+    "@ai-native-flow/node-sdk": "0.0.1",
+    "@ai-native-flow/runtime": "0.0.1",
+    "@ai-native-flow/transport-cli": "0.0.1",
+    "@ai-native-flow/transport-http": "0.0.1",
+    "@ai-native-flow/transport-http-runner": "0.0.1",
+    "@ai-native-flow/transport-sdk": "0.0.1",
+    "@ai-native-flow/variable-store": "0.0.1",
+    "yaml": "^2.9.0",
+    "zod": "^3.23.8"
+  }
+}

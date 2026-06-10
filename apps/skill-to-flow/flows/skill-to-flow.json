@@ -1,0 +1,788 @@
+{
+  "id": "skill_to_flow",
+  "version": "1.0.0",
+  "schemaVersion": "flow.graph.v1",
+  "label": "Skill 转 Flow（LLM 驱动）",
+  "description": "将 CodeBuddy SKILL.md 转为可执行 Flow 包：解析 → LLM 规划 → LLM 设计 → LLM 合成 → 真校验 → Agent 物化。",
+  "inputSchema": {
+    "type": "object"
+  },
+  "nodes": [
+    {
+      "id": "node_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "Start",
+      "position": {
+        "x": -200,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 112
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Next"
+        },
+        {
+          "id": "runInput",
+          "direction": "output",
+          "kind": "data",
+          "label": "Run Input"
+        }
+      ],
+      "config": {}
+    },
+    {
+      "id": "node_end",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "End",
+      "position": {
+        "x": 2750,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 96
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "Run"
+        }
+      ],
+      "config": {}
+    },
+    {
+      "id": "skill_parser",
+      "type": "skill_parser",
+      "typeVersion": "1.0.0",
+      "label": "Skill 解析器（规则）",
+      "position": {
+        "x": 100,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 224
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "skill_def",
+          "direction": "output",
+          "kind": "data",
+          "label": "SkillDefinition",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "default_name": "unnamed-skill",
+        "max_body_length": 100000
+      }
+    },
+    {
+      "id": "skill_planner",
+      "type": "skill_planner",
+      "typeVersion": "1.0.0",
+      "label": "Skill 规划器（LLM）",
+      "position": {
+        "x": 450,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 428
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "skill_def",
+          "direction": "input",
+          "kind": "data",
+          "label": "SkillDefinition"
+        },
+        {
+          "id": "plan",
+          "direction": "output",
+          "kind": "data",
+          "label": "ExecutionPlan",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "base_url": {
+          "$var": "daourl"
+        },
+        "api_key": {
+          "$var": "daokey"
+        },
+        "model": {
+          "$var": "daomodel"
+        },
+        "temperature": 0,
+        "max_tokens": 4096,
+        "max_retries": 2,
+        "max_steps": 12,
+        "min_steps": 3
+      }
+    },
+    {
+      "id": "node_designer",
+      "type": "node_designer",
+      "typeVersion": "1.0.0",
+      "label": "节点设计器（LLM·并发）",
+      "position": {
+        "x": 800,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 394
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "skill_def",
+          "direction": "input",
+          "kind": "data",
+          "label": "SkillDefinition"
+        },
+        {
+          "id": "plan",
+          "direction": "input",
+          "kind": "data",
+          "label": "ExecutionPlan"
+        },
+        {
+          "id": "node_specs",
+          "direction": "output",
+          "kind": "data",
+          "label": "NodeSpec[]",
+          "schema": {
+            "type": "array"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "base_url": {
+          "$var": "daourl"
+        },
+        "api_key": {
+          "$var": "daokey"
+        },
+        "model": {
+          "$var": "daomodel"
+        },
+        "temperature": 0,
+        "max_tokens": 4096,
+        "max_concurrency": 3,
+        "max_retries": 2
+      }
+    },
+    {
+      "id": "code_synthesizer",
+      "type": "code_synthesizer",
+      "typeVersion": "1.0.0",
+      "label": "代码合成器（LLM·并发）",
+      "position": {
+        "x": 1150,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 490
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "skill_def",
+          "direction": "input",
+          "kind": "data",
+          "label": "SkillDefinition"
+        },
+        {
+          "id": "plan",
+          "direction": "input",
+          "kind": "data",
+          "label": "ExecutionPlan"
+        },
+        {
+          "id": "node_specs",
+          "direction": "input",
+          "kind": "data",
+          "label": "NodeSpec[]"
+        },
+        {
+          "id": "package",
+          "direction": "output",
+          "kind": "data",
+          "label": "GeneratedFlowPackage",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "base_url": {
+          "$var": "daourl"
+        },
+        "api_key": {
+          "$var": "daokey"
+        },
+        "model": {
+          "$var": "daomodel"
+        },
+        "temperature": 0,
+        "max_tokens": 4096,
+        "flow_version": "1.0.0",
+        "max_concurrency": 3,
+        "max_retries": 2,
+        "package_scope": "@ai-native-flow"
+      }
+    },
+    {
+      "id": "flow_validator",
+      "type": "flow_validator",
+      "typeVersion": "1.0.0",
+      "label": "Flow 验证器（规则）",
+      "position": {
+        "x": 1500,
+        "y": 0
+      },
+      "size": {
+        "width": 280,
+        "height": 224
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "package",
+          "direction": "input",
+          "kind": "data",
+          "label": "GeneratedFlowPackage"
+        },
+        {
+          "id": "node_specs",
+          "direction": "input",
+          "kind": "data",
+          "label": "NodeSpec[]"
+        },
+        {
+          "id": "artifact",
+          "direction": "output",
+          "kind": "data",
+          "label": "FlowArtifact",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "lint_sources": true,
+        "strict": false
+      }
+    },
+    {
+      "id": "output_dir",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "输出目录解析",
+      "position": {
+        "x": 1500,
+        "y": 300
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "Input"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "Output"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "template": "${input.output_dir}"
+      }
+    },
+    {
+      "id": "materialize_task",
+      "type": "text_input",
+      "typeVersion": "1.0.0",
+      "label": "物化任务说明",
+      "position": {
+        "x": 1850,
+        "y": 260
+      },
+      "size": {
+        "width": 280,
+        "height": 190
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "text",
+          "direction": "output",
+          "kind": "data",
+          "label": "Text",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "value": "Materialize the generated Flow package from context.package.\nFirst inspect context.isValid, context.errors, context.warnings, and context.fileIssues. Treat validation errors, warnings, and fileIssues as repair context, not as text to ignore.\nAlso inspect context.requirements before writing files. Preserve the original goals, input/output contract, acceptance criteria, constraints, and context handoff policy in the generated package; use them to judge whether verification failures need code repair or model-owned unresolved_errors.\nUse context.materializationPlan.files as the ordered write checklist.\nPrefer one write_files call with files_ref=\"materializationPlan.files\" and create=true to write the whole package.\nIf context.fileIssues is non-empty, or context.warnings contains lint.unsafe_file_path, lint.duplicate_file_path, lint.non_posix_file_path, or lint.directory_file_path, do not use files_ref directly; instead call write_files with an explicit files array that chooses safe unique POSIX-style package-relative file paths while preserving each entry's contentsRef.\nFor surgical repairs after verification, use edit_file with path_ref/new_text_ref refs instead of pasting large source into new_text.\nUse create=true and stay under working_dir.\nAfter writing files, run each command in context.materializationPlan.verifyCommands in order when possible, such as `npx tsx build.ts` for graph validation and `npm run typecheck --if-present` for generated TypeScript.\nIf verification fails, use the command observation plus context.errors/context.warnings to edit files and retry within maxSteps.\nFinish with a final summary and only include model-owned repair notes in final context, such as unresolved_errors when semantic errors remain after your edits.\nDo not guess or hand-write changed_files, written_files, verification_results, or validator_status; the runtime agent fills those fields from real tool logs and the input FlowArtifact.\nDownstream nodes expect the exact runtime-owned field names changed_files, written_files, verification_results, validator_status, and unresolved_errors; never rename verification_results to verification."
+      }
+    },
+    {
+      "id": "package_materializer",
+      "type": "agent",
+      "typeVersion": "1.0.0",
+      "label": "包物化 Agent（文件+Bash）",
+      "position": {
+        "x": 2216.64642084344,
+        "y": 6.878879114701931
+      },
+      "size": {
+        "width": 280,
+        "height": 648
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "In",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "Out"
+        },
+        {
+          "id": "task",
+          "direction": "input",
+          "kind": "data",
+          "label": "Task",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "context",
+          "direction": "input",
+          "kind": "data",
+          "label": "Context",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "working_dir",
+          "direction": "input",
+          "kind": "data",
+          "label": "Working directory",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "summary",
+          "direction": "output",
+          "kind": "data",
+          "label": "Summary",
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "id": "context",
+          "direction": "output",
+          "kind": "data",
+          "label": "Context",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
+          "id": "changed_files",
+          "direction": "output",
+          "kind": "data",
+          "label": "Changed files",
+          "schema": {
+            "type": "array"
+          }
+        },
+        {
+          "id": "tool_log",
+          "direction": "output",
+          "kind": "data",
+          "label": "Tool log",
+          "schema": {
+            "type": "array"
+          }
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "Error"
+        }
+      ],
+      "config": {
+        "baseUrl": {
+          "$var": "daourl"
+        },
+        "apiKey": {
+          "$var": "daokey"
+        },
+        "model": {
+          "$var": "daomodel"
+        },
+        "temperature": 0,
+        "maxTokens": 4096,
+        "allowBash": true,
+        "allowedTools": [
+          "list_files",
+          "read_file",
+          "grep",
+          "edit_file",
+          "write_files",
+          "run_bash"
+        ],
+        "maxOutputChars": 40000,
+        "maxSteps": 30,
+        "systemPrompt": "You are a terse build agent. Use tools to write generated files and verify the package. Stay inside working_dir.",
+        "timeoutMs": 30000,
+        "workingDir": "./generated/skill-to-flow-output"
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_01",
+      "from": {
+        "nodeId": "node_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "skill_parser",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "edge_02",
+      "from": {
+        "nodeId": "skill_parser",
+        "portId": "skill_def"
+      },
+      "to": {
+        "nodeId": "skill_planner",
+        "portId": "skill_def"
+      }
+    },
+    {
+      "id": "edge_03",
+      "from": {
+        "nodeId": "skill_parser",
+        "portId": "skill_def"
+      },
+      "to": {
+        "nodeId": "node_designer",
+        "portId": "skill_def"
+      }
+    },
+    {
+      "id": "edge_04",
+      "from": {
+        "nodeId": "skill_planner",
+        "portId": "plan"
+      },
+      "to": {
+        "nodeId": "node_designer",
+        "portId": "plan"
+      }
+    },
+    {
+      "id": "edge_05",
+      "from": {
+        "nodeId": "skill_parser",
+        "portId": "skill_def"
+      },
+      "to": {
+        "nodeId": "code_synthesizer",
+        "portId": "skill_def"
+      }
+    },
+    {
+      "id": "edge_06",
+      "from": {
+        "nodeId": "skill_planner",
+        "portId": "plan"
+      },
+      "to": {
+        "nodeId": "code_synthesizer",
+        "portId": "plan"
+      }
+    },
+    {
+      "id": "edge_07",
+      "from": {
+        "nodeId": "node_designer",
+        "portId": "node_specs"
+      },
+      "to": {
+        "nodeId": "code_synthesizer",
+        "portId": "node_specs"
+      }
+    },
+    {
+      "id": "edge_08",
+      "from": {
+        "nodeId": "code_synthesizer",
+        "portId": "package"
+      },
+      "to": {
+        "nodeId": "flow_validator",
+        "portId": "package"
+      }
+    },
+    {
+      "id": "edge_09",
+      "from": {
+        "nodeId": "node_designer",
+        "portId": "node_specs"
+      },
+      "to": {
+        "nodeId": "flow_validator",
+        "portId": "node_specs"
+      }
+    },
+    {
+      "id": "edge_10",
+      "from": {
+        "nodeId": "node_start",
+        "portId": "runInput"
+      },
+      "to": {
+        "nodeId": "output_dir",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "edge_11",
+      "from": {
+        "nodeId": "output_dir",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "package_materializer",
+        "portId": "working_dir"
+      }
+    },
+    {
+      "id": "edge_12",
+      "from": {
+        "nodeId": "flow_validator",
+        "portId": "artifact"
+      },
+      "to": {
+        "nodeId": "package_materializer",
+        "portId": "context"
+      }
+    },
+    {
+      "id": "edge_13",
+      "from": {
+        "nodeId": "materialize_task",
+        "portId": "text"
+      },
+      "to": {
+        "nodeId": "package_materializer",
+        "portId": "task"
+      }
+    },
+    {
+      "id": "edge_14",
+      "from": {
+        "nodeId": "flow_validator",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "materialize_task",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "edge_15",
+      "from": {
+        "nodeId": "materialize_task",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "package_materializer",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "edge_16",
+      "from": {
+        "nodeId": "package_materializer",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "node_end",
+        "portId": "in"
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@ai-native-flow/flow-ir": ["../../packages/flow-ir/src/index.ts"],
+      "@ai-native-flow/flow-validator": ["../../packages/flow-validator/src/index.ts"],
+      "@ai-native-flow/flow-builder": ["../../packages/flow-builder/src/index.ts"],
+      "@ai-native-flow/event-bus": ["../../packages/event-bus/src/index.ts"],
+      "@ai-native-flow/node-sdk": ["../../packages/node-sdk/src/index.ts"],
+      "@ai-native-flow/ai-stream": ["../../packages/ai-stream/src/index.ts"],
+      "@ai-native-flow/runtime": ["../../packages/runtime/src/index.ts"],
+      "@ai-native-flow/variable-store": ["../../packages/variable-store/src/index.ts"],
+      "@ai-native-flow/transport-http": ["../../packages/transport-http/src/index.ts"],
+      "@ai-native-flow/transport-sdk": ["../../packages/transports/sdk/src/index.ts"],
+      "@ai-native-flow/transport-cli": ["../../packages/transports/cli/src/index.ts"],
+      "@ai-native-flow/transport-cli/bootstrap": ["../../packages/transports/cli/src/bootstrap.ts"]
+    }
+  },
+  "include": ["**/*.ts"]
+}
