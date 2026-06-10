@@ -57,11 +57,46 @@
 
 ---
 
-## 五、安装
+## 五、安装与推荐集成方式
+
+### 5.1 直接开发本项目
+
+直接修改 Runtime、Studio 或本项目自带 apps 时，在本仓库内安装依赖：
 
 ```bash
 npm install
 ```
+
+### 5.2 宿主项目推荐作为 submodule 使用
+
+外部业务项目推荐把本项目作为 Git submodule 放在宿主仓库根目录，例如 `nkg-ai-flow/`：
+
+```bash
+git submodule add https://github.com/wqaetly/nkg-ai-flow nkg-ai-flow
+git submodule update --init --recursive
+```
+
+宿主项目通过 `file:` 依赖引用需要的包，只引入实际用到的模块：
+
+```json
+{
+  "dependencies": {
+    "@ai-native-flow/builder-runner": "file:nkg-ai-flow/packages/builder-runner",
+    "@ai-native-flow/flow-builder": "file:nkg-ai-flow/packages/flow-builder",
+    "@ai-native-flow/runtime": "file:nkg-ai-flow/packages/runtime",
+    "@ai-native-flow/node-sdk": "file:nkg-ai-flow/packages/node-sdk",
+    "@ai-native-flow/variable-store": "file:nkg-ai-flow/packages/variable-store"
+  }
+}
+```
+
+然后在宿主项目根目录执行：
+
+```bash
+npm install
+```
+
+这种方式适合业务项目保持自己的源码、脚本、数据和部署结构，同时复用本项目的 Flow Builder、Runtime、节点注册与配置模块。
 
 ---
 
@@ -238,27 +273,22 @@ Private（`package.json` 中 `"private": true`），暂未对外发布。
 
 ---
 
-## 十二、使用方式注意事项
+## 十二、推荐使用方式与 app 注册
 
-### 12.1 直接使用本项目
+### 12.1 推荐：宿主项目通过 submodule 集成
 
-直接在本仓库启动 Studio 或 HTTP runner 时，不需要根 `anf.apps.json`。loader 会自动扫描本项目自带的 `apps/*/anf.app.json`，有 `anf.app.json` 的 app 才参与注册。
+业务项目推荐参考 `kesmj` 的集成方式：
 
-新增本项目内置业务 app 时，把 app 放到 `apps/<app>/` 下，并在该目录提供 `anf.app.json`：
-
-```json
-{
-  "name": "my-app",
-  "flowDirs": ["flows"],
-  "nodePacks": ["nodes/index.ts"]
-}
+```text
+host-project/
+├── nkg-ai-flow/              # git submodule
+├── package.json              # file:nkg-ai-flow/packages/... 依赖
+├── anf.apps.json             # 注册宿主 app
+├── apps/<host-app>/anf.app.json
+└── src/<flow-or-nodes>/
 ```
 
-`flowDirs[]` 和 `nodePacks[]` 路径相对 app 自己的 `anf.app.json` 所在目录解析。
-
-### 12.2 作为 submodule 使用
-
-宿主项目应在宿主根目录提供自己的 `anf.apps.json`，只用 `apps[]` 注册宿主自己的 app：
+宿主根目录只用 `anf.apps.json` 注册宿主自己的 app：
 
 ```json
 {
@@ -268,9 +298,42 @@ Private（`package.json` 中 `"private": true`），暂未对外发布。
 }
 ```
 
+每个宿主 app 再提供自己的 `anf.app.json`，声明 Flow JSON / Builder 产物目录和节点包：
+
+```json
+{
+  "name": "host-flow",
+  "flowDirs": [
+    "../../src/agent-flow"
+  ],
+  "nodePacks": [
+    "../../src/agent-flow/nodes/index.ts"
+  ]
+}
+```
+
 注意事项：
 
-- 从宿主项目目录或其子目录启动 runner / sidecar，确保优先命中宿主的 `anf.apps.json`；
+- `nkg-ai-flow/` 只作为 runtime/tooling submodule，不要在宿主 `anf.apps.json` 里声明 submodule 路径；
 - 宿主 `apps[]` 路径相对宿主 `anf.apps.json` 所在目录解析；
-- 本项目作为 submodule 存在时，自带 apps 仍由本项目自动发现，宿主不需要声明 submodule 路径；
-- loader 会按规范化绝对路径去重；没有 `anf.app.json` 的 app 不注册。
+- app 内 `flowDirs[]` 和 `nodePacks[]` 路径相对该 app 的 `anf.app.json` 所在目录解析；
+- 从宿主项目目录或其子目录启动 runner / sidecar，确保 loader 能向上找到宿主 `anf.apps.json`；
+- loader 会按规范化绝对路径去重；没有 `anf.app.json` 的目录不会注册。
+
+宿主项目如果使用 Builder 生成 Flow artifact，可在自己的脚本里调用 `@ai-native-flow/builder-runner`，把产物写到宿主自己的 `artifacts/flows` 或源码目录；本项目不要求宿主把业务 Flow 放进 submodule。
+
+### 12.2 直接使用本项目
+
+直接在本仓库启动 Studio 或 HTTP runner 时，不需要根 `anf.apps.json`。loader 会自动扫描本项目自带的 `apps/*/anf.app.json`，有 `anf.app.json` 的 app 才参与注册。
+
+新增本项目内置 app 时，把 app 放到 `apps/<app>/` 下，并在该目录提供 `anf.app.json`：
+
+```json
+{
+  "name": "my-app",
+  "flowDirs": ["flows"],
+  "nodePacks": ["nodes/index.ts"]
+}
+```
+
+这种方式主要用于开发和验证本项目自身能力；业务项目优先使用 12.1 的 submodule 集成方式。
