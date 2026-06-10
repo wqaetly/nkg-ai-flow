@@ -166,20 +166,20 @@ const controlIn: PortDefinition = {
   id: "in",
   direction: "input",
   kind: "control",
-  label: "Run",
+  label: "运行",
 };
 const controlOut: PortDefinition = {
   id: "out",
   direction: "output",
   kind: "control",
-  label: "Next",
+  label: "下一步",
 };
 
 export const BUILTIN_START: NodeTypeDefinition = {
   type: "start",
   typeVersion: "1.0.0",
-  title: "Start",
-  description: "Flow entry pseudo-node.",
+  title: "开始",
+  description: "流程入口伪节点。",
   defaultPorts: [controlOut],
   runtime: "builtin",
 };
@@ -187,8 +187,8 @@ export const BUILTIN_START: NodeTypeDefinition = {
 export const BUILTIN_END: NodeTypeDefinition = {
   type: "end",
   typeVersion: "1.0.0",
-  title: "End",
-  description: "Flow exit pseudo-node; aggregates final output.",
+  title: "结束",
+  description: "流程出口伪节点；汇总最终输出。",
   defaultPorts: [controlIn],
   runtime: "builtin",
 };

@@ -25,21 +25,21 @@ const conditionConfig = z
 export const conditionNode = defineNode({
   type: "condition",
   typeVersion: "1.0.0",
-  title: "Condition",
-  description: "Boolean condition routing to true / false branches.",
+  title: "条件判断",
+  description: "按布尔条件路由到是/否分支。",
   kind: "pseudo",
   config: conditionConfig,
   fieldMeta: {
     expression: {
-      label: "Expression",
+      label: "表达式",
       control: "input",
       placeholder: "input.text == 'ok'",
     },
   },
   ports: [
     controlIn,
-    { id: "true", direction: "output", kind: "control", label: "True" },
-    { id: "false", direction: "output", kind: "control", label: "False" },
+    { id: "true", direction: "output", kind: "control", label: "是" },
+    { id: "false", direction: "output", kind: "control", label: "否" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {

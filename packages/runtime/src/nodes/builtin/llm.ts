@@ -43,42 +43,42 @@ const llmConfig = z
       .min(1)
       .default(DEFAULT_BASE_URL_REF)
       .describe(
-        "OpenAI-compatible base URL (e.g. https://api.openai.com/v1) or $var:LLM_BASE_URL.",
+        "兼容 OpenAI 的基础地址，例如 https://api.openai.com/v1，或 $var:LLM_BASE_URL。",
       ),
     apiKey: z
       .string()
       .min(1)
       .default(DEFAULT_API_KEY_REF)
       .describe(
-        "Bearer token. Plain string, `$var:NAME`, or legacy `$secret:NAME` reference.",
+        "鉴权令牌。支持明文、`$var:NAME` 或旧版 `$secret:NAME` 引用。",
       ),
     model: z
       .string()
       .min(1)
       .default(DEFAULT_MODEL_REF)
-      .describe("Model id or $var:LLM_DEFAULT_MODEL."),
+      .describe("模型标识，或 $var:LLM_DEFAULT_MODEL。"),
     prompt: z
       .string()
       .default("")
       .describe(
-        "Prompt template; supports `${input.path}` placeholders unless the prompt port is wired.",
+        "提示词模板；未连接提示词端口时支持 `${input.path}` 占位符。",
       ),
     temperature: z
       .number()
       .min(0)
       .max(2)
       .default(DEFAULT_TEMPERATURE)
-      .describe("Sampling temperature (0 = deterministic, 2 = wild)."),
+      .describe("采样温度，0 表示确定性输出，2 表示更发散。"),
     maxTokens: z
       .number()
       .min(1)
       .max(32_000)
       .default(DEFAULT_MAX_TOKENS)
-      .describe("Maximum output tokens."),
+      .describe("最大输出标记数。"),
     stream: z
       .boolean()
       .optional()
-      .describe("Stream tokens to the `answer` port as they arrive."),
+      .describe("生成时将内容流式输出到回答通道。"),
   })
   .passthrough();
 
@@ -87,36 +87,37 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
     defineNode({
       type: "llm",
       typeVersion: "1.0.0",
-      title: "LLM",
-      description: "Model call with prompt template and structured output.",
+      title: "大语言模型",
+      description: "使用提示词模板调用模型并返回结构化输出。",
       config: llmConfig,
       fieldMeta: {
         baseUrl: {
-          label: "URL",
+          label: "基础地址",
           placeholder: DEFAULT_BASE_URL_REF,
           order: 1,
         },
         apiKey: {
-          label: "APIKEY",
+          label: "接口密钥",
           placeholder: DEFAULT_API_KEY_REF,
           order: 2,
         },
-        model: { label: "Model", placeholder: DEFAULT_MODEL_REF, order: 3 },
+        model: { label: "模型", placeholder: DEFAULT_MODEL_REF, order: 3 },
         prompt: {
           control: "textarea",
-          placeholder: "Write the prompt template…",
+          label: "提示词",
+          placeholder: "输入提示词模板...",
           order: 6,
         },
-        temperature: { label: "Temperature", order: 4 },
-        maxTokens: { label: "Max Tokens", order: 5 },
-        stream: { label: "Stream", control: "switch", order: 7 },
+        temperature: { label: "温度", order: 4 },
+        maxTokens: { label: "最大输出标记数", order: 5 },
+        stream: { label: "流式输出", control: "switch", order: 7 },
       },
       ports: [
         {
           id: "result",
           direction: "output",
           kind: "data",
-          label: "Result",
+          label: "结果",
           schema: { type: "string" },
         },
       ],

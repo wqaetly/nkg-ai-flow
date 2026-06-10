@@ -1,7 +1,7 @@
 /**
  * `start` pseudo-node — flow entry point.
  *
- * The Execution Engine seeds `runInput` from the RunRecord; we surface
+ * The Execution Engine seeds `runInput` from the 运行Record; we surface
  * it back on the `runInput` data slot so downstream nodes can read it
  * by destructuring the engine-provided input object. The control wire
  * out of `out` carries no payload, only the activation signal.
@@ -13,8 +13,8 @@ import { controlOut } from "./_helpers.js";
 export const startNode = defineNode({
   type: "start",
   typeVersion: "1.0.0",
-  title: "Start",
-  description: "Flow entry pseudo-node.",
+  title: "开始",
+  description: "流程入口伪节点。",
   kind: "pseudo",
   ports: [controlOut],
   validateInput: false,

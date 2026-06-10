@@ -56,7 +56,7 @@ const CONTROL_IN: PortDefinition = {
   id: "in",
   direction: "input",
   kind: "control",
-  label: "In",
+  label: "输入",
   multiple: true,
 };
 
@@ -65,7 +65,7 @@ const CONTROL_OUT: PortDefinition = {
   id: "out",
   direction: "output",
   kind: "control",
-  label: "Out",
+  label: "输出",
 };
 
 /** Conventional error-output port. */
@@ -73,7 +73,7 @@ const ERROR_OUT: PortDefinition = {
   id: "error",
   direction: "output",
   kind: "error",
-  label: "Error",
+  label: "错误",
 };
 
 /**

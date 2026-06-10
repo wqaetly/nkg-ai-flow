@@ -25,21 +25,21 @@ export const controlIn: PortDefinition = {
   id: "in",
   direction: "input",
   kind: "control",
-  label: "Run",
+  label: "运行",
 };
 
 export const controlOut: PortDefinition = {
   id: "out",
   direction: "output",
   kind: "control",
-  label: "Next",
+  label: "下一步",
 };
 
 export const errorOut: PortDefinition = {
   id: "error",
   direction: "output",
   kind: "error",
-  label: "Error",
+  label: "错误",
 };
 
 /* -------------------------------------------------------------------------- */
@@ -75,7 +75,7 @@ export function renderTemplate(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Condition evaluation (condition node)                                       */
+/* 条件判断 evaluation (condition node)                                       */
 /* -------------------------------------------------------------------------- */
 
 /**
