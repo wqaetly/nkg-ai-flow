@@ -158,15 +158,9 @@
         }
       ],
       "config": {
-        "base_url": {
-          "$var": "daourl"
-        },
-        "api_key": {
-          "$var": "daokey"
-        },
-        "model": {
-          "$var": "daomodel"
-        },
+        "base_url": "$var:LLM_BASE_URL",
+        "api_key": "$var:LLM_API_KEY",
+        "model": "$var:LLM_DEFAULT_MODEL",
         "temperature": 0,
         "max_tokens": 4096,
         "max_retries": 2,
@@ -230,15 +224,9 @@
         }
       ],
       "config": {
-        "base_url": {
-          "$var": "daourl"
-        },
-        "api_key": {
-          "$var": "daokey"
-        },
-        "model": {
-          "$var": "daomodel"
-        },
+        "base_url": "$var:LLM_BASE_URL",
+        "api_key": "$var:LLM_API_KEY",
+        "model": "$var:LLM_DEFAULT_MODEL",
         "temperature": 0,
         "max_tokens": 4096,
         "max_concurrency": 3,
@@ -307,15 +295,9 @@
         }
       ],
       "config": {
-        "base_url": {
-          "$var": "daourl"
-        },
-        "api_key": {
-          "$var": "daokey"
-        },
-        "model": {
-          "$var": "daomodel"
-        },
+        "base_url": "$var:LLM_BASE_URL",
+        "api_key": "$var:LLM_API_KEY",
+        "model": "$var:LLM_DEFAULT_MODEL",
         "temperature": 0,
         "max_tokens": 4096,
         "flow_version": "1.0.0",
@@ -487,8 +469,8 @@
       "typeVersion": "1.0.0",
       "label": "包物化 Agent（文件+Bash）",
       "position": {
-        "x": 2216.64642084344,
-        "y": 6.878879114701931
+        "x": 2200,
+        "y": 0
       },
       "size": {
         "width": 280,
@@ -579,15 +561,9 @@
         }
       ],
       "config": {
-        "baseUrl": {
-          "$var": "daourl"
-        },
-        "apiKey": {
-          "$var": "daokey"
-        },
-        "model": {
-          "$var": "daomodel"
-        },
+        "baseUrl": "$var:LLM_BASE_URL",
+        "apiKey": "$var:LLM_API_KEY",
+        "model": "$var:LLM_DEFAULT_MODEL",
         "temperature": 0,
         "maxTokens": 4096,
         "allowBash": true,
@@ -786,3 +762,4 @@
     }
   ]
 }
+
