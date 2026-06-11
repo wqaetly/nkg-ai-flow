@@ -9,6 +9,7 @@ import {
   ReactFlow,
   ReactFlowProvider,
   SelectionMode,
+  ViewportPortal,
   applyEdgeChanges,
   applyNodeChanges,
   useReactFlow,
@@ -577,6 +578,11 @@ function ReactFlowStudioInner({
     [edges, selectedNodeIdSet],
   );
 
+  const loopHighlights = useMemo(
+    () => deriveLoopHighlights(nodes, edges),
+    [nodes, edges],
+  );
+
   // Stable identity for the env list so the provider only re-renders
   // when the workbench actually mutates the rows.
   const envList = useMemo<EnvVarEntry[]>(
@@ -644,6 +650,7 @@ function ReactFlowStudioInner({
           proOptions={{ hideAttribution: true }}
           style={{ width: "100%", height: "100%" }}
         >
+          <LoopBodyHighlights highlights={loopHighlights} />
           <Background
             color="var(--anf-bg-dot, #d8def0)"
             variant={BackgroundVariant.Dots}
@@ -729,9 +736,212 @@ function shallowRuntimeEqual(
   return a.startedAt === b.startedAt && a.durationMs === b.durationMs;
 }
 
+interface LoopHighlight {
+  id: string;
+  points: Point[];
+  bounds: Rect;
+  kind: "foreach" | "for" | "loop";
+}
+
 interface Point {
   x: number;
   y: number;
+}
+
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+const LOOP_BEGIN_TO_END: Record<string, { endType: string; kind: LoopHighlight["kind"] }> = {
+  foreach_begin: { endType: "foreach_end", kind: "foreach" },
+  for_begin: { endType: "for_end", kind: "for" },
+  loop_begin: { endType: "loop_end", kind: "loop" },
+};
+
+const LOOP_HIGHLIGHT_PADDING = 34;
+
+function LoopBodyHighlights({ highlights }: { highlights: LoopHighlight[] }) {
+  if (highlights.length === 0) return null;
+  return (
+    <ViewportPortal>
+      <div className="anf-loop-highlight-layer" aria-hidden>
+        {highlights.map((highlight) => (
+          <svg
+            key={highlight.id}
+            className={`anf-loop-highlight anf-loop-highlight--${highlight.kind}`}
+            style={{
+              left: highlight.bounds.x,
+              top: highlight.bounds.y,
+              width: highlight.bounds.width,
+              height: highlight.bounds.height,
+            }}
+            viewBox={`0 0 ${fmt(highlight.bounds.width)} ${fmt(highlight.bounds.height)}`}
+            preserveAspectRatio="none"
+          >
+            <polygon
+              className="anf-loop-highlight-shape"
+              points={highlight.points
+                .map((point) => `${fmt(point.x - highlight.bounds.x)},${fmt(point.y - highlight.bounds.y)}`)
+                .join(" ")}
+            />
+          </svg>
+        ))}
+      </div>
+    </ViewportPortal>
+  );
+}
+
+function deriveLoopHighlights(
+  nodes: ReactFlowStudioNode[],
+  edges: ReactFlowStudioEdge[],
+): LoopHighlight[] {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const outEdges = new Map<string, ReactFlowStudioEdge[]>();
+  for (const edge of edges) {
+    const list = outEdges.get(edge.source) ?? [];
+    list.push(edge);
+    outEdges.set(edge.source, list);
+  }
+
+  return nodes.flatMap((beginNode) => {
+    const loop = LOOP_BEGIN_TO_END[beginNode.data.type];
+    if (!loop) return [];
+
+    const bodyNodeIds = new Set<string>();
+    const pending: string[] = [];
+    let endNodeId: string | undefined;
+
+    for (const edge of outEdges.get(beginNode.id) ?? []) {
+      if (edge.sourceHandle !== "body") continue;
+      const target = nodesById.get(edge.target);
+      if (!target) continue;
+      if (target.data.type === loop.endType) {
+        endNodeId = target.id;
+        continue;
+      }
+      pending.push(target.id);
+    }
+
+    while (pending.length > 0) {
+      const nodeId = pending.shift()!;
+      if (bodyNodeIds.has(nodeId) || nodeId === beginNode.id) continue;
+      const node = nodesById.get(nodeId);
+      if (!node) continue;
+      if (node.data.type === loop.endType) {
+        endNodeId = node.id;
+        continue;
+      }
+
+      bodyNodeIds.add(nodeId);
+      for (const edge of outEdges.get(nodeId) ?? []) {
+        if ((edge.data?.kind ?? "unknown") !== "control") continue;
+        const target = nodesById.get(edge.target);
+        if (!target) continue;
+        if (target.data.type === loop.endType) {
+          endNodeId = target.id;
+          continue;
+        }
+        pending.push(target.id);
+      }
+    }
+
+    if (!endNodeId || bodyNodeIds.size === 0) return [];
+
+    const highlightNodeIds = [beginNode.id, ...bodyNodeIds, endNodeId];
+    const rects = highlightNodeIds
+      .map((nodeId) => nodesById.get(nodeId))
+      .filter((node): node is ReactFlowStudioNode => Boolean(node))
+      .map(nodeBounds)
+      .filter((rect): rect is Rect => Boolean(rect));
+    if (rects.length < 2) return [];
+
+    const points = convexHull(rects.flatMap(rectCorners));
+    if (points.length < 3) return [];
+    const bounds = boundsForPoints(points);
+    return [{
+      id: `${beginNode.id}__${endNodeId}`,
+      points,
+      bounds,
+      kind: loop.kind,
+    }];
+  });
+}
+
+function nodeBounds(node: ReactFlowStudioNode): Rect | undefined {
+  const width = node.measured?.width ?? node.width ?? node.data?.width;
+  const height = node.measured?.height ?? node.height ?? node.data?.height;
+  if (typeof width !== "number" || typeof height !== "number") return undefined;
+  return {
+    x: node.position.x - LOOP_HIGHLIGHT_PADDING,
+    y: node.position.y - LOOP_HIGHLIGHT_PADDING,
+    width: width + LOOP_HIGHLIGHT_PADDING * 2,
+    height: height + LOOP_HIGHLIGHT_PADDING * 2,
+  };
+}
+
+function rectCorners(rect: Rect): Point[] {
+  const x2 = rect.x + rect.width;
+  const y2 = rect.y + rect.height;
+  return [
+    { x: rect.x, y: rect.y },
+    { x: x2, y: rect.y },
+    { x: x2, y: y2 },
+    { x: rect.x, y: y2 },
+  ];
+}
+
+function convexHull(points: Point[]): Point[] {
+  const unique = Array.from(
+    new Map(points.map((point) => [`${point.x}:${point.y}`, point])).values(),
+  ).sort((a, b) => a.x - b.x || a.y - b.y);
+  if (unique.length <= 1) return unique;
+
+  const lower: Point[] = [];
+  for (const point of unique) {
+    while (lower.length >= 2 && cross(lower[lower.length - 2]!, lower[lower.length - 1]!, point) <= 0) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+
+  const upper: Point[] = [];
+  for (let i = unique.length - 1; i >= 0; i -= 1) {
+    const point = unique[i]!;
+    while (upper.length >= 2 && cross(upper[upper.length - 2]!, upper[upper.length - 1]!, point) <= 0) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+
+  lower.pop();
+  upper.pop();
+  return lower.concat(upper);
+}
+
+function cross(a: Point, b: Point, c: Point): number {
+  return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+}
+
+function boundsForPoints(points: Point[]): Rect {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  for (const point of points) {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  }
+  return {
+    x: minX,
+    y: minY,
+    width: Math.max(1, maxX - minX),
+    height: Math.max(1, maxY - minY),
+  };
 }
 
 const CIRCUIT_EDGE_STUB = 32;

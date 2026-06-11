@@ -149,6 +149,41 @@ body,
   background: var(--anf-canvas-bg);
 }
 
+/* ---------- loop body highlight layer ---------- */
+
+.anf-loop-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.anf-loop-highlight {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.anf-loop-highlight-shape {
+  fill: rgba(109, 77, 255, 0.08);
+  stroke: rgba(109, 77, 255, 0.42);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 10px 24px rgba(109, 77, 255, 0.08));
+}
+
+.anf-loop-highlight--for .anf-loop-highlight-shape {
+  fill: rgba(14, 165, 233, 0.08);
+  stroke: rgba(14, 165, 233, 0.44);
+  filter: drop-shadow(0 10px 24px rgba(14, 165, 233, 0.08));
+}
+
+.anf-loop-highlight--loop .anf-loop-highlight-shape {
+  fill: rgba(245, 158, 11, 0.09);
+  stroke: rgba(245, 158, 11, 0.46);
+  filter: drop-shadow(0 10px 24px rgba(245, 158, 11, 0.09));
+}
+
 /* ---------- node card (Langflow-inspired) ---------- */
 
 .anf-node {
