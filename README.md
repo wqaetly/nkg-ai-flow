@@ -107,6 +107,14 @@
 npm install
 ```
 
+> 国内网络或公司内网拉取 npm 官方源较慢/失败时，建议在用户级配置中切换为公开镜像，**不要**在仓库内提交 `.npmrc`，避免污染团队环境：
+>
+> ```bash
+> npm config set registry https://registry.npmmirror.com
+> ```
+>
+> 如果遇到 `getaddrinfo ENOTFOUND mirrors.tencentyun.com` 之类错误，通常是 `package-lock.json` 中残留了某次在腾讯云 CVM 内网环境生成的 `resolved` URL；请在外网环境下重新生成 lock，或将这些 `resolved` 替换为官方源（如 `https://registry.npmjs.org/...`），`integrity` 字段无需改动。
+
 ### 6.2 宿主项目推荐作为 submodule 使用
 
 外部业务项目推荐把本项目作为 Git submodule 放在宿主仓库根目录，例如 `nkg-ai-flow/`：
