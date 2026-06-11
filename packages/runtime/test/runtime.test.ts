@@ -84,6 +84,62 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("Hello, Node");
   });
 
+  it("executes every item in a foreach begin/end block", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_block_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta", "gamma"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+      config: { mode: "sequential", concurrency: 1, batchSize: 1 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 300, y: 0 },
+      config: { template: "item=${input}" },
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(begin.out("item"), body.in("input"));
+    flow.connect(body.out("out"), end.in("body_done"));
+    flow.connect(body.out("output"), end.in("result"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(end.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_block_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=item=alpha,item=beta,item=gamma");
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",

@@ -71,6 +71,12 @@ const RUNTIME_BUILTIN_NODE_TYPES = [
   "agent",
   "event_trigger",
   "send_event",
+  "foreach_begin",
+  "foreach_end",
+  "for_begin",
+  "for_end",
+  "loop_begin",
+  "loop_end",
 ] as const;
 
 /* -------------------------------------------------------------------------- */

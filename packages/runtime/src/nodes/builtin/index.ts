@@ -23,3 +23,11 @@ export { textInputNode } from "./textInput.js";
 export { agentNode } from "./agent.js";
 export { eventTriggerNode } from "./eventTrigger.js";
 export { sendEventNode } from "./sendEvent.js";
+export {
+  foreachBeginNode,
+  foreachEndNode,
+  forBeginNode,
+  forEndNode,
+  loopBeginNode,
+  loopEndNode,
+} from "./loopBlocks.js";

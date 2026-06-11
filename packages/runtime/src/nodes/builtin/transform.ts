@@ -44,7 +44,12 @@ export const transformNode = defineNode({
   fieldMeta: {
     template: { label: "Template", control: "textarea", order: 1 },
     expression: { label: "Expression", control: "input", order: 2 },
-    value: { label: "Static Value", control: "json", order: 3 },
+    value: {
+      label: "Static Value",
+      control: "textarea",
+      order: 3,
+      placeholder: "Static text emitted as the transform output.",
+    },
   },
   ports: [
     { id: "input", direction: "input", kind: "data", label: "Input" },

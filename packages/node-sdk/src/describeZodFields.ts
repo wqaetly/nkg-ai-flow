@@ -259,7 +259,7 @@ function applyKindFromSchema(schema: ZodLike, desc: FieldDescriptor): void {
     }
     case "ZodArray": {
       // String-like arrays get a first-class list control; everything
-      // else falls back to the JSON editor via `unknown`.
+      // else falls back to the generic long-text renderer via `unknown`.
       const innerDef = def.type?._def;
       switch (innerDef?.typeName) {
         case "ZodString":
@@ -316,7 +316,7 @@ function describeNestedObject(schema: ZodLike): FieldDescriptor[] {
   const out: FieldDescriptor[] = [];
   for (const [name, child] of Object.entries(shape)) {
     // Nested objects are flattened to one level; deeper nesting becomes
-    // `unknown` (rendered as JSON) per requirement 1's edge-case rule.
+    // `unknown` and uses the generic long-text renderer.
     const inner = describeField(name, child as ZodLike);
     if (inner.kind === "object") inner.children = undefined;
     out.push(inner);

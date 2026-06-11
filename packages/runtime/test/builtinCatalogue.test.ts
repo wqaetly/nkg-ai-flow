@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { NodeEvent } from "@ai-native-flow/event-bus";
+import type { NodeConfigSchema, NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import {
   InMemorySecretStore,
   InMemoryVariableStore,
@@ -22,6 +23,12 @@ const BUILTIN_TYPES = [
   "agent",
   "event_trigger",
   "send_event",
+  "foreach_begin",
+  "foreach_end",
+  "for_begin",
+  "for_end",
+  "loop_begin",
+  "loop_end",
 ] as const;
 
 function testContext(): NodeContext {
@@ -64,6 +71,11 @@ function testContext(): NodeContext {
   };
 }
 
+function configFields(definition: NodeTypeDefinition) {
+  const schema = definition.configSchema as NodeConfigSchema | undefined;
+  return Array.isArray(schema?.fields) ? schema.fields : [];
+}
+
 describe("runtime / built-in catalogue", () => {
   it("exposes exactly the current built-in definitions including agent", () => {
     const definitions = getBuiltinNodeDefinitions({
@@ -89,6 +101,34 @@ describe("runtime / built-in catalogue", () => {
         "tool_log",
       ]),
     );
+  });
+
+  it("uses long-text controls instead of dedicated JSON field controls", () => {
+    const definitions = getBuiltinNodeDefinitions({
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const fields = definitions.flatMap((definition) =>
+      configFields(definition).map((field) => ({
+        nodeType: definition.type,
+        ...field,
+      })),
+    );
+
+    expect(fields.filter((field) => field.control === "json")).toEqual([]);
+    expect(
+      fields.find(
+        (field) => field.nodeType === "transform" && field.name === "value",
+      )?.control,
+    ).toBe("textarea");
+    expect(
+      fields.find(
+        (field) => field.nodeType === "http" && field.name === "headers",
+      )?.control,
+    ).toBe("textarea");
+    expect(
+      fields.find((field) => field.nodeType === "http" && field.name === "body")
+        ?.control,
+    ).toBe("textarea");
   });
 
   it("registers agent through the standard built-in runner catalogue", async () => {

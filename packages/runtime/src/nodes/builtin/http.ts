@@ -47,8 +47,8 @@ export const httpNode = defineNode({
   fieldMeta: {
     url: { label: "URL", placeholder: "https://api.example.com/v1", order: 1 },
     method: { label: "Method", control: "select", order: 2 },
-    headers: { label: "Headers", control: "json", order: 3 },
-    body: { label: "Body", control: "json", order: 4 },
+    headers: { label: "Headers", control: "textarea", order: 3 },
+    body: { label: "Body", control: "textarea", order: 4 },
   },
   ports: [
     {

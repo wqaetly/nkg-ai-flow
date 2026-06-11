@@ -36,7 +36,13 @@ import {
   endNode,
   eventTriggerNode,
   httpNode,
+  foreachBeginNode,
+  foreachEndNode,
+  forBeginNode,
+  forEndNode,
   llmNode,
+  loopBeginNode,
+  loopEndNode,
   sendEventNode,
   startNode,
   textInputNode,
@@ -143,6 +149,12 @@ export function createBuiltinRunnerRegistry(
   });
   installNode(target, eventTriggerNode);
   installNode(target, sendEventNode);
+  installNode(target, foreachBeginNode);
+  installNode(target, foreachEndNode);
+  installNode(target, forBeginNode);
+  installNode(target, forEndNode);
+  installNode(target, loopBeginNode);
+  installNode(target, loopEndNode);
 
   return registry;
 }

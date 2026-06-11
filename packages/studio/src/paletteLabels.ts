@@ -41,6 +41,22 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "事件触发",
         description: "收到匹配的字符串事件时启动流程。",
       },
+      for_begin: {
+        title: "For 开始",
+        description: "固定范围循环块入口，输出当前索引和总数。",
+      },
+      for_end: {
+        title: "For 结束",
+        description: "固定范围循环块出口，收集每轮结果。",
+      },
+      foreach_begin: {
+        title: "ForEach 开始",
+        description: "数组循环块入口，输出当前项、索引和总数。",
+      },
+      foreach_end: {
+        title: "ForEach 结束",
+        description: "数组循环块出口，聚合循环体输出。",
+      },
       flow_validator: {
         title: "Flow 验证器",
         description: "校验生成的 FlowGraph，并对生成的 TS 源码做基础检查。",
@@ -52,6 +68,14 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
       llm: {
         title: "大模型调用",
         description: "使用提示词模板调用模型，并可选择流式输出。",
+      },
+      loop_begin: {
+        title: "Loop 开始",
+        description: "While / Until 循环块入口，输出状态和轮次。",
+      },
+      loop_end: {
+        title: "Loop 结束",
+        description: "While / Until 循环块出口，输出最终状态或上限分支。",
       },
       node_designer: {
         title: "节点设计器（LLM 并发）",

@@ -37,7 +37,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       baseUrl: "服务地址",
       base_url: "服务地址",
       body: "请求体",
+      batchSize: "批大小",
+      checkMode: "检查时机",
+      concurrency: "并发数",
+      condition: "继续条件",
       default_name: "默认名称",
+      end: "结束值",
       expression: "表达式",
       event: "事件",
       flow_version: "流程版本",
@@ -47,6 +52,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       max_concurrency: "最大并发数",
       max_retries: "重试次数",
       maxOutputChars: "最大输出字符数",
+      maxIterations: "最大循环次数",
       maxSteps: "最大步骤数",
       maxTokens: "最大输出 Token",
       max_tokens: "最大输出 Token",
@@ -57,6 +63,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       package_scope: "包作用域",
       prompt: "提示词",
       strict: "严格模式",
+      start: "起始值",
+      step: "步长",
       stream: "流式输出",
       systemPrompt: "系统提示词",
       temperature: "温度",
@@ -99,6 +107,16 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       event_trigger: {
         event: "触发事件",
       },
+      for_begin: {
+        start: "起始值",
+        end: "结束值",
+        step: "步长",
+      },
+      foreach_begin: {
+        mode: "执行模式",
+        concurrency: "并发数",
+        batchSize: "批大小",
+      },
       flow_validator: {
         strict: "严格模式",
         lint_sources: "校验生成源码",
@@ -117,6 +135,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         temperature: "温度",
         maxTokens: "最大输出 Token",
         stream: "流式输出",
+      },
+      loop_begin: {
+        maxIterations: "最大循环次数",
+        checkMode: "检查时机",
+      },
+      loop_end: {
+        condition: "继续条件",
       },
       node_designer: {
         base_url: "服务地址",

@@ -1157,39 +1157,6 @@ body,
   color: var(--anf-text);
 }
 
-.anf-field-control--json {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.anf-field-json-input,
-.anf-field-json-textarea {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-family: inherit;
-  font-size: 12px;
-  color: var(--anf-text);
-  background: transparent;
-  border: none;
-  outline: none;
-  padding: 4px 8px;
-  resize: vertical;
-}
-
-.anf-field-json-toggle {
-  flex: 0 0 auto;
-  border: none;
-  border-left: 1px solid var(--anf-border);
-  background: var(--anf-surface-soft);
-  color: var(--anf-text-soft);
-  cursor: pointer;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
 .anf-field-control--array {
   font-family: inherit;
 }
@@ -1363,7 +1330,7 @@ body,
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 6px;
   min-height: 22px;
   min-width: 0;
 }
@@ -1377,6 +1344,12 @@ body,
 }
 
 /* The flow pin is bigger and styled like UE's exec pin. */
+.anf-port--flow {
+  min-height: 26px;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+
 .anf-port--flow .anf-port-label {
   font-size: 11px;
   text-transform: uppercase;

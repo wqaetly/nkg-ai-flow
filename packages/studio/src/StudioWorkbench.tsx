@@ -448,6 +448,7 @@ export function StudioWorkbench({
   /** Subscribe to console.* once on mount and mirror entries into the panel. */
   useEffect(() => {
     if (!captureConsole) return;
+    let active = true;
     const original = {
       log: console.log,
       info: console.info,
@@ -455,6 +456,10 @@ export function StudioWorkbench({
       error: console.error,
       debug: console.debug,
     };
+    const defer =
+      typeof queueMicrotask === "function"
+        ? queueMicrotask
+        : (cb: () => void) => setTimeout(cb, 0);
     const push = (level: ConsoleLevel, args: unknown[]) => {
       const message = args
         .map((arg) => {
@@ -467,7 +472,9 @@ export function StudioWorkbench({
           }
         })
         .join(" ");
-      appendLog(level, message);
+      defer(() => {
+        if (active) appendLog(level, message);
+      });
     };
     console.log = (...args: unknown[]) => { push("log", args); original.log(...args); };
     console.info = (...args: unknown[]) => { push("info", args); original.info(...args); };
@@ -475,6 +482,7 @@ export function StudioWorkbench({
     console.error = (...args: unknown[]) => { push("error", args); original.error(...args); };
     console.debug = (...args: unknown[]) => { push("debug", args); original.debug(...args); };
     return () => {
+      active = false;
       console.log = original.log;
       console.info = original.info;
       console.warn = original.warn;

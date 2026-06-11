@@ -5,7 +5,7 @@
  * this registry. Resolution order (highest priority first):
  *
  *   1. Exact match on `(nodeType, fieldName)`
- *   2. Match on `fieldMeta.control` value (e.g. "textarea", "json")
+ *   2. Match on `fieldMeta.control` value (e.g. "textarea")
  *   3. Match on `kind` (e.g. "string", "number", "enum")
  *   4. The `unknown` fallback renderer
  *

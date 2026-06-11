@@ -16,7 +16,7 @@
  * shared registry export.
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 import type {
@@ -39,6 +39,19 @@ const STOP_PROPS = {
 function asString(v: unknown): string {
   if (v === undefined || v === null) return "";
   if (typeof v === "string") return v;
+  return String(v);
+}
+
+function asTextValue(v: unknown): string {
+  if (v === undefined || v === null) return "";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") {
+    try {
+      return JSON.stringify(v, null, 2);
+    } catch {
+      return String(v);
+    }
+  }
   return String(v);
 }
 
@@ -84,7 +97,7 @@ const TextareaRenderer: FieldRenderer = ({
 }) => (
   <TextFieldShell
     descriptor={descriptor}
-    value={asString(value)}
+    value={asTextValue(value)}
     placeholder={descriptor.placeholder}
     disabled={disabled}
     onChange={onChange}
@@ -262,112 +275,7 @@ const StringArrayRenderer: FieldRenderer = ({
   );
 };
 
-/**
- * Compact JSON editor used for `record` / `object` / `unknown`. Edits
- * are committed only when the buffer parses; while invalid we keep the
- * draft local and mark the field invalid.
- */
-const JsonRenderer: FieldRenderer = ({
-  descriptor,
-  value,
-  onChange,
-  disabled,
-}) => {
-  const [expanded, setExpanded] = useState(false);
-  const initial = useMemo(() => formatJson(value), [value]);
-  const [draft, setDraft] = useState(initial);
-  const [invalid, setInvalid] = useState(false);
-  const lastValueRef = useRef(initial);
-
-  // Keep draft in sync when the upstream value changes (e.g. external
-  // edit). We deliberately ignore programmatic changes that match what
-  // we last committed to avoid clobbering user typing.
-  useEffect(() => {
-    const formatted = formatJson(value);
-    if (formatted !== lastValueRef.current) {
-      lastValueRef.current = formatted;
-      setDraft(formatted);
-      setInvalid(false);
-    }
-  }, [value]);
-
-  const commit = (raw: string) => {
-    setDraft(raw);
-    if (raw.trim() === "") {
-      setInvalid(false);
-      lastValueRef.current = "";
-      onChange(undefined);
-      return;
-    }
-    try {
-      const parsed = JSON.parse(raw);
-      setInvalid(false);
-      lastValueRef.current = formatJson(parsed);
-      onChange(parsed);
-    } catch {
-      setInvalid(true);
-    }
-  };
-
-  return (
-    <span
-      {...STOP_PROPS}
-      className={classNames(
-        "anf-field-control anf-field-control--json nodrag nopan nowheel",
-        invalid && "anf-field--invalid",
-      )}
-    >
-      {expanded ? (
-        <textarea
-          className="anf-field-json-textarea"
-          value={draft}
-          disabled={disabled}
-          rows={5}
-          spellCheck={false}
-          onMouseDown={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onChange={(e) => commit(e.target.value)}
-        />
-      ) : (
-        <input
-          type="text"
-          className="anf-field-json-input"
-          value={draft}
-          placeholder={descriptor.placeholder ?? "{}"}
-          disabled={disabled}
-          onMouseDown={(e) => e.stopPropagation()}
-          onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
-          onChange={(e) => commit(e.target.value)}
-        />
-      )}
-      <button
-        type="button"
-        className="anf-field-json-toggle"
-        disabled={disabled}
-        title={expanded ? "Collapse" : "Expand"}
-        onClick={(e) => {
-          e.stopPropagation();
-          setExpanded((x) => !x);
-        }}
-      >
-        {expanded ? "▴" : "▾"}
-      </button>
-    </span>
-  );
-};
-
-const UnknownRenderer: FieldRenderer = JsonRenderer;
-
-function formatJson(v: unknown): string {
-  if (v === undefined || v === null) return "";
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return "";
-  }
-}
+const UnknownRenderer: FieldRenderer = TextareaRenderer;
 
 function TextFieldShell({
   descriptor,
@@ -527,8 +435,8 @@ export function registerDefaults(registry: FieldRendererRegistry): void {
   registry.register({ kind: "boolean" }, BooleanRenderer);
   registry.register({ kind: "enum" }, EnumRenderer);
   registry.register({ kind: "string[]" }, StringArrayRenderer);
-  registry.register({ kind: "record" }, JsonRenderer);
-  registry.register({ kind: "object" }, JsonRenderer);
+  registry.register({ kind: "record" }, TextareaRenderer);
+  registry.register({ kind: "object" }, TextareaRenderer);
   registry.register({ kind: "unknown" }, UnknownRenderer);
 
   // Control overrides
@@ -538,8 +446,6 @@ export function registerDefaults(registry: FieldRendererRegistry): void {
   registry.register({ control: "number" }, NumberRenderer);
   registry.register({ control: "switch" }, BooleanRenderer);
   registry.register({ control: "select" }, EnumRenderer);
-  registry.register({ control: "json" }, JsonRenderer);
-
   // Fallback
   registry.setFallback(UnknownRenderer);
 }
@@ -552,6 +458,5 @@ export {
   BooleanRenderer,
   EnumRenderer,
   StringArrayRenderer,
-  JsonRenderer,
   UnknownRenderer,
 };

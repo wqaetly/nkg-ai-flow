@@ -184,8 +184,8 @@ export interface FieldMeta {
   order?: number;
   /**
    * Force a specific control. Overrides the kind-based default.
-   * `"json"` is an alias for the multi-line JSON editor used by
-   * `record` / `object` / `unknown` kinds.
+   * `"json"` remains in the serialized type for historical descriptors;
+   * first-party Studio renderers no longer provide a dedicated JSON control.
    */
   control?:
     | "input"
@@ -215,7 +215,7 @@ export interface FieldDescriptor extends FieldMeta {
   constraints?: FieldConstraints;
   /**
    * For `kind === "object"`: nested descriptors (one level only in
-   * Phase 1; deeper objects are rendered as JSON via `unknown`).
+   * Phase 1; deeper objects use the generic `unknown` rendering).
    */
   children?: FieldDescriptor[];
 }

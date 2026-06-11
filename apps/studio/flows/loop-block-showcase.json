@@ -1,0 +1,1829 @@
+{
+  "id": "loop_block_showcase",
+  "version": "1.0.0",
+  "schemaVersion": "flow.graph.v1",
+  "label": "Loop Block Showcase",
+  "description": "一个画布内用四条独立链路全面展示 ForEach 顺序、ForEach 并行批量、For 固定范围和 Loop 状态迭代的同画布 Begin/End 用法。",
+  "nodes": [
+    {
+      "id": "seq_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "链路 A · ForEach 顺序",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "seq_items",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "准备待处理数组",
+      "position": {
+        "x": 450,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "value": [
+          "alpha",
+          "beta",
+          "gamma"
+        ]
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "seq_foreach_begin",
+      "type": "foreach_begin",
+      "typeVersion": "1.0.0",
+      "label": "ForEach 开始 · 顺序",
+      "position": {
+        "x": 900,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        },
+        {
+          "id": "body",
+          "direction": "output",
+          "kind": "control",
+          "label": "循环体"
+        },
+        {
+          "id": "items",
+          "direction": "input",
+          "kind": "data",
+          "label": "数组"
+        },
+        {
+          "id": "item",
+          "direction": "output",
+          "kind": "data",
+          "label": "当前项"
+        },
+        {
+          "id": "index",
+          "direction": "output",
+          "kind": "data",
+          "label": "索引"
+        },
+        {
+          "id": "count",
+          "direction": "output",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "mode": "sequential",
+        "concurrency": 1,
+        "batchSize": 1
+      },
+      "size": {
+        "width": 280,
+        "height": 286
+      }
+    },
+    {
+      "id": "seq_body",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "循环体 · 处理 item/index/count",
+      "position": {
+        "x": 1350,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "index",
+          "direction": "input",
+          "kind": "data",
+          "label": "索引"
+        },
+        {
+          "id": "count",
+          "direction": "input",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "template": "item=${input}"
+      },
+      "size": {
+        "width": 295,
+        "height": 286
+      }
+    },
+    {
+      "id": "seq_foreach_end",
+      "type": "foreach_end",
+      "typeVersion": "1.0.0",
+      "label": "ForEach 结束 · 收集结果",
+      "position": {
+        "x": 1815,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "body_done",
+          "direction": "input",
+          "kind": "control",
+          "label": "循环体完成"
+        },
+        {
+          "id": "done",
+          "direction": "output",
+          "kind": "control",
+          "label": "完成"
+        },
+        {
+          "id": "result",
+          "direction": "input",
+          "kind": "data",
+          "label": "单次结果",
+          "multiple": true
+        },
+        {
+          "id": "results",
+          "direction": "output",
+          "kind": "data",
+          "label": "结果数组"
+        },
+        {
+          "id": "errors",
+          "direction": "output",
+          "kind": "data",
+          "label": "错误列表"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 140
+      }
+    },
+    {
+      "id": "seq_report",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "汇总 results/errors",
+      "position": {
+        "x": 2265,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "errors",
+          "direction": "input",
+          "kind": "data",
+          "label": "错误列表"
+        }
+      ],
+      "config": {
+        "template": "foreach sequential results=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "seq_end",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "顺序 ForEach 出口",
+      "position": {
+        "x": 2715,
+        "y": 0
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "batch_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "链路 B · ForEach 并行批量",
+      "position": {
+        "x": 0,
+        "y": 176
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "batch_items",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "准备批量任务",
+      "position": {
+        "x": 450,
+        "y": 338
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "value": [
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": 3
+          },
+          {
+            "id": 4
+          }
+        ]
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "batch_foreach_begin",
+      "type": "foreach_begin",
+      "typeVersion": "1.0.0",
+      "label": "ForEach 开始 · 并行批量",
+      "position": {
+        "x": 900,
+        "y": 366
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        },
+        {
+          "id": "body",
+          "direction": "output",
+          "kind": "control",
+          "label": "循环体"
+        },
+        {
+          "id": "items",
+          "direction": "input",
+          "kind": "data",
+          "label": "数组"
+        },
+        {
+          "id": "item",
+          "direction": "output",
+          "kind": "data",
+          "label": "当前项"
+        },
+        {
+          "id": "index",
+          "direction": "output",
+          "kind": "data",
+          "label": "索引"
+        },
+        {
+          "id": "count",
+          "direction": "output",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "mode": "parallel",
+        "concurrency": 3,
+        "batchSize": 2
+      },
+      "size": {
+        "width": 280,
+        "height": 286
+      }
+    },
+    {
+      "id": "batch_body",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "循环体 · 调用/处理单项",
+      "position": {
+        "x": 1350,
+        "y": 366
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "index",
+          "direction": "input",
+          "kind": "data",
+          "label": "索引"
+        },
+        {
+          "id": "count",
+          "direction": "input",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "template": "batch item=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 286
+      }
+    },
+    {
+      "id": "batch_foreach_end",
+      "type": "foreach_end",
+      "typeVersion": "1.0.0",
+      "label": "ForEach 结束 · 批量汇总",
+      "position": {
+        "x": 1815,
+        "y": 220
+      },
+      "ports": [
+        {
+          "id": "body_done",
+          "direction": "input",
+          "kind": "control",
+          "label": "循环体完成"
+        },
+        {
+          "id": "done",
+          "direction": "output",
+          "kind": "control",
+          "label": "完成"
+        },
+        {
+          "id": "result",
+          "direction": "input",
+          "kind": "data",
+          "label": "单次结果",
+          "multiple": true
+        },
+        {
+          "id": "results",
+          "direction": "output",
+          "kind": "data",
+          "label": "结果数组"
+        },
+        {
+          "id": "errors",
+          "direction": "output",
+          "kind": "data",
+          "label": "错误列表"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 140
+      }
+    },
+    {
+      "id": "batch_report",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "汇总批量 results/errors",
+      "position": {
+        "x": 2265,
+        "y": 338
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "errors",
+          "direction": "input",
+          "kind": "data",
+          "label": "错误列表"
+        }
+      ],
+      "config": {
+        "template": "foreach parallel results=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "batch_end",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "并行 ForEach 出口",
+      "position": {
+        "x": 2715,
+        "y": 176
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "for_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "链路 C · For 固定范围",
+      "position": {
+        "x": 0,
+        "y": 352
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "for_begin",
+      "type": "for_begin",
+      "typeVersion": "1.0.0",
+      "label": "For 开始 · 0 到 5",
+      "position": {
+        "x": 450,
+        "y": 676
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        },
+        {
+          "id": "body",
+          "direction": "output",
+          "kind": "control",
+          "label": "循环体"
+        },
+        {
+          "id": "index",
+          "direction": "output",
+          "kind": "data",
+          "label": "索引"
+        },
+        {
+          "id": "count",
+          "direction": "output",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "start": 0,
+        "end": 5,
+        "step": 1
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "for_body",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "循环体 · 使用 index/count",
+      "position": {
+        "x": 900,
+        "y": 732
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "count",
+          "direction": "input",
+          "kind": "data",
+          "label": "总数"
+        }
+      ],
+      "config": {
+        "template": "for index=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "for_end",
+      "type": "for_end",
+      "typeVersion": "1.0.0",
+      "label": "For 结束 · 收集索引结果",
+      "position": {
+        "x": 1350,
+        "y": 732
+      },
+      "ports": [
+        {
+          "id": "body_done",
+          "direction": "input",
+          "kind": "control",
+          "label": "循环体完成"
+        },
+        {
+          "id": "done",
+          "direction": "output",
+          "kind": "control",
+          "label": "完成"
+        },
+        {
+          "id": "result",
+          "direction": "input",
+          "kind": "data",
+          "label": "单次结果",
+          "multiple": true
+        },
+        {
+          "id": "results",
+          "direction": "output",
+          "kind": "data",
+          "label": "结果数组"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 112
+      }
+    },
+    {
+      "id": "for_report",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "汇总 for results",
+      "position": {
+        "x": 1815,
+        "y": 440
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "template": "for results=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "for_exit",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "For 出口",
+      "position": {
+        "x": 2265,
+        "y": 676
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "loop_start",
+      "type": "start",
+      "typeVersion": "1.0.0",
+      "label": "链路 D · Loop 状态迭代",
+      "position": {
+        "x": 0,
+        "y": 528
+      },
+      "ports": [
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "loop_initial_state",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "准备初始 state",
+      "position": {
+        "x": 450,
+        "y": 1014
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "value": {
+          "draft": "v1",
+          "continue": "false"
+        }
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "loop_begin",
+      "type": "loop_begin",
+      "typeVersion": "1.0.0",
+      "label": "Loop 开始 · 状态入口",
+      "position": {
+        "x": 900,
+        "y": 1070
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        },
+        {
+          "id": "body",
+          "direction": "output",
+          "kind": "control",
+          "label": "循环体"
+        },
+        {
+          "id": "initialState",
+          "direction": "input",
+          "kind": "data",
+          "label": "初始状态"
+        },
+        {
+          "id": "state",
+          "direction": "output",
+          "kind": "data",
+          "label": "当前状态"
+        },
+        {
+          "id": "iteration",
+          "direction": "output",
+          "kind": "data",
+          "label": "轮次"
+        }
+      ],
+      "config": {
+        "maxIterations": 10,
+        "checkMode": "after"
+      },
+      "size": {
+        "width": 280,
+        "height": 224
+      }
+    },
+    {
+      "id": "loop_body",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "循环体 · 读取 state/iteration",
+      "position": {
+        "x": 1350,
+        "y": 924
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        },
+        {
+          "id": "iteration",
+          "direction": "input",
+          "kind": "data",
+          "label": "轮次"
+        }
+      ],
+      "config": {
+        "value": {
+          "draft": "v2",
+          "continue": "false"
+        }
+      },
+      "size": {
+        "width": 288,
+        "height": 258
+      }
+    },
+    {
+      "id": "loop_end",
+      "type": "loop_end",
+      "typeVersion": "1.0.0",
+      "label": "Loop 结束 · 条件出口",
+      "position": {
+        "x": 1815,
+        "y": 778
+      },
+      "ports": [
+        {
+          "id": "body_done",
+          "direction": "input",
+          "kind": "control",
+          "label": "循环体完成"
+        },
+        {
+          "id": "done",
+          "direction": "output",
+          "kind": "control",
+          "label": "完成"
+        },
+        {
+          "id": "maxed",
+          "direction": "output",
+          "kind": "control",
+          "label": "达到上限"
+        },
+        {
+          "id": "nextState",
+          "direction": "input",
+          "kind": "data",
+          "label": "下一状态"
+        },
+        {
+          "id": "finalState",
+          "direction": "output",
+          "kind": "data",
+          "label": "最终状态"
+        }
+      ],
+      "config": {
+        "condition": "nextState.continue == \"true\""
+      },
+      "size": {
+        "width": 280,
+        "height": 162
+      }
+    },
+    {
+      "id": "loop_done_report",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "完成分支 · finalState",
+      "position": {
+        "x": 2265,
+        "y": 852
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "template": "loop done final=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "loop_done_exit",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "Loop 完成出口",
+      "position": {
+        "x": 2715,
+        "y": 352
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    },
+    {
+      "id": "loop_maxed_report",
+      "type": "transform",
+      "typeVersion": "1.0.0",
+      "label": "上限分支 · finalState",
+      "position": {
+        "x": 2265,
+        "y": 1190
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行",
+          "multiple": true
+        },
+        {
+          "id": "out",
+          "direction": "output",
+          "kind": "control",
+          "label": "下一步"
+        },
+        {
+          "id": "error",
+          "direction": "output",
+          "kind": "error",
+          "label": "错误"
+        },
+        {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "输入"
+        },
+        {
+          "id": "output",
+          "direction": "output",
+          "kind": "data",
+          "label": "输出"
+        }
+      ],
+      "config": {
+        "template": "loop maxed final=${input}"
+      },
+      "size": {
+        "width": 280,
+        "height": 258
+      }
+    },
+    {
+      "id": "loop_maxed_exit",
+      "type": "end",
+      "typeVersion": "1.0.0",
+      "label": "Loop 上限出口",
+      "position": {
+        "x": 2715,
+        "y": 528
+      },
+      "ports": [
+        {
+          "id": "in",
+          "direction": "input",
+          "kind": "control",
+          "label": "运行"
+        }
+      ],
+      "config": {},
+      "size": {
+        "width": 280,
+        "height": 96
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "seq_e01",
+      "from": {
+        "nodeId": "seq_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "seq_items",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "seq_e02",
+      "from": {
+        "nodeId": "seq_items",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "seq_e03",
+      "from": {
+        "nodeId": "seq_items",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "items"
+      }
+    },
+    {
+      "id": "seq_e04",
+      "from": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "body"
+      },
+      "to": {
+        "nodeId": "seq_body",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "seq_e05",
+      "from": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "item"
+      },
+      "to": {
+        "nodeId": "seq_body",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "seq_e06",
+      "from": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "index"
+      },
+      "to": {
+        "nodeId": "seq_body",
+        "portId": "index"
+      }
+    },
+    {
+      "id": "seq_e07",
+      "from": {
+        "nodeId": "seq_foreach_begin",
+        "portId": "count"
+      },
+      "to": {
+        "nodeId": "seq_body",
+        "portId": "count"
+      }
+    },
+    {
+      "id": "seq_e08",
+      "from": {
+        "nodeId": "seq_body",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "seq_foreach_end",
+        "portId": "body_done"
+      }
+    },
+    {
+      "id": "seq_e09",
+      "from": {
+        "nodeId": "seq_body",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "seq_foreach_end",
+        "portId": "result"
+      }
+    },
+    {
+      "id": "seq_e10",
+      "from": {
+        "nodeId": "seq_foreach_end",
+        "portId": "done"
+      },
+      "to": {
+        "nodeId": "seq_report",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "seq_e11",
+      "from": {
+        "nodeId": "seq_foreach_end",
+        "portId": "results"
+      },
+      "to": {
+        "nodeId": "seq_report",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "seq_e12",
+      "from": {
+        "nodeId": "seq_foreach_end",
+        "portId": "errors"
+      },
+      "to": {
+        "nodeId": "seq_report",
+        "portId": "errors"
+      }
+    },
+    {
+      "id": "seq_e13",
+      "from": {
+        "nodeId": "seq_report",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "seq_end",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "batch_e01",
+      "from": {
+        "nodeId": "batch_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "batch_items",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "batch_e02",
+      "from": {
+        "nodeId": "batch_items",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "batch_e03",
+      "from": {
+        "nodeId": "batch_items",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "items"
+      }
+    },
+    {
+      "id": "batch_e04",
+      "from": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "body"
+      },
+      "to": {
+        "nodeId": "batch_body",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "batch_e05",
+      "from": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "item"
+      },
+      "to": {
+        "nodeId": "batch_body",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "batch_e06",
+      "from": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "index"
+      },
+      "to": {
+        "nodeId": "batch_body",
+        "portId": "index"
+      }
+    },
+    {
+      "id": "batch_e07",
+      "from": {
+        "nodeId": "batch_foreach_begin",
+        "portId": "count"
+      },
+      "to": {
+        "nodeId": "batch_body",
+        "portId": "count"
+      }
+    },
+    {
+      "id": "batch_e08",
+      "from": {
+        "nodeId": "batch_body",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "batch_foreach_end",
+        "portId": "body_done"
+      }
+    },
+    {
+      "id": "batch_e09",
+      "from": {
+        "nodeId": "batch_body",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "batch_foreach_end",
+        "portId": "result"
+      }
+    },
+    {
+      "id": "batch_e10",
+      "from": {
+        "nodeId": "batch_foreach_end",
+        "portId": "done"
+      },
+      "to": {
+        "nodeId": "batch_report",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "batch_e11",
+      "from": {
+        "nodeId": "batch_foreach_end",
+        "portId": "results"
+      },
+      "to": {
+        "nodeId": "batch_report",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "batch_e12",
+      "from": {
+        "nodeId": "batch_foreach_end",
+        "portId": "errors"
+      },
+      "to": {
+        "nodeId": "batch_report",
+        "portId": "errors"
+      }
+    },
+    {
+      "id": "batch_e13",
+      "from": {
+        "nodeId": "batch_report",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "batch_end",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "for_e01",
+      "from": {
+        "nodeId": "for_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "for_begin",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "for_e02",
+      "from": {
+        "nodeId": "for_begin",
+        "portId": "body"
+      },
+      "to": {
+        "nodeId": "for_body",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "for_e03",
+      "from": {
+        "nodeId": "for_begin",
+        "portId": "index"
+      },
+      "to": {
+        "nodeId": "for_body",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "for_e04",
+      "from": {
+        "nodeId": "for_begin",
+        "portId": "count"
+      },
+      "to": {
+        "nodeId": "for_body",
+        "portId": "count"
+      }
+    },
+    {
+      "id": "for_e05",
+      "from": {
+        "nodeId": "for_body",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "for_end",
+        "portId": "body_done"
+      }
+    },
+    {
+      "id": "for_e06",
+      "from": {
+        "nodeId": "for_body",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "for_end",
+        "portId": "result"
+      }
+    },
+    {
+      "id": "for_e07",
+      "from": {
+        "nodeId": "for_end",
+        "portId": "done"
+      },
+      "to": {
+        "nodeId": "for_report",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "for_e08",
+      "from": {
+        "nodeId": "for_end",
+        "portId": "results"
+      },
+      "to": {
+        "nodeId": "for_report",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "for_e09",
+      "from": {
+        "nodeId": "for_report",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "for_exit",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e01",
+      "from": {
+        "nodeId": "loop_start",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "loop_initial_state",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e02",
+      "from": {
+        "nodeId": "loop_initial_state",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "loop_begin",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e03",
+      "from": {
+        "nodeId": "loop_initial_state",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "loop_begin",
+        "portId": "initialState"
+      }
+    },
+    {
+      "id": "loop_e04",
+      "from": {
+        "nodeId": "loop_begin",
+        "portId": "body"
+      },
+      "to": {
+        "nodeId": "loop_body",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e05",
+      "from": {
+        "nodeId": "loop_begin",
+        "portId": "state"
+      },
+      "to": {
+        "nodeId": "loop_body",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "loop_e06",
+      "from": {
+        "nodeId": "loop_begin",
+        "portId": "iteration"
+      },
+      "to": {
+        "nodeId": "loop_body",
+        "portId": "iteration"
+      }
+    },
+    {
+      "id": "loop_e07",
+      "from": {
+        "nodeId": "loop_body",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "loop_end",
+        "portId": "body_done"
+      }
+    },
+    {
+      "id": "loop_e08",
+      "from": {
+        "nodeId": "loop_body",
+        "portId": "output"
+      },
+      "to": {
+        "nodeId": "loop_end",
+        "portId": "nextState"
+      }
+    },
+    {
+      "id": "loop_e09",
+      "from": {
+        "nodeId": "loop_end",
+        "portId": "done"
+      },
+      "to": {
+        "nodeId": "loop_done_report",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e10",
+      "from": {
+        "nodeId": "loop_end",
+        "portId": "finalState"
+      },
+      "to": {
+        "nodeId": "loop_done_report",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "loop_e11",
+      "from": {
+        "nodeId": "loop_done_report",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "loop_done_exit",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e12",
+      "from": {
+        "nodeId": "loop_end",
+        "portId": "maxed"
+      },
+      "to": {
+        "nodeId": "loop_maxed_report",
+        "portId": "in"
+      }
+    },
+    {
+      "id": "loop_e13",
+      "from": {
+        "nodeId": "loop_end",
+        "portId": "finalState"
+      },
+      "to": {
+        "nodeId": "loop_maxed_report",
+        "portId": "input"
+      }
+    },
+    {
+      "id": "loop_e14",
+      "from": {
+        "nodeId": "loop_maxed_report",
+        "portId": "out"
+      },
+      "to": {
+        "nodeId": "loop_maxed_exit",
+        "portId": "in"
+      }
+    }
+  ],
+  "viewport": {
+    "x": 90,
+    "y": 90,
+    "zoom": 0.42
+  }
+}

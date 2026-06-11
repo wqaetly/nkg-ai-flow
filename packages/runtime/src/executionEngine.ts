@@ -111,6 +111,8 @@ export class ExecutionEngine {
   private readonly portValues = new Map<string, unknown>();
   /** Per-node count of remaining required inbound edges. */
   private readonly remainingDeps = new Map<string, number>();
+  /** Per-node input overrides used by block runners when aggregating loop results. */
+  private readonly inputOverrides = new Map<string, unknown>();
   /** Node lookup by id. */
   private readonly nodesById = new Map<string, NodeInstance>();
   /** Outbound edges per node id. */
@@ -277,6 +279,9 @@ export class ExecutionEngine {
           if (!handled) {
             return { succeeded: false, cancelled: false, error: result.error };
           }
+          continue;
+        }
+        if (await this.executeLoopBlock(node, queue)) {
           continue;
         }
         // success: propagate outputs along outgoing edges
@@ -531,11 +536,21 @@ export class ExecutionEngine {
     // 3. Inbound edges
     const inbound = this.inEdges.get(node.id) ?? [];
     let hasDataInbound = false;
+    const appliedOverrides = new Set<string>();
     for (const edge of inbound) {
-      const value = this.portValues.get(`${edge.from.nodeId}.${edge.from.portId}`);
       const fromPort = this.findPort(edge.from.nodeId, edge.from.portId);
       const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
       if (fromPort && fromPort.kind === "data") hasDataInbound = true;
+      if (toPort && toPort.kind === "data") hasDataInbound = true;
+      const overrideKey = `${node.id}.${edge.to.portId}`;
+      if (this.inputOverrides.has(overrideKey)) {
+        if (!appliedOverrides.has(edge.to.portId)) {
+          inputs[edge.to.portId] = this.inputOverrides.get(overrideKey);
+          appliedOverrides.add(edge.to.portId);
+        }
+        continue;
+      }
+      const value = this.portValues.get(`${edge.from.nodeId}.${edge.from.portId}`);
       const nextValue = value ?? null;
       if (toPort?.multiple) {
         const prev = inputs[edge.to.portId];
@@ -634,6 +649,231 @@ export class ExecutionEngine {
     }
   }
 
+  private async executeLoopBlock(
+    beginNode: NodeInstance,
+    queue: string[],
+  ): Promise<boolean> {
+    const spec = loopSpecFor(beginNode.type);
+    if (!spec) return false;
+
+    const block = this.findLoopBlock(beginNode, spec.endType);
+    if (!block) return false;
+
+    if (beginNode.type === "loop_begin") {
+      return this.executeWhileBlock(beginNode, block, queue);
+    }
+
+    const iterations =
+      beginNode.type === "foreach_begin"
+        ? this.foreachIterations(beginNode)
+        : this.forIterations(beginNode);
+    const aggregated = new Map<string, unknown[]>();
+
+    for (const outputs of iterations) {
+      this.recordOutputs(beginNode, outputs);
+      const bodyOk = await this.executeLoopBody(block, queue);
+      if (!bodyOk) return true;
+      this.collectLoopEndInputs(block, aggregated);
+    }
+
+    this.applyLoopEndOverrides(block.endNode, aggregated);
+    const endResult = await this.executeNode(block.endNode);
+    this.clearLoopEndOverrides(block.endNode, aggregated);
+    if (endResult.kind === "error") {
+      await this.routeErrorOrFail(block.endNode, endResult.error, queue);
+      return true;
+    }
+    if (endResult.kind === "success") {
+      this.recordOutputs(block.endNode, endResult.outputs);
+      this.enqueueReadyDownstream(block.endNode, endResult.outputs, queue);
+    }
+    return true;
+  }
+
+  private foreachIterations(beginNode: NodeInstance): NodeOutputs[] {
+    const inputs = this.assembleInputs(beginNode);
+    const items = Array.isArray(inputs.items) ? inputs.items : [];
+    return items.map((item, index) => ({
+      body: null,
+      item,
+      index,
+      count: items.length,
+    }));
+  }
+
+  private forIterations(beginNode: NodeInstance): NodeOutputs[] {
+    const inputs = this.assembleInputs(beginNode);
+    const config = asRecord(inputs.__config__);
+    const start = numberOr(config.start, 0);
+    const end = numberOr(config.end, start);
+    const rawStep = numberOr(config.step, 1);
+    const step = rawStep === 0 ? 1 : rawStep;
+    const values: number[] = [];
+    if (step > 0) {
+      for (let index = start; index < end; index += step) values.push(index);
+    } else {
+      for (let index = start; index > end; index += step) values.push(index);
+    }
+    return values.map((index) => ({
+      body: null,
+      index,
+      count: values.length,
+    }));
+  }
+
+  private async executeWhileBlock(
+    beginNode: NodeInstance,
+    block: LoopBlock,
+    queue: string[],
+  ): Promise<boolean> {
+    const inputs = this.assembleInputs(beginNode);
+    const config = asRecord(inputs.__config__);
+    const maxIterations = Math.max(1, Math.trunc(numberOr(config.maxIterations, 10)));
+    let state = inputs.initialState ?? inputs.input ?? null;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      this.recordOutputs(beginNode, {
+        body: null,
+        state,
+        iteration,
+      });
+      const bodyOk = await this.executeLoopBody(block, queue);
+      if (!bodyOk) return true;
+
+      const aggregated = new Map<string, unknown[]>();
+      this.collectLoopEndInputs(block, aggregated);
+      this.applyLoopEndOverrides(block.endNode, aggregated);
+      const endResult = await this.executeNode(block.endNode);
+      this.clearLoopEndOverrides(block.endNode, aggregated);
+      if (endResult.kind === "error") {
+        await this.routeErrorOrFail(block.endNode, endResult.error, queue);
+        return true;
+      }
+      if (endResult.kind !== "success") return true;
+
+      const wantsAnotherIteration = "maxed" in endResult.outputs;
+      state = endResult.outputs.finalState ?? state;
+      const hitLimit = wantsAnotherIteration && iteration === maxIterations - 1;
+      if (!wantsAnotherIteration || hitLimit) {
+        const outputs = hitLimit
+          ? { ...endResult.outputs, maxed: null }
+          : endResult.outputs;
+        this.recordOutputs(block.endNode, outputs);
+        this.enqueueReadyDownstream(block.endNode, outputs, queue);
+        return true;
+      }
+    }
+    return true;
+  }
+
+  private async executeLoopBody(
+    block: LoopBlock,
+    queue: string[],
+  ): Promise<boolean> {
+    const localQueue = [...block.bodyStartNodeIds];
+    const seen = new Set<string>();
+    while (localQueue.length > 0) {
+      const nodeId = localQueue.shift()!;
+      if (seen.has(nodeId)) continue;
+      seen.add(nodeId);
+      const node = this.nodesById.get(nodeId);
+      if (!node) continue;
+      const result = await this.executeNode(node);
+      if (result.kind === "skip") continue;
+      if (result.kind === "error") {
+        return this.routeErrorOrFail(node, result.error, queue);
+      }
+      this.recordOutputs(node, result.outputs);
+      for (const edge of this.outEdges.get(node.id) ?? []) {
+        if (!(edge.from.portId in result.outputs)) continue;
+        if (!block.bodyNodeIds.has(edge.to.nodeId)) continue;
+        const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
+        if (toPort?.kind !== "control") continue;
+        localQueue.push(edge.to.nodeId);
+      }
+    }
+    return true;
+  }
+
+  private collectLoopEndInputs(
+    block: LoopBlock,
+    aggregated: Map<string, unknown[]>,
+  ): void {
+    for (const edge of this.inEdges.get(block.endNode.id) ?? []) {
+      if (!block.bodyNodeIds.has(edge.from.nodeId)) continue;
+      const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
+      if (toPort?.kind !== "data") continue;
+      const value = this.portValues.get(`${edge.from.nodeId}.${edge.from.portId}`);
+      const list = aggregated.get(edge.to.portId) ?? [];
+      list.push(value ?? null);
+      aggregated.set(edge.to.portId, list);
+    }
+  }
+
+  private applyLoopEndOverrides(
+    endNode: NodeInstance,
+    aggregated: Map<string, unknown[]>,
+  ): void {
+    for (const [portId, values] of aggregated) {
+      const port = this.findPort(endNode.id, portId);
+      this.inputOverrides.set(
+        `${endNode.id}.${portId}`,
+        port?.multiple ? values : values.at(-1),
+      );
+    }
+  }
+
+  private clearLoopEndOverrides(
+    endNode: NodeInstance,
+    aggregated: Map<string, unknown[]>,
+  ): void {
+    for (const portId of aggregated.keys()) {
+      this.inputOverrides.delete(`${endNode.id}.${portId}`);
+    }
+  }
+
+  private findLoopBlock(
+    beginNode: NodeInstance,
+    endType: string,
+  ): LoopBlock | undefined {
+    const bodyStartNodeIds: string[] = [];
+    const bodyNodeIds = new Set<string>();
+    let endNode: NodeInstance | undefined;
+    const pending: string[] = [];
+
+    for (const edge of this.outEdges.get(beginNode.id) ?? []) {
+      if (edge.from.portId !== "body") continue;
+      const target = this.nodesById.get(edge.to.nodeId);
+      if (!target) continue;
+      if (target.type === endType) {
+        endNode = target;
+      } else {
+        bodyStartNodeIds.push(target.id);
+        pending.push(target.id);
+      }
+    }
+
+    while (pending.length > 0) {
+      const nodeId = pending.shift()!;
+      if (bodyNodeIds.has(nodeId)) continue;
+      bodyNodeIds.add(nodeId);
+      for (const edge of this.outEdges.get(nodeId) ?? []) {
+        const fromPort = this.findPort(edge.from.nodeId, edge.from.portId);
+        if (fromPort?.kind !== "control") continue;
+        const target = this.nodesById.get(edge.to.nodeId);
+        if (!target) continue;
+        if (target.type === endType) {
+          endNode = target;
+          continue;
+        }
+        pending.push(target.id);
+      }
+    }
+
+    if (!endNode) return undefined;
+    return { endNode, bodyNodeIds, bodyStartNodeIds };
+  }
+
   private async routeErrorOrFail(
     node: NodeInstance,
     error: RuntimeError,
@@ -681,6 +921,35 @@ function pushEdge(
     bucket.set(key, list);
   }
   list.push(edge);
+}
+
+interface LoopBlock {
+  endNode: NodeInstance;
+  bodyNodeIds: Set<string>;
+  bodyStartNodeIds: string[];
+}
+
+function loopSpecFor(type: string): { endType: string } | undefined {
+  switch (type) {
+    case "foreach_begin":
+      return { endType: "foreach_end" };
+    case "for_begin":
+      return { endType: "for_end" };
+    case "loop_begin":
+      return { endType: "loop_end" };
+    default:
+      return undefined;
+  }
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function numberOr(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
 /**

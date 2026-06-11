@@ -149,7 +149,7 @@ interface FieldRowProps {
 function fieldSupportsEnvPicker(field: FieldDescriptor): boolean {
   // Boolean and enum fields have a closed value space; pulling an env
   // variable into them would just produce garbage. Everything else
-  // (string / number / textarea / json / arrays / records) is fair game.
+  // (string / number / textarea / arrays / records) is fair game.
   if (field.kind === "boolean" || field.kind === "enum") return false;
   return true;
 }
