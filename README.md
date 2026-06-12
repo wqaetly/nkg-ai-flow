@@ -159,6 +159,24 @@ npm install
 
 进程环境变量只作为启动时输入源；进入运行时后，变量读取都通过 `VariableStore` / `SecretStore` 完成。`secretNames` 中列出的条目会被路由到 `SecretStore`，不会回流到 `VariableStore`。
 
+### 7.1 Flow 伴生环境文件规范
+
+业务 Flow 的运行配置必须跟随 Flow artifact 放在同目录的伴生 JSON 文件中，不要使用 `.env.local` 或其他项目根目录 env 文件作为运行时配置来源。
+
+命名规则：
+
+- `src/agent-flow/hex-advisor.flow.json`
+- `src/agent-flow/hex-advisor.flow.env.json`：可提交的默认变量、非敏感占位或 Studio 可见配置；
+- `src/agent-flow/hex-advisor.flow.local.env.json`：本机真实密钥和私有配置，必须被 git ignore。
+
+开发准则：
+
+- 新增或修改 Flow 时，同步创建或更新对应的 `*.flow.local.env.json`，并确认 `.gitignore` 覆盖 `*.flow.local.env.json`；
+- Flow JSON / Builder config 只写 `$var.NAME` / `$secret.NAME` 这类引用，不把真实 key、URL 或模型配置硬编码进图；
+- runtime / CLI / smoke test 应基于 `createFlowScopedStores({ flowPath })` 或等价封装读取伴生文件，确保 Studio、HTTP runner 和本地验证消费同一套配置；
+- `.env.example` 只作为人工说明或迁移参考，不能作为项目运行时读取路径；
+- 缺少必需变量或仍是占位值时应直接失败，不能用 mock、空字符串、默认 key 或本地兜底逻辑继续执行。
+
 ---
 
 ## 八、运行示例

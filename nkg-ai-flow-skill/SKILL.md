@@ -14,6 +14,7 @@ Treat a custom flow as a runnable app, not as an isolated JSON blob.
 - Preserve data lineage: every non-root step must consume an upstream output, a cumulative `context`, or an explicit static config/task.
 - Use cumulative `context` for multi-step design, validation, repair, and materialization workflows.
 - Use the built-in `agent` node for file edits, command execution, iterative verification, or materialization. Do not pretend deterministic nodes can perform filesystem or shell work.
+- Treat each flow's companion env JSON as the runtime configuration source. Never base flow runtime configuration on `.env.local`.
 - Validate by running the build/typecheck/test commands that actually exercise the changed app.
 
 ## First Pass
@@ -31,6 +32,22 @@ Before writing code, inspect the closest local reference:
 | Workspace/app discovery | `docs/specs/workspace-model.md` and existing `anf.app.json` files |
 
 If an existing app already does something close, extend that pattern instead of introducing a new shape.
+
+## Environment Configuration
+
+Flow runtime configuration is flow-scoped and artifact-adjacent.
+
+Rules:
+
+- Never instruct users or code to rely on `.env.local` for flow runtime configuration.
+- For a flow artifact such as `src/agent-flow/hex-advisor.flow.json`, use sibling files:
+  - `src/agent-flow/hex-advisor.flow.env.json` for committed defaults or non-sensitive placeholders.
+  - `src/agent-flow/hex-advisor.flow.local.env.json` for local secrets and private runtime values.
+- Ensure `*.flow.local.env.json` is ignored by git before writing local keys.
+- Builder and Flow JSON config should reference values with `$var.NAME` / `$secret.NAME`; do not hardcode real keys, provider URLs, or model settings into graph JSON.
+- Runtime entrypoints, smoke tests, and CLIs should read the sidecar via `createFlowScopedStores({ flowPath })` or an equivalent flow-scoped wrapper before calling `bootstrapDefaults(...)`.
+- `.env.example` is documentation only. It can show names and migration hints, but it is not a runtime input source.
+- Missing required values, placeholder secrets, and invalid sidecar contents must fail loudly. Do not add mock providers, empty defaults, `.env.local` fallback, or test-only bypasses.
 
 ## Design Procedure
 
