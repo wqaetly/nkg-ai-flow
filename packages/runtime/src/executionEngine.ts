@@ -756,7 +756,7 @@ export class ExecutionEngine {
       const hitLimit = wantsAnotherIteration && iteration === maxIterations - 1;
       if (!wantsAnotherIteration || hitLimit) {
         const outputs = hitLimit
-          ? { ...endResult.outputs, maxed: null }
+          ? { ...endResult.outputs, done: null, maxed: null }
           : endResult.outputs;
         this.recordOutputs(block.endNode, outputs);
         this.enqueueReadyDownstream(block.endNode, outputs, queue);
