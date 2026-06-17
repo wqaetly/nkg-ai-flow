@@ -24,7 +24,7 @@
 - **多入口调用归一**：同一份 Flow 可通过 **HTTP / CLI / MCP / SDK / Studio** 调用，全部消费同一条 Runtime Event Bus。
 - **稳定流式输出**：AI SDK / IDE SDK / 外部 CLI / sidecar 的输出统一归一为 `NodeEvent` 事件流，不用 `stdout` / `stderr` 承载语义 token。
 - **AI 安全参与开发**：AI 可生成 Builder 逻辑、Graph Operation 或受限节点代码，但不能直接修改核心 Runtime；执行通过 Sandbox Adapter 受控。
-- **配置与凭据双轨**：`VariableStore` 可枚举、可进入 Trace；`SecretStore` 自动脱敏，永不写入 Flow JSON / Run Event。
+- **配置可观测**：`VariableStore` 可枚举、可进入 Trace,Studio 与 Run Event 中可追踪每条值的来源。
 - **可视化协作编辑**：Studio 不只是浏览器，还支持拖拽、增删节点和多端口连边，编辑动作以 `GraphOperation` 记录。
 
 ---
@@ -35,7 +35,7 @@
 - **Runtime 执行与热更新**：通过 Run Manager、Scheduler、Registry 和 Event Bus 执行 Flow，支持版本化 Artifact、运行中版本固定和新版本 promote。
 - **节点扩展机制**：业务节点通过 `defineNode` / `defineNodeFactory` 声明，node pack 可随 app 注册动态加载。
 - **多入口调用**：同一份 Flow 可通过 HTTP / CLI / MCP / SDK / Studio 调用，并共享 Runtime API 与事件流。
-- **配置与凭据管理**：内置 `VariableStore` / `SecretStore`，支持 `$var` / `$secret` 引用、敏感信息脱敏和运行级覆盖。
+- **配置管理**：内置 `VariableStore`，支持 `$var` 引用、可枚举、可追踪和运行级覆盖。
 - **Studio 可视化编辑**：提供 React + React Flow 编辑器，用于浏览、编辑、调试和观察 Flow 运行事件。
 - **app 注册**：本项目自带 apps 自动发现；宿主项目可通过根 `anf.apps.json` 注册宿主自己的 apps。
 
@@ -179,12 +179,11 @@ host-project/
 
 项目使用内置环境变量模块管理运行时配置，不把 `.env` / `.env.local` 作为运行期配置模型：
 
-- `VariableStore` 管理普通变量，可枚举、可追踪；
-- `SecretStore` 管理敏感凭据，自动脱敏，不写入 Flow JSON / Run Event / Trace；
-- 各 app / test 通过 `bootstrapDefaults(...)` 声明允许注入的变量与密钥名；
-- Flow / node config 通过 `$var` / `$secret` 引用运行时变量，而不是直接读取外部 env 文件。
+- `VariableStore` 管理运行时变量，可枚举、可追踪、支持运行级覆盖；
+- 各 app / test 通过 `bootstrapDefaults(...)` 声明允许注入的变量名；
+- Flow / node config 通过 `$var` 引用运行时变量，而不是直接读取外部 env 文件。
 
-进程环境变量只作为启动时输入源；进入运行时后，变量读取都通过 `VariableStore` / `SecretStore` 完成。`secretNames` 中列出的条目会被路由到 `SecretStore`，不会回流到 `VariableStore`。
+进程环境变量只作为启动时输入源；进入运行时后，变量读取都通过 `VariableStore` 完成。
 
 ### 4.1 Flow 伴生环境文件规范
 
@@ -194,15 +193,15 @@ host-project/
 
 - `src/agent-flow/hex-advisor.flow.json`
 - `src/agent-flow/hex-advisor.flow.env.json`：可提交的默认变量、非敏感占位或 Studio 可见配置；
-- `src/agent-flow/hex-advisor.flow.local.env.json`：本机真实密钥和私有配置，必须被 git ignore。
+- `src/agent-flow/hex-advisor.flow.local.env.json`：本机真实配置和私有变量，必须被 git ignore。
 
 开发准则：
 
 - 新增或修改 Flow 时，同步创建或更新对应的 `*.flow.local.env.json`，并确认 `.gitignore` 覆盖 `*.flow.local.env.json`；
-- Flow JSON / Builder config 只写 `$var.NAME` / `$secret.NAME` 这类引用，不把真实 key、URL 或模型配置硬编码进图；
+- Flow JSON / Builder config 只写 `$var.NAME` 这类引用，不把真实 key、URL 或模型配置硬编码进图；
 - runtime / CLI / smoke test 应基于 `createFlowScopedStores({ flowPath })` 或等价封装读取伴生文件，确保 Studio、HTTP runner 和本地验证消费同一套配置；
 - `.env.example` 只作为人工说明或迁移参考，不能作为项目运行时读取路径；
-- 缺少必需变量或仍是占位值时应直接失败，不能用 mock、空字符串、默认 key 或本地兜底逻辑继续执行。
+- 缺少必需变量或仍是占位值时应直接失败，不能用 mock、空字符串、默认值或本地兜底逻辑继续执行。
 
 ---
 
@@ -355,5 +354,5 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 - [ARCHITECTURE.md](./ARCHITECTURE.md)：项目目标、核心原则、总体架构、模块边界
 - [docs/implementation/ai-implementation-guide.md](./docs/implementation/ai-implementation-guide.md)：默认技术栈、实现顺序、AI 禁止事项
 - [docs/implementation/roadmap.md](./docs/implementation/roadmap.md)：Phase 0+ 的目标与 Definition of Done
-- [docs/specs/](./docs/specs)：Flow Schema / Runtime / Streaming / Studio / Sandbox / Variable & Secret 等规格
+- [docs/specs/](./docs/specs)：Flow Schema / Runtime / Streaming / Studio / Sandbox / Variable Store 等规格
 - [docs/decisions/](./docs/decisions)：Hot Swap / Event Channel / Node-first / Schema Versioning 等 ADR
