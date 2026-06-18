@@ -106,7 +106,6 @@ packages/
   ai-stream/
     src/types.ts
     src/openaiAdapter.ts
-    src/fakeAdapter.ts
 
   variable-store/                # MVP for VariableStore + SecretStore (Phase 2)
     src/types.ts                 # VariableStore / SecretStore / SecretValue / $var / $secret

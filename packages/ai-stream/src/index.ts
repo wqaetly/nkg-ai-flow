@@ -6,12 +6,9 @@
  *
  *     import {
  *       OpenAICompatibleStreamAdapter,
- *       FakeStreamAdapter,
- *       fakeTextStream,
  *       type AiStreamEvent,
  *     } from "@ai-native-flow/ai-stream";
  */
 
 export * from "./types.js";
 export * from "./openaiAdapter.js";
-export * from "./fakeAdapter.js";

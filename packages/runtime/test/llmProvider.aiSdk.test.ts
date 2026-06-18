@@ -219,6 +219,7 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
       model: { modelId: "deepseek-v4-flash" },
       prompt: "stream me",
       temperature: 0.1,
+      maxOutputTokens: 50,
       abortSignal: expect.any(AbortSignal),
     });
     expect(events).toEqual([

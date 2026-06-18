@@ -6,9 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
-  FakeStreamAdapter,
   OpenAICompatibleStreamAdapter,
-  fakeTextStream,
   type AiStreamEvent,
 } from "../src/index.js";
 
@@ -34,51 +32,6 @@ async function collect(iter: AsyncIterable<AiStreamEvent>): Promise<AiStreamEven
   for await (const ev of iter) out.push(ev);
   return out;
 }
-
-describe("ai-stream / FakeStreamAdapter", () => {
-  it("yields the supplied events in order and finishes with `done`", async () => {
-    const adapter = new FakeStreamAdapter();
-    const events = await collect(
-      adapter.adapt([
-        { kind: "text_delta", text: "Hi" },
-        { kind: "text_delta", text: ", " },
-        { kind: "text_delta", text: "world" },
-      ]),
-    );
-    expect(events.map((e) => e.kind)).toEqual([
-      "text_delta",
-      "text_delta",
-      "text_delta",
-      "done",
-    ]);
-  });
-
-  it("fakeTextStream chunks a string into deterministic deltas + done", () => {
-    const events = fakeTextStream("Hello, World!", { chunkSize: 4 });
-    expect(events.filter((e) => e.kind === "text_delta")).toHaveLength(4);
-    expect(events[events.length - 1]).toMatchObject({
-      kind: "done",
-      finishReason: "stop",
-    });
-  });
-
-  it("honours an aborted signal by terminating early", async () => {
-    const adapter = new FakeStreamAdapter();
-    const ac = new AbortController();
-    const events: AiStreamEvent[] = [];
-    for await (const ev of adapter.adapt(
-      [
-        { kind: "text_delta", text: "a" },
-        { kind: "text_delta", text: "b" },
-      ],
-      { signal: ac.signal },
-    )) {
-      events.push(ev);
-      ac.abort();
-    }
-    expect(events).toHaveLength(1);
-  });
-});
 
 describe("ai-stream / OpenAICompatibleStreamAdapter", () => {
   it("parses content deltas and a final usage frame from SSE", async () => {

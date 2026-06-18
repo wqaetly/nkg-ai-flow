@@ -24,12 +24,15 @@ export {
   // Provider abstraction for the `llm` node. The built-in production
   // provider delegates OpenAI-compatible calls to Vercel AI SDK.
   AiSdkOpenAICompatibleLlmProvider,
+  generateJsonCompletion,
+  streamCompletion,
   DEFAULT_LLM_API_KEY_REF,
   DEFAULT_LLM_BASE_URL_REF,
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
   type AiSdkOpenAICompatibleLlmProviderOptions,
+  type GenerateCompletionParams,
   type LlmProvider,
   type LlmCompletionRequest,
   type LlmCompletionResponse,

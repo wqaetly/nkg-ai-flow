@@ -50,6 +50,21 @@ export interface LlmCompletionRequest {
    * configs; legacy `$secret` references resolve through the same VariableStore.
    */
   apiKey?: string;
+  /**
+   * When true, ask the model for strict JSON output. Translated to the
+   * OpenAI-compatible `response_format: { type: "json_object" }` body field
+   * (DeepSeek "JSON Output"). Default false keeps the legacy plain-text behavior
+   * so built-in `llm` nodes are unaffected.
+   */
+  jsonOutput?: boolean;
+  /**
+   * Vendor-specific request fields passed through verbatim, keyed by provider
+   * name (e.g. `{ lfzxb: { thinking: { type: "disabled" } } }`). The
+   * OpenAI-compatible adapter spreads any key not in its own option schema
+   * straight into the request body, so this is the supported escape hatch for
+   * fields the SDK does not model (thinking toggles, reasoning effort, etc.).
+   */
+  providerOptions?: Record<string, Record<string, unknown>>;
 }
 
 export interface LlmCompletionResponse {
@@ -64,6 +79,15 @@ export interface LlmCompletionResponse {
   };
 }
 
+/**
+ * Boundary between node logic and a concrete model backend.
+ *
+ * Retry contract: transport-level retries (5xx / network / rate limit) are the
+ * backend's responsibility (the AI SDK provider applies its own `maxRetries`);
+ * business-level retries — a successful call that yields an empty body — are
+ * handled here in the provider (`complete` rejects empty text; `completeStream`
+ * re-pulls the stream up to `maxAttempts`).
+ */
 export interface LlmProvider {
   complete(
     req: LlmCompletionRequest,
@@ -102,6 +126,176 @@ export interface AiSdkOpenAICompatibleLlmProviderOptions {
   };
   /** Provider label passed to `createOpenAICompatible`. */
   providerName?: string;
+}
+
+/**
+ * Shared parameters for the two NodeContext-free AI SDK entry points
+ * ({@link generateJsonCompletion} and {@link streamCompletion}).
+ */
+export interface GenerateCompletionParams {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  prompt: string;
+  /** Optional system instruction. Forwarded to the SDK's `system` only when set. */
+  system?: string;
+  temperature?: number;
+  maxTokens?: number;
+  /** Provider label for `createOpenAICompatible`. Must match the `providerOptions` key. */
+  providerName?: string;
+  /** When true, request strict JSON via `response_format: { type: "json_object" }`. */
+  jsonOutput?: boolean;
+  /** Vendor-specific body fields, keyed by provider name (spread verbatim by the adapter). */
+  providerOptions?: Record<string, Record<string, unknown>>;
+  /**
+   * Retry budget handed to the AI SDK. Defaults to the SDK default (2).
+   *
+   * Retry responsibilities are split deliberately:
+   *   - transport-level retries (5xx / network / rate limit) are owned by the
+   *     AI SDK via this `maxRetries`;
+   *   - business-level retries (e.g. a successful HTTP call that returns an
+   *     empty body) are owned by the provider/caller — see the empty-response
+   *     checks in `complete()` / `streamCompletion`.
+   */
+  maxRetries?: number;
+  abortSignal?: AbortSignal;
+  /**
+   * Custom fetch, forwarded to `createOpenAICompatible`. Production callers omit
+   * this (the SDK uses global fetch); tests inject a stub to assert the outgoing
+   * request body without hitting the network.
+   */
+  fetchImpl?: typeof fetch;
+}
+
+/**
+ * Resolve the provider name and assemble the final `providerOptions` map.
+ *
+ * The OpenAI-compatible adapter only spreads the `providerOptions` bucket
+ * **whose key equals the provider name**; any other bucket is silently ignored.
+ * A mismatched key therefore drops vendor fields without any error — the exact
+ * trap that masked a missing `reasoningEffort`. So we validate it loudly here.
+ */
+function buildProviderOptions(
+  params: Pick<
+    GenerateCompletionParams,
+    "providerName" | "providerOptions" | "jsonOutput"
+  >,
+): { providerName: string; providerOptions: Record<string, Record<string, unknown>> } {
+  const providerName = params.providerName ?? "openai-compatible";
+  const providerOptions: Record<string, Record<string, unknown>> = {};
+  for (const [key, value] of Object.entries(params.providerOptions ?? {})) {
+    if (key !== providerName) {
+      throw new RuntimeErrorException(
+        createRuntimeError({
+          code: "node.llm.provider_options_key_mismatch",
+          kind: "validation",
+          category: "author",
+          message:
+            `providerOptions key "${key}" does not match providerName "${providerName}". ` +
+            "The OpenAI-compatible adapter only forwards the bucket matching the provider " +
+            "name, so these fields would be silently dropped.",
+          source: { module: "node_logic" },
+          context: { providerName, offendingKey: key },
+        }),
+      );
+    }
+    providerOptions[key] = { ...value };
+  }
+  if (params.jsonOutput) {
+    const bucket = (providerOptions[providerName] ??= {});
+    // Only set when the caller hasn't already provided a response_format.
+    if (!("response_format" in bucket)) {
+      bucket.response_format = { type: "json_object" };
+    }
+  }
+  return { providerName, providerOptions };
+}
+
+/** Normalize AI SDK usage across SDK v4 (`promptTokens`) and v6 (`inputTokens`) field names. */
+function normalizeUsage(raw: unknown): LlmCompletionResponse["usage"] {
+  const usage = raw as
+    | {
+        promptTokens?: number;
+        completionTokens?: number;
+        inputTokens?: number;
+        outputTokens?: number;
+        totalTokens?: number;
+      }
+    | undefined;
+  return {
+    promptTokens: usage?.promptTokens ?? usage?.inputTokens,
+    completionTokens: usage?.completionTokens ?? usage?.outputTokens,
+    totalTokens: usage?.totalTokens,
+  };
+}
+
+/**
+ * NodeContext-free entry point to the AI SDK OpenAI-compatible path.
+ *
+ * Both {@link AiSdkOpenAICompatibleLlmProvider.complete} and external callers
+ * funnel through here so there is a single place that talks to Vercel AI SDK.
+ *
+ * JSON Output + vendor private fields are delivered through `providerOptions`:
+ * the OpenAI-compatible adapter spreads any key that is not part of its own
+ * option schema straight into the request body. So `response_format` and e.g.
+ * `thinking` ride along untouched, while schema-known keys like `reasoningEffort`
+ * are mapped by the adapter (`reasoning_effort`). Callers therefore pass
+ * `reasoningEffort` (camelCase) but `response_format` / `thinking` (raw).
+ */
+export async function generateJsonCompletion(
+  params: GenerateCompletionParams,
+): Promise<LlmCompletionResponse> {
+  const { providerName, providerOptions } = buildProviderOptions(params);
+  const provider = createOpenAICompatible({
+    name: providerName,
+    baseURL: params.baseUrl,
+    apiKey: params.apiKey,
+    ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
+  });
+  const result = await generateText({
+    model: provider(params.model),
+    ...(params.system ? { system: params.system } : {}),
+    prompt: params.prompt,
+    temperature: params.temperature,
+    maxOutputTokens: params.maxTokens,
+    abortSignal: params.abortSignal,
+    ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
+    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
+  });
+  return {
+    text: result.text,
+    raw: result,
+    usage: normalizeUsage(result.usage),
+  };
+}
+
+/**
+ * Streaming sibling of {@link generateJsonCompletion}: the single place that
+ * calls `streamText`. Returns the raw AI SDK text stream factory plus the
+ * resolved provider, so the provider class can wrap it into the runtime's
+ * `AiStreamEvent` protocol.
+ */
+export function streamCompletion(
+  params: GenerateCompletionParams,
+): () => AsyncIterable<string> {
+  const { providerName, providerOptions } = buildProviderOptions(params);
+  const provider = createOpenAICompatible({
+    name: providerName,
+    baseURL: params.baseUrl,
+    apiKey: params.apiKey,
+    ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
+  });
+  return () =>
+    streamText({
+      model: provider(params.model),
+      ...(params.system ? { system: params.system } : {}),
+      prompt: params.prompt,
+      temperature: params.temperature,
+      maxOutputTokens: params.maxTokens,
+      abortSignal: params.abortSignal,
+      ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
+      ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
+    }).textStream;
 }
 
 /**
@@ -146,19 +340,19 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
     }
 
     try {
-      const provider = createOpenAICompatible({
-        name: this.options.providerName ?? "openai-compatible",
-        baseURL: baseUrl,
+      const completion = await generateJsonCompletion({
+        baseUrl,
         apiKey,
-      });
-      const result = await generateText({
-        model: provider(modelId),
+        model: modelId,
         prompt: req.prompt,
         temperature: req.temperature,
-        maxOutputTokens: req.maxTokens,
+        maxTokens: req.maxTokens,
+        providerName: this.options.providerName,
+        jsonOutput: req.jsonOutput,
+        providerOptions: req.providerOptions,
         abortSignal: ctx.signal,
       });
-      if (!result.text.trim()) {
+      if (!completion.text.trim()) {
         throw new RuntimeErrorException(
           createRuntimeError({
             code: "node.llm.empty_response",
@@ -171,24 +365,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
           }),
         );
       }
-      const usage = result.usage as
-        | {
-            promptTokens?: number;
-            completionTokens?: number;
-            inputTokens?: number;
-            outputTokens?: number;
-            totalTokens?: number;
-          }
-        | undefined;
-      return {
-        text: result.text,
-        raw: result,
-        usage: {
-          promptTokens: usage?.promptTokens ?? usage?.inputTokens,
-          completionTokens: usage?.completionTokens ?? usage?.outputTokens,
-          totalTokens: usage?.totalTokens,
-        },
-      };
+      return completion;
     } catch (cause) {
       if (cause instanceof RuntimeErrorException) throw cause;
       throw new RuntimeErrorException(
@@ -230,21 +407,19 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
     }
 
     try {
-      const provider = createOpenAICompatible({
-        name: this.options.providerName ?? "openai-compatible",
-        baseURL: baseUrl,
-        apiKey,
-      });
       return aiSdkTextStreamToEvents(
-        () =>
-          streamText({
-            model: provider(modelId),
-            prompt: req.prompt,
-            temperature: req.temperature,
-            maxOutputTokens:
-              this.options.providerName === "lfzxb" ? undefined : req.maxTokens,
-            abortSignal: ctx.signal,
-          }).textStream,
+        streamCompletion({
+          baseUrl,
+          apiKey,
+          model: modelId,
+          prompt: req.prompt,
+          temperature: req.temperature,
+          maxTokens: req.maxTokens,
+          providerName: this.options.providerName,
+          jsonOutput: req.jsonOutput,
+          providerOptions: req.providerOptions,
+          abortSignal: ctx.signal,
+        }),
         { nodeId: ctx.nodeId, maxAttempts: 2 },
       );
     } catch (cause) {
