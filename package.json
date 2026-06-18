@@ -17,7 +17,7 @@
     "dev:studio": "npm run studio:dev",
     "dev:sidecar": "npm run studio:dev:backend",
     "dev:web": "npm run studio:dev:frontend",
-    "prestudio:dev": "node scripts/clear-studio-ports.mjs",
+    "prestudio:dev": "tsx scripts/clear-studio-ports.mjs",
     "studio:dev": "concurrently -k -n backend,frontend -c blue,green \"npm run studio:dev:backend\" \"npm run studio:dev:frontend\"",
     "studio:dev:frontend": "npm run dev:frontend -w @ai-native-flow/studio-app",
     "studio:dev:backend": "npm run dev:backend -w @ai-native-flow/studio-app"

@@ -15,6 +15,7 @@
     "@ai-native-flow/flow-builder": "0.0.1",
     "@ai-native-flow/flow-ir": "0.0.1",
     "@ai-native-flow/flow-validator": "0.0.1",
+    "@ai-native-flow/net-utils": "0.0.1",
     "@ai-native-flow/node-sdk": "0.0.1",
     "@ai-native-flow/runtime": "0.0.1",
     "@ai-native-flow/studio": "0.0.1",

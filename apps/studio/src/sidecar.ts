@@ -65,9 +65,18 @@ import {
   type LoadedNodePack,
   type WorkspaceManifest,
 } from "@ai-native-flow/workspace-manifest";
+import { findAvailablePort } from "@ai-native-flow/net-utils";
 
-const port = Number(process.env.ANF_SIDECAR_PORT ?? "5173");
 const hostname = process.env.ANF_SIDECAR_HOSTNAME ?? "127.0.0.1";
+// Resolve a bindable port before listening. The preferred port (env or 5173)
+// may be occupied or kernel-reserved (Windows WinNAT/Hyper-V binds throw
+// EACCES); findAvailablePort kills any occupant and falls forward to the next
+// free port. When a parent process injected an already-probed ANF_SIDECAR_PORT,
+// this resolves to that same port immediately.
+const port = await findAvailablePort(Number(process.env.ANF_SIDECAR_PORT ?? "5173"), {
+  host: hostname,
+  prefix: "studio-sidecar",
+});
 
 const corsRaw = (process.env.ANF_SIDECAR_CORS ?? "*").trim();
 const cors: "*" | readonly string[] =

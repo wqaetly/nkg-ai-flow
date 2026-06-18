@@ -1,0 +1,15 @@
+{
+  "name": "@ai-native-flow/net-utils",
+  "version": "0.0.1",
+  "description": "Cross-platform port helpers: kill an occupying process, probe bindability, and find an available port (handles Windows WinNAT/Hyper-V reserved ranges).",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  }
+}

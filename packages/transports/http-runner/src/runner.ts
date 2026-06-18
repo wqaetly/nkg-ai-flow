@@ -53,6 +53,7 @@ import {
   type NodePackEntry,
   type WorkspaceManifest,
 } from "@ai-native-flow/workspace-manifest";
+import { findAvailablePort } from "@ai-native-flow/net-utils";
 
 import {
   registerFlowsFromManifest,
@@ -307,8 +308,15 @@ export async function startHttpRunner(
 ): Promise<HttpRunnerHandle> {
   const built = await buildHttpRunnerHandler(options);
 
-  const port = resolvePort(options);
+  const resolved = resolvePort(options);
   const hostname = resolveHostname(options);
+  // A caller that passes an explicit `options.port` is asserting "bind exactly
+  // here" (e.g. behind a reverse proxy), so we must not silently move. When the
+  // port comes from env/default we fall forward past occupied or
+  // kernel-reserved (Windows WinNAT/Hyper-V) ports instead of crashing.
+  const port = resolved.explicit
+    ? resolved.port
+    : await findAvailablePort(resolved.port, { host: hostname, prefix: "http-runner" });
 
   const server = createServer((req, res) => {
     void dispatch(req, res, built.handler);
@@ -337,14 +345,14 @@ export async function startHttpRunner(
   });
 }
 
-function resolvePort(options: HttpRunnerOptions): number {
-  if (typeof options.port === "number") return options.port;
+function resolvePort(options: HttpRunnerOptions): { port: number; explicit: boolean } {
+  if (typeof options.port === "number") return { port: options.port, explicit: true };
   const env = process.env.ANF_HTTP_PORT ?? process.env.PORT;
   if (env && env.trim()) {
     const parsed = Number(env);
-    if (Number.isFinite(parsed)) return parsed;
+    if (Number.isFinite(parsed)) return { port: parsed, explicit: false };
   }
-  return 8787;
+  return { port: 8787, explicit: false };
 }
 
 function resolveHostname(options: HttpRunnerOptions): string {
