@@ -230,6 +230,33 @@ function normalizeUsage(raw: unknown): LlmCompletionResponse["usage"] {
 }
 
 /**
+ * Build everything the two SDK calls share: the resolved provider instance and
+ * the common argument object handed to `generateText` / `streamText`. The only
+ * thing that differs between the JSON and streaming paths is which SDK function
+ * consumes these args, so everything else is computed here exactly once.
+ */
+function buildCallArgs(params: GenerateCompletionParams) {
+  const { providerName, providerOptions } = buildProviderOptions(params);
+  const provider = createOpenAICompatible({
+    name: providerName,
+    baseURL: params.baseUrl,
+    apiKey: params.apiKey,
+    ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
+  });
+  const args = {
+    model: provider(params.model),
+    ...(params.system ? { system: params.system } : {}),
+    prompt: params.prompt,
+    temperature: params.temperature,
+    maxOutputTokens: params.maxTokens,
+    abortSignal: params.abortSignal,
+    ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
+    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
+  };
+  return args;
+}
+
+/**
  * NodeContext-free entry point to the AI SDK OpenAI-compatible path.
  *
  * Both {@link AiSdkOpenAICompatibleLlmProvider.complete} and external callers
@@ -245,23 +272,7 @@ function normalizeUsage(raw: unknown): LlmCompletionResponse["usage"] {
 export async function generateJsonCompletion(
   params: GenerateCompletionParams,
 ): Promise<LlmCompletionResponse> {
-  const { providerName, providerOptions } = buildProviderOptions(params);
-  const provider = createOpenAICompatible({
-    name: providerName,
-    baseURL: params.baseUrl,
-    apiKey: params.apiKey,
-    ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
-  });
-  const result = await generateText({
-    model: provider(params.model),
-    ...(params.system ? { system: params.system } : {}),
-    prompt: params.prompt,
-    temperature: params.temperature,
-    maxOutputTokens: params.maxTokens,
-    abortSignal: params.abortSignal,
-    ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
-    ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
-  });
+  const result = await generateText(buildCallArgs(params));
   return {
     text: result.text,
     raw: result,
@@ -271,31 +282,15 @@ export async function generateJsonCompletion(
 
 /**
  * Streaming sibling of {@link generateJsonCompletion}: the single place that
- * calls `streamText`. Returns the raw AI SDK text stream factory plus the
- * resolved provider, so the provider class can wrap it into the runtime's
- * `AiStreamEvent` protocol.
+ * calls `streamText`. Returns a factory that opens the AI SDK text stream, so
+ * the provider class can wrap each delta into the runtime's `AiStreamEvent`
+ * protocol (and re-pull on an empty stream).
  */
 export function streamCompletion(
   params: GenerateCompletionParams,
 ): () => AsyncIterable<string> {
-  const { providerName, providerOptions } = buildProviderOptions(params);
-  const provider = createOpenAICompatible({
-    name: providerName,
-    baseURL: params.baseUrl,
-    apiKey: params.apiKey,
-    ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
-  });
-  return () =>
-    streamText({
-      model: provider(params.model),
-      ...(params.system ? { system: params.system } : {}),
-      prompt: params.prompt,
-      temperature: params.temperature,
-      maxOutputTokens: params.maxTokens,
-      abortSignal: params.abortSignal,
-      ...(params.maxRetries !== undefined ? { maxRetries: params.maxRetries } : {}),
-      ...(Object.keys(providerOptions).length > 0 ? { providerOptions } : {}),
-    }).textStream;
+  const args = buildCallArgs(params);
+  return () => streamText(args).textStream;
 }
 
 /**
@@ -307,10 +302,15 @@ export function streamCompletion(
 export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
   constructor(private readonly options: AiSdkOpenAICompatibleLlmProviderOptions = {}) {}
 
-  async complete(
+  /**
+   * Resolve base URL / API key / model from the per-call request (with `$var`
+   * shorthand) falling back to the configured variables. Shared by `complete`
+   * and `completeStream` so the resolution + `no_model` guard live in one place.
+   */
+  private resolveCallConfig(
     req: LlmCompletionRequest,
     ctx: NodeContext,
-  ): Promise<LlmCompletionResponse> {
+  ): { baseUrl: string; apiKey: string; modelId: string } {
     const { variables } = ctx;
     const baseUrl =
       resolveConfigString(req.baseUrl, variables, "baseUrl", ctx.nodeId) ??
@@ -324,8 +324,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
       "model",
       ctx.nodeId,
     );
-    const defaultModel = pickDefaultModel(variables, this.options);
-    const modelId = requestModel ?? defaultModel;
+    const modelId = requestModel ?? pickDefaultModel(variables, this.options);
     if (!modelId) {
       throw new RuntimeErrorException(
         createRuntimeError({
@@ -338,6 +337,14 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
         }),
       );
     }
+    return { baseUrl, apiKey, modelId };
+  }
+
+  async complete(
+    req: LlmCompletionRequest,
+    ctx: NodeContext,
+  ): Promise<LlmCompletionResponse> {
+    const { baseUrl, apiKey, modelId } = this.resolveCallConfig(req, ctx);
 
     try {
       const completion = await generateJsonCompletion({
@@ -378,33 +385,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
     req: LlmCompletionRequest,
     ctx: NodeContext,
   ): Promise<AiStreamAsyncIterable> {
-    const { variables } = ctx;
-    const baseUrl =
-      resolveConfigString(req.baseUrl, variables, "baseUrl", ctx.nodeId) ??
-      pickBaseUrl(variables, this.options);
-    const apiKey =
-      resolveConfigString(req.apiKey, variables, "apiKey", ctx.nodeId) ??
-      pickApiKey(variables, this.options);
-    const requestModel = resolveConfigString(
-      req.model,
-      variables,
-      "model",
-      ctx.nodeId,
-    );
-    const defaultModel = pickDefaultModel(variables, this.options);
-    const modelId = requestModel ?? defaultModel;
-    if (!modelId) {
-      throw new RuntimeErrorException(
-        createRuntimeError({
-          code: "node.llm.no_model",
-          kind: "validation",
-          category: "author",
-          message:
-            "LLM node has no model: provide it via `node.config.model`, the `LLM_DEFAULT_MODEL` variable, or `AiSdkOpenAICompatibleLlmProviderOptions.fallback.defaultModel`.",
-          source: { module: "node_logic", nodeId: ctx.nodeId },
-        }),
-      );
-    }
+    const { baseUrl, apiKey, modelId } = this.resolveCallConfig(req, ctx);
 
     try {
       return aiSdkTextStreamToEvents(
