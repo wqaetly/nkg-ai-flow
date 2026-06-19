@@ -51,11 +51,28 @@ const SIDECAR_STORAGE_KEY = "anf.studio.sidecarUrl";
 
 function readPersistedSidecarUrl(): string {
   if (typeof window === "undefined") return DEFAULT_SIDECAR_URL;
+  const urlOverride = new URLSearchParams(window.location.search).get("sidecar");
+  if (urlOverride && /^https?:\/\//i.test(urlOverride)) return urlOverride;
   try {
     return localStorage.getItem(SIDECAR_STORAGE_KEY) ?? DEFAULT_SIDECAR_URL;
   } catch {
     return DEFAULT_SIDECAR_URL;
   }
+}
+
+function readRequestedFlowId(): string | undefined {
+  if (typeof window === "undefined") return undefined;
+  return new URLSearchParams(window.location.search).get("flow") ?? undefined;
+}
+
+function prioritizeRequestedFlow(flows: FlowEntry[], requestedFlowId: string | undefined): FlowEntry[] {
+  if (!requestedFlowId) return flows;
+  const index = flows.findIndex((flow) => flow.id === requestedFlowId);
+  if (index <= 0) return flows;
+  const next = [...flows];
+  const [target] = next.splice(index, 1);
+  if (target) next.unshift(target);
+  return next;
 }
 
 interface SidecarFlowItem {
@@ -345,6 +362,7 @@ type LoadState =
 
 function App() {
   const [loadState, setLoadState] = React.useState<LoadState>({ kind: "loading" });
+  const requestedFlowId = React.useMemo(readRequestedFlowId, []);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -417,10 +435,11 @@ function App() {
 
   return (
     <StudioWorkbench
-      initialFlows={loadState.flows}
+      initialFlows={prioritizeRequestedFlow(loadState.flows, requestedFlowId)}
       defaultPalette={loadState.flows[0]?.state.palette}
       title="AI Native Flow Studio"
       initialSidecarUrl={loadState.sidecarUrl}
+      initialActiveId={requestedFlowId}
     />
   );
 }
