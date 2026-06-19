@@ -46,7 +46,7 @@ const DEFAULT_LLM_CONFIG = {
 let palette = registry.list();
 
 /** Default sidecar URL — kept in sync with `StudioWorkbench`'s constant. */
-const DEFAULT_SIDECAR_URL = "http://localhost:5173";
+const DEFAULT_SIDECAR_URL = "http://localhost:5273";
 const SIDECAR_STORAGE_KEY = "anf.studio.sidecarUrl";
 
 function readPersistedSidecarUrl(): string {

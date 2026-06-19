@@ -47,7 +47,7 @@ export default defineConfig({
   server: {
     host: true,
     // Vite dev server runs on 3000 so the AI-Native-Flow Node sidecar
-    // keeps the conventional 5173 port that Studio's
+    // keeps the conventional 5273 port that Studio's
     // `DEFAULT_SIDECAR_URL` points at out of the box. Pick a different
     // port via `--port` if 3000 is occupied.
     port: 3000,

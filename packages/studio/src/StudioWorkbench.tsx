@@ -32,7 +32,7 @@ import {
 import iconUrl from "./icon.webp";
 
 /** Default sidecar location — single-machine local dev convention. */
-const DEFAULT_SIDECAR_URL = "http://localhost:5173";
+const DEFAULT_SIDECAR_URL = "http://localhost:5273";
 const SIDECAR_STORAGE_KEY = "anf.studio.sidecarUrl";
 
 /**
@@ -97,7 +97,7 @@ export interface StudioWorkbenchProps {
    */
   captureConsole?: boolean;
   /**
-   * Initial sidecar base URL. Defaults to `http://localhost:5173`. The
+   * Initial sidecar base URL. Defaults to `http://localhost:5273`. The
    * user can override this in-session via the title-bar field; the
    * choice is persisted to `localStorage` so refreshes preserve it.
    * Tests pass a stub URL (and `captureConsole={false}`) to keep the
