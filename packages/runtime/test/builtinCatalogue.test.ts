@@ -30,6 +30,7 @@ const BUILTIN_TYPES = [
   "switch_case",
   "tool",
   "text_input",
+  "wait_signal",
   "llm",
   "agent",
   "event_trigger",

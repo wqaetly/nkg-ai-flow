@@ -169,6 +169,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "数据转换",
         description: "使用模板、表达式或静态值进行数据转换。",
       },
+      wait_signal: {
+        title: "等待信号",
+        description: "创建或检查外部等待信号，并路由到收到、等待或过期分支。",
+      },
     },
   },
 };

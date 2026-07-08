@@ -63,6 +63,7 @@ import {
   textInputNode,
   toolNode,
   transformNode,
+  waitSignalNode,
 } from "./builtin/index.js";
 import { createNodeAgentToolHost } from "./builtin/agentTools.node.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./llmProvider.js";
@@ -168,6 +169,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, switchCaseNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);
+  installNode(target, waitSignalNode);
   installNode(target, llmNode, { llmProvider });
   installNode(target, agentNode, {
     llmProvider,

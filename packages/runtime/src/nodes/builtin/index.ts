@@ -31,6 +31,7 @@ export { switchCaseNode } from "./switchCase.js";
 export { toolNode } from "./tool.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";
+export { waitSignalNode } from "./waitSignal.js";
 export { agentNode } from "./agent.js";
 export { eventTriggerNode } from "./eventTrigger.js";
 export { sendEventNode } from "./sendEvent.js";
