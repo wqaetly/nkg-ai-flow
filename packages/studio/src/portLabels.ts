@@ -867,7 +867,16 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         text: "文本",
       },
       tool: {
+        in: "输入",
+        args: "工具参数",
+        context: "上下文",
+        workingDir: "工作目录",
+        success: "成功",
+        failed: "失败",
         result: "结果",
+        ok: "是否成功",
+        errorMessage: "错误信息",
+        changedFiles: "变更文件",
       },
       unique_items: {
         items: "唯一项",

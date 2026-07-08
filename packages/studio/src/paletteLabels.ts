@@ -375,7 +375,7 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
       },
       tool: {
         title: "工具调用",
-        description: "调用内置工具、MCP 工具或外部工具。",
+        description: "直接调用运行时内置工具，并按成功或失败分支继续流程。",
       },
       unique_items: {
         title: "数组去重",

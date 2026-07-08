@@ -587,6 +587,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       tool: {
         tool: "工具名称",
+        args: "工具参数",
+        workingDir: "工作目录",
+        allowedTools: "允许使用的工具",
+        allowBash: "允许执行 Bash",
+        timeoutMs: "超时时间（毫秒）",
+        maxOutputChars: "最大输出字符数",
+        failOnError: "失败时中断",
       },
       unique_items: {
         path: "去重字段路径",
