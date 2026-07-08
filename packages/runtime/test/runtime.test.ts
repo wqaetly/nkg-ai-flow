@@ -2346,6 +2346,84 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("count:2");
   });
 
+  it("uses dynamic empty_gate policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "empty_gate_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { items: [], label: "   " } },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 100 },
+      config: { value: "string" },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 180 },
+      config: { value: "label" },
+    });
+    const trimStrings = flow.node("transform", {
+      id: "trimStrings",
+      position: { x: 120, y: 260 },
+      config: { value: false },
+    });
+    const gate = flow.node("empty_gate", {
+      id: "gate",
+      position: { x: 340, y: 0 },
+      config: {
+        mode: "array",
+        path: "items",
+        trimStrings: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "count:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), trimStrings.in("in"));
+    flow.connect(source.out("out"), gate.in("in"));
+    flow.connect(source.out("output"), gate.in("value"));
+    flow.connect(mode.out("output"), gate.in("mode"));
+    flow.connect(path.out("output"), gate.in("path"));
+    flow.connect(trimStrings.out("output"), gate.in("trimStrings"));
+    flow.connect(gate.out("non_empty"), report.in("in"));
+    flow.connect(gate.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "empty_gate_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("count:3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      mode: "string",
+      path: "label",
+      trimStrings: false,
+      selected: "   ",
+      isEmpty: false,
+      reason: "string_non_empty",
+    });
+  });
+
   it("routes empty_gate to empty for empty arrays", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "empty_gate_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

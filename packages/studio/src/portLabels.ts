@@ -485,6 +485,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       empty_gate: {
         in: "输入",
+        mode: "模式",
+        path: "路径",
+        trimStrings: "是否裁剪字符串",
         value: "原始值",
         empty: "为空",
         non_empty: "非空",

@@ -73,9 +73,15 @@ export const emptyGateNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "trimStrings", direction: "input", kind: "data", label: "Trim strings", schema: { type: "boolean" } },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "empty", direction: "output", kind: "control", label: "Empty" },
     { id: "non_empty", direction: "output", kind: "control", label: "Non-empty" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "trimStrings", direction: "output", kind: "data", label: "Trim strings", schema: { type: "boolean" } },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "selected", direction: "output", kind: "data", label: "Selected Value" },
     { id: "items", direction: "output", kind: "data", label: "Items" },
@@ -87,11 +93,13 @@ export const emptyGateNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const value = input.value ?? input.input ?? input.in ?? null;
-    const selected = selectValue(value, String(config.path ?? ""));
-    const mode = readMode(config.mode);
+    const path = String(input.path ?? config.path ?? "");
+    const selected = selectValue(value, path);
+    const mode = readMode(input.mode ?? config.mode);
+    const trimStrings = readBoolean(input.trimStrings) ?? readBoolean(config.trimStrings) ?? true;
     const decision = decide(selected, {
       mode,
-      trimStrings: config.trimStrings !== false,
+      trimStrings,
     });
 
     ctx.log.debug("empty_gate selected branch", {
@@ -105,6 +113,9 @@ export const emptyGateNode = defineNode({
       kind: "success",
       outputs: {
         [decision.branch]: null,
+        mode,
+        path,
+        trimStrings,
         value,
         selected,
         items: decision.items,
@@ -121,6 +132,15 @@ function readMode(value: unknown): EmptyGateMode {
   return value === "array" || value === "object" || value === "string" || value === "present"
     ? value
     : "auto";
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function selectValue(value: unknown, path: string): unknown {
