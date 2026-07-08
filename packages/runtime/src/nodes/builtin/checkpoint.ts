@@ -16,8 +16,8 @@ import type {
 } from "@ai-native-flow/variable-store";
 
 type CheckpointMode = "save" | "load" | "clear" | "touch";
-type CheckpointStatus = "saved" | "loaded" | "missing" | "cleared";
-type CheckpointBranch = "saved" | "loaded" | "missing" | "cleared";
+type CheckpointStatus = "saved" | "loaded" | "expired" | "missing" | "cleared";
+type CheckpointBranch = "saved" | "loaded" | "missing" | "cleared" | "expired";
 
 interface CheckpointState {
   name: string;
@@ -93,6 +93,7 @@ export const checkpointNode = defineNode({
     { id: "loaded", direction: "output", kind: "control", label: "Loaded" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
+    { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "snapshot", direction: "output", kind: "data", label: "Snapshot" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
@@ -193,11 +194,17 @@ function applyMode(
       : { branch: "missing", state: null };
   }
   if (mode === "load") {
+    if (previous?.status === "expired") {
+      return { branch: "expired", state: previous };
+    }
     return previous
       ? { branch: "loaded", state: { ...previous, status: "loaded", loadedAt: now, updatedAt: now } }
       : { branch: "missing", state: null };
   }
   if (mode === "touch") {
+    if (previous?.status === "expired") {
+      return { branch: "expired", state: previous };
+    }
     return previous
       ? {
           branch: "saved",
@@ -241,7 +248,7 @@ function normalizeExpired(
   now: number,
 ): CheckpointState | null {
   if (state?.expiresAt !== null && state?.expiresAt !== undefined && now >= state.expiresAt) {
-    return null;
+    return { ...state, status: "expired", updatedAt: now };
   }
   return state;
 }
@@ -253,7 +260,7 @@ function readCheckpoint(value: unknown): CheckpointState | null {
   if (name === "") return null;
   return {
     name,
-    status: record.status === "loaded" ? "loaded" : "saved",
+    status: record.status === "loaded" ? "loaded" : record.status === "expired" ? "expired" : "saved",
     snapshot: toJsonValue(record.snapshot) ?? null,
     label: typeof record.label === "string" ? record.label : "",
     version: readNonNegativeInteger(record.version),

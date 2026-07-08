@@ -268,6 +268,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         loaded: "已读取",
         missing: "缺失",
         cleared: "已清除",
+        expired: "已过期",
         state: "检查点状态",
         status: "状态",
         version: "版本",

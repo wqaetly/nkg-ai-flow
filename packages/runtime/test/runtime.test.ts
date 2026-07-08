@@ -7262,6 +7262,62 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_CHECKPOINT")).toBe(false);
   });
 
+  it("routes checkpoint load to expired when the saved snapshot TTL has elapsed", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_CHECKPOINT", {
+      name: "ORDER_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "payment", status: "stale" },
+      label: "payment gate",
+      version: 2,
+      savedAt: now - 120_000,
+      loadedAt: null,
+      expiresAt: now - 1,
+      updatedAt: now - 120_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "checkpoint:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(checkpoint.out("expired"), report.in("in"));
+    flow.connect(checkpoint.out("snapshot"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:stale");
+    expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
+      status: "expired",
+      version: 2,
+      snapshot: { step: "payment", status: "stale" },
+    });
+  });
+
   it("joins fan-out branches and collects their values", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
