@@ -637,6 +637,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       metric: {
         in: "输入",
+        name: "指标名",
         value: "指标值",
         updated: "已更新",
         read: "已读取",

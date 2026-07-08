@@ -6515,6 +6515,61 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("increments a dynamically named metric", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const metricName = flow.node("transform", {
+      id: "metricName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_APPROVED_COUNT" },
+    });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 260, y: 0 },
+      config: {
+        mode: "increment",
+        value: 3,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "metric:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), metricName.in("in"));
+    flow.connect(start.out("out"), metric.in("in"));
+    flow.connect(metricName.out("output"), metric.in("name"));
+    flow.connect(metric.out("updated"), report.in("in"));
+    flow.connect(metric.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("metric:ORDER_DYNAMIC_APPROVED_COUNT");
+    expect(variables.get("ORDER_DYNAMIC_APPROVED_COUNT")).toMatchObject({
+      name: "ORDER_DYNAMIC_APPROVED_COUNT",
+      value: 3,
+      count: 1,
+      sum: 3,
+      max: 3,
+      last: 3,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("observes metric samples and computes aggregates", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_LATENCY_MS", {

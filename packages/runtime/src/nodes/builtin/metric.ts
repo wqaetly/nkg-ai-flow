@@ -80,12 +80,14 @@ export const metricNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "updated", direction: "output", kind: "control", label: "Updated" },
     { id: "read", direction: "output", kind: "control", label: "Read" },
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "value", direction: "output", kind: "data", label: "Value", schema: { type: "number" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     { id: "sum", direction: "output", kind: "data", label: "Sum", schema: { type: "number" } },
@@ -97,9 +99,9 @@ export const metricNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
-      return error("node.metric.missing_name", "metric node requires config.name", ctx.nodeId);
+      return error("node.metric.missing_name", "metric node requires config.name or name input", ctx.nodeId);
     }
 
     const store = asMutableVariableStore(ctx.variables);
@@ -169,6 +171,7 @@ function success(branch: MetricBranch, state: MetricState) {
     outputs: {
       [branch]: null,
       state,
+      name: state.name,
       value: state.value,
       count: state.count,
       sum: state.sum,
