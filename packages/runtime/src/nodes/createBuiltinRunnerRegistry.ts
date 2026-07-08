@@ -33,6 +33,7 @@ import type { NodeRunner } from "../nodeContext.js";
 import {
   approvalNode,
   auditLogNode,
+  batchItemsNode,
   batchWindowNode,
   cacheNode,
   checkpointNode,
@@ -197,6 +198,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, transformNode);
   installNode(target, approvalNode);
   installNode(target, auditLogNode);
+  installNode(target, batchItemsNode);
   installNode(target, batchWindowNode);
   installNode(target, cacheNode);
   installNode(target, checkpointNode);

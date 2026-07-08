@@ -143,6 +143,10 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxEntries: "最大保留条目",
         limit: "读取数量",
       },
+      batch_items: {
+        size: "批次大小",
+        includePartial: "保留尾批",
+      },
       code_synthesizer: {
         base_url: "服务地址",
         api_key: "API 密钥",

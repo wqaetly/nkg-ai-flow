@@ -19,6 +19,7 @@ const BUILTIN_TYPES = [
   "transform",
   "approval",
   "audit_log",
+  "batch_items",
   "batch_window",
   "cache",
   "checkpoint",

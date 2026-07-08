@@ -33,6 +33,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "审计日志",
         description: "记录、读取或清空业务级审计事件轨迹。",
       },
+      batch_items: {
+        title: "数组分批",
+        description: "把数组按固定大小切成多个批次，用于批量 API 或并行处理。",
+      },
       code_synthesizer: {
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",
