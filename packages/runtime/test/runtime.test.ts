@@ -3039,6 +3039,109 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("closes a half_open circuit_breaker after a successful probe", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_CIRCUIT", {
+      status: "half_open",
+      failureCount: 2,
+      openedAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 1_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_half_open_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const recordSuccess = flow.node("circuit_breaker", {
+      id: "record_success",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_CIRCUIT",
+        mode: "record_success",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), recordSuccess.in("in"));
+    flow.connect(recordSuccess.out("closed"), report.in("in"));
+    flow.connect(recordSuccess.out("openedAt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_half_open_success_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:");
+    expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
+      status: "closed",
+      failureCount: 0,
+      openedAt: null,
+    });
+  });
+
+  it("reopens a half_open circuit_breaker after a failed probe", async () => {
+    const previousOpenedAt = Date.now() - 10_000;
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_CIRCUIT", {
+      status: "half_open",
+      failureCount: 2,
+      openedAt: previousOpenedAt,
+      updatedAt: Date.now() - 1_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_half_open_failure_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const recordFailure = flow.node("circuit_breaker", {
+      id: "record_failure",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_CIRCUIT",
+        failureThreshold: 3,
+        resetTimeoutMs: 60_000,
+        mode: "record_failure",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), recordFailure.in("in"));
+    flow.connect(recordFailure.out("open"), report.in("in"));
+    flow.connect(recordFailure.out("failureCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_half_open_failure_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:3");
+    expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
+      status: "open",
+      failureCount: 3,
+    });
+    expect((variables.get("PAYMENT_CIRCUIT") as { openedAt: number }).openedAt).toBeGreaterThan(previousOpenedAt);
+  });
+
   it("drains compensation actions in reverse registration order", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

@@ -108,6 +108,8 @@ export const circuitBreakerNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "openedAt", direction: "output", kind: "data", label: "Opened At", schema: { type: "string" } },
+    { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ config, ctx }) {
@@ -150,6 +152,8 @@ export const circuitBreakerNode = defineNode({
       next.status === "open" && next.openedAt !== null
         ? Math.max(0, resetTimeoutMs - (now - next.openedAt))
         : 0;
+    const openedAt = next.openedAt === null ? "" : new Date(next.openedAt).toISOString();
+    const updatedAt = new Date(next.updatedAt).toISOString();
 
     store.set(name, toVariableValue(next), metadata(ctx.flowId));
     const branch =
@@ -175,6 +179,8 @@ export const circuitBreakerNode = defineNode({
         status: next.status,
         failureCount: next.failureCount,
         remainingMs,
+        openedAt,
+        updatedAt,
       },
     };
   },

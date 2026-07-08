@@ -242,6 +242,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         failureCount: "失败次数",
         remainingMs: "剩余毫秒",
+        openedAt: "打开时间",
+        updatedAt: "更新时间",
       },
       compare_gate: {
         in: "输入",
