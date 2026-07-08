@@ -34,6 +34,7 @@ export { distinctUntilChangedNode } from "./distinctUntilChanged.js";
 export { emptyGateNode } from "./emptyGate.js";
 export { filterItemsNode } from "./filterItems.js";
 export { firstSuccessNode } from "./firstSuccess.js";
+export { groupItemsNode } from "./groupItems.js";
 export { httpNode } from "./http.js";
 export { idempotencyKeyNode } from "./idempotencyKey.js";
 export { joinNode } from "./join.js";

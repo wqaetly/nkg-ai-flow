@@ -50,6 +50,7 @@ import {
   fallbackNode,
   filterItemsNode,
   firstSuccessNode,
+  groupItemsNode,
   agentNode,
   endNode,
   eventTriggerNode,
@@ -202,6 +203,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, emptyGateNode);
   installNode(target, filterItemsNode);
   installNode(target, firstSuccessNode);
+  installNode(target, groupItemsNode);
   installNode(target, httpNode);
   installNode(target, idempotencyKeyNode);
   installNode(target, joinNode);

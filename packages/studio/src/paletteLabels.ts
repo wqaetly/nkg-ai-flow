@@ -117,6 +117,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "首个成功",
         description: "从有序候选结果中选择第一个成功值。",
       },
+      group_items: {
+        title: "数组分组",
+        description: "按字段或完整值把数组项目分组成对象和分组列表。",
+      },
       for_begin: {
         title: "For 开始",
         description: "固定范围循环块入口，输出当前索引和总数。",

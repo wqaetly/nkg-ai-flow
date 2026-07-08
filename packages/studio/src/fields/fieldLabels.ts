@@ -264,6 +264,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         successValues: "成功状态值",
         errorPath: "错误字段路径",
       },
+      group_items: {
+        path: "分组字段路径",
+        missingKey: "缺失分组键",
+        caseSensitive: "区分大小写",
+      },
       for_begin: {
         start: "起始值",
         end: "结束值",

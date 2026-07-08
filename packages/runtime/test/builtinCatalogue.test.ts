@@ -34,6 +34,7 @@ const BUILTIN_TYPES = [
   "empty_gate",
   "filter_items",
   "first_success",
+  "group_items",
   "http",
   "idempotency_key",
   "join",

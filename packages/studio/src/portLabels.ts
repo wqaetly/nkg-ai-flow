@@ -362,6 +362,14 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         reason: "原因",
       },
+      group_items: {
+        items: "分组项",
+        groups: "分组对象",
+        entries: "分组列表",
+        keys: "分组键",
+        count: "分组数量",
+        total: "总数",
+      },
       for_begin: {
         body: "循环体",
         index: "索引",
