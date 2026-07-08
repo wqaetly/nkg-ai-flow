@@ -8673,6 +8673,79 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("isolates sequential foreach data scope between iterations", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_iteration_scope_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 120 },
+      config: {
+        value: [
+          { run: true, value: "first" },
+          { run: false, value: "second" },
+        ],
+      },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 220, y: 120 },
+    });
+    const gate = flow.node("condition", {
+      id: "gate",
+      position: { x: 340, y: 120 },
+      config: { expression: "input.run" },
+    });
+    const optional = flow.node("transform", {
+      id: "optional",
+      position: { x: 460, y: 60 },
+    });
+    const collect = flow.node("transform", {
+      id: "collect",
+      position: { x: 580, y: 120 },
+      config: { template: "seen:${input.value}" },
+    });
+    const loopEnd = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 700, y: 120 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 820, y: 120 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 940, y: 120 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), gate.in("in"));
+    flow.connect(begin.out("item"), optional.in("input"));
+    flow.connect(gate.out("true"), optional.in("in"));
+    flow.connect(gate.out("false"), collect.in("in"));
+    flow.connect(optional.out("out"), collect.in("in"));
+    flow.connect(optional.out("output"), collect.in("input"));
+    flow.connect(collect.out("out"), loopEnd.in("body_done"));
+    flow.connect(collect.out("output"), loopEnd.in("result"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_iteration_scope_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=seen:first,seen:");
+  });
+
   it("runs foreach parallel mode with batchSize and concurrency while preserving result order", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

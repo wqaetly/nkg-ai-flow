@@ -945,16 +945,30 @@ export class ExecutionEngine {
 
     for (let iteration = 0; iteration < iterations.length; iteration += 1) {
       const outputs = iterations[iteration]!;
+      const iterationState: ExecutionState = {
+        portValues: new Map(state.portValues),
+        inputOverrides: new Map(state.inputOverrides),
+      };
       await this.publishLoopIterationProgress(beginNode, block, {
         phase: "started",
         iteration,
         status: "running",
         context: loopIterationContext(outputs),
       });
-      this.recordOutputs(beginNode, outputs, state);
-      const bodyResult = await this.executeLoopBody(block, queue, errorPolicy, state);
+      this.recordOutputs(beginNode, outputs, iterationState);
+      const bodyResult = await this.executeLoopBody(
+        block,
+        queue,
+        errorPolicy,
+        iterationState,
+      );
       loopErrors.push(...bodyResult.errors);
-      this.collectLoopEndInputs(block, aggregated, bodyResult.executedNodeIds, state);
+      this.collectLoopEndInputs(
+        block,
+        aggregated,
+        bodyResult.executedNodeIds,
+        iterationState,
+      );
       if (bodyResult.status === "failed") {
         await this.publishLoopIterationProgress(beginNode, block, {
           phase: "finished",
@@ -1005,15 +1019,15 @@ export class ExecutionEngine {
     }
 
     addLoopErrors(aggregated, loopErrors);
-    this.applyLoopEndOverrides(block.endNode, aggregated);
-    const endResult = await this.executeNode(block.endNode);
-    this.clearLoopEndOverrides(block.endNode, aggregated);
+    this.applyLoopEndOverrides(block.endNode, aggregated, state);
+    const endResult = await this.executeNode(block.endNode, state);
+    this.clearLoopEndOverrides(block.endNode, aggregated, state);
     if (endResult.kind === "error") {
       await this.routeErrorOrFail(block.endNode, endResult.error, queue);
       return true;
     }
     if (endResult.kind === "success") {
-      this.recordOutputs(block.endNode, endResult.outputs);
+      this.recordOutputs(block.endNode, endResult.outputs, state);
       this.enqueueReadyDownstream(block.endNode, endResult.outputs, queue);
     }
     return true;
