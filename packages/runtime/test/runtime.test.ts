@@ -535,6 +535,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("deadline:on_time");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadlineOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "deadline") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadlineOutput).toMatchObject({
+      status: "on_time",
+      deadlineAt: expect.any(Number),
+      effectiveDeadlineAt: expect.any(Number),
+      graceMs: 0,
+      remainingMs: expect.any(Number),
+      overdueByMs: 0,
+      onTimeValue: true,
+      overdueValue: false,
+      now: expect.any(Number),
+    });
   });
 
   it("routes deadline to overdue after the deadline", async () => {
@@ -567,6 +584,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("deadline:overdue");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadlineOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "deadline") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadlineOutput).toMatchObject({
+      status: "overdue",
+      deadlineAt: expect.any(Number),
+      effectiveDeadlineAt: expect.any(Number),
+      graceMs: 0,
+      remainingMs: 0,
+      overdueByMs: expect.any(Number),
+      onTimeValue: false,
+      overdueValue: true,
+      now: expect.any(Number),
+    });
   });
 
   it("routes branch_timeout to timed_out from duration metadata", async () => {

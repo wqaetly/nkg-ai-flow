@@ -332,8 +332,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         on_time: "准时",
         overdue: "已超时",
         status: "状态",
+        effectiveDeadlineAt: "有效截止时间",
+        graceMs: "宽限毫秒",
         remainingMs: "剩余毫秒",
         overdueByMs: "超时毫秒",
+        onTimeValue: "是否准时",
+        overdueValue: "是否超时",
         now: "当前时间",
       },
       dead_letter: {
