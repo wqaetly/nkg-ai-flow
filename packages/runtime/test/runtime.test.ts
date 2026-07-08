@@ -212,6 +212,45 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
   });
 
+  it("filters array items with filter_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "filter_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: ["keep", "drop", "keep"] },
+    });
+    const filter = flow.node("filter_items", {
+      id: "filter",
+      position: { x: 260, y: 0 },
+      config: { condition: "item == \"keep\"" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "kept=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), filter.in("in"));
+    flow.connect(input.out("output"), filter.in("items"));
+    flow.connect(filter.out("out"), report.in("in"));
+    flow.connect(filter.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "filter_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("kept=keep,keep");
+  });
+
   it("executes every item in a foreach begin/end block", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

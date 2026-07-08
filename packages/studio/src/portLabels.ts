@@ -58,6 +58,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       package: "生成包",
       plan: "执行计划",
       response: "响应",
+      rejected: "剔除项",
       result: "结果",
       results: "结果数组",
       runInput: "运行输入",
@@ -96,6 +97,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       event_trigger: {
         event: "事件",
+      },
+      filter_items: {
+        items: "保留项",
+        rejected: "剔除项",
+        count: "保留数量",
       },
       for_begin: {
         body: "循环体",

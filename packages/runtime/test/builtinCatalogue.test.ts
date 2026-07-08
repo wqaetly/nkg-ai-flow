@@ -17,6 +17,7 @@ const BUILTIN_TYPES = [
   "transform",
   "condition",
   "delay",
+  "filter_items",
   "http",
   "join",
   "parallel",

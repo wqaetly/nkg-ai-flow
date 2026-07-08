@@ -17,6 +17,7 @@ export { endNode } from "./end.js";
 export { transformNode } from "./transform.js";
 export { conditionNode } from "./condition.js";
 export { delayNode } from "./delay.js";
+export { filterItemsNode } from "./filterItems.js";
 export { httpNode } from "./http.js";
 export { joinNode } from "./join.js";
 export { parallelNode } from "./parallel.js";

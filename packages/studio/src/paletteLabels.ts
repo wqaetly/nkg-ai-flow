@@ -45,6 +45,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "事件触发",
         description: "收到匹配的字符串事件时启动流程。",
       },
+      filter_items: {
+        title: "过滤数组",
+        description: "按条件保留数组中的部分元素。",
+      },
       for_begin: {
         title: "For 开始",
         description: "固定范围循环块入口，输出当前索引和总数。",

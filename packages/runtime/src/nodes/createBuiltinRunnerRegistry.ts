@@ -33,6 +33,7 @@ import type { NodeRunner } from "../nodeContext.js";
 import {
   conditionNode,
   delayNode,
+  filterItemsNode,
   agentNode,
   endNode,
   eventTriggerNode,
@@ -145,6 +146,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, transformNode);
   installNode(target, conditionNode);
   installNode(target, delayNode);
+  installNode(target, filterItemsNode);
   installNode(target, httpNode);
   installNode(target, joinNode);
   installNode(target, parallelNode);

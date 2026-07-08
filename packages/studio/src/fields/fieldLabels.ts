@@ -112,6 +112,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       event_trigger: {
         event: "触发事件",
       },
+      filter_items: {
+        condition: "过滤条件",
+      },
       for_begin: {
         start: "起始值",
         end: "结束值",
