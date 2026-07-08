@@ -4772,6 +4772,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("timer:waiting");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timer") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timerOutput).toMatchObject({
+      status: "waiting",
+      requestedAt: expect.any(String),
+      dueAt: expect.any(String),
+      timeoutAt: "",
+      timeoutMs: 0,
+      remainingMs: expect.any(Number),
+      overdueByMs: 0,
+      dueValue: false,
+      waitingValue: true,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
       status: "waiting",
     });
@@ -4871,6 +4889,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("timer:expired");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timer") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timerOutput).toMatchObject({
+      status: "expired",
+      requestedAt: expect.any(String),
+      dueAt: expect.any(String),
+      timeoutAt: expect.any(String),
+      timeoutMs: expect.any(Number),
+      remainingMs: 0,
+      overdueByMs: expect.any(Number),
+      dueValue: false,
+      waitingValue: false,
+      expiredValue: true,
+    });
     expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
       status: "expired",
     });

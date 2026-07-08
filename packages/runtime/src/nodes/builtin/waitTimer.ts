@@ -102,7 +102,16 @@ export const waitTimerNode = defineNode({
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
     { id: "dueAt", direction: "output", kind: "data", label: "Due At", schema: { type: "string" } },
+    { id: "timeoutAt", direction: "output", kind: "data", label: "Timeout At", schema: { type: "string" } },
+    {
+      id: "timeoutMs",
+      direction: "output",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
     {
       id: "remainingMs",
       direction: "output",
@@ -117,6 +126,9 @@ export const waitTimerNode = defineNode({
       label: "Overdue by ms",
       schema: { type: "number" },
     },
+    { id: "dueValue", direction: "output", kind: "data", label: "Due", schema: { type: "boolean" } },
+    { id: "waitingValue", direction: "output", kind: "data", label: "Waiting", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -152,7 +164,12 @@ export const waitTimerNode = defineNode({
     const next = evaluateState(created, now);
     const remainingMs = Math.max(0, next.dueAt - now);
     const overdueByMs = Math.max(0, now - next.dueAt);
+    const requestedAtIso = new Date(next.requestedAt).toISOString();
     const dueAtIso = new Date(next.dueAt).toISOString();
+    const timeoutAtIso =
+      next.timeoutAt === null ? "" : new Date(next.timeoutAt).toISOString();
+    const timeoutMs =
+      next.timeoutAt === null ? 0 : Math.max(0, next.timeoutAt - next.dueAt);
 
     store.set(name, toVariableValue(next), metadata(ctx.flowId));
     ctx.log.debug("wait_timer selected branch", {
@@ -169,9 +186,15 @@ export const waitTimerNode = defineNode({
         [next.status]: null,
         state: next,
         status: next.status,
+        requestedAt: requestedAtIso,
         dueAt: dueAtIso,
+        timeoutAt: timeoutAtIso,
+        timeoutMs,
         remainingMs,
         overdueByMs,
+        dueValue: next.status === "due",
+        waitingValue: next.status === "waiting",
+        expiredValue: next.status === "expired",
       },
     };
   },
