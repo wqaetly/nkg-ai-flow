@@ -78,6 +78,7 @@ export const queueNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "item", direction: "input", kind: "data", label: "Item" },
     { id: "pushed", direction: "output", kind: "control", label: "Pushed" },
     { id: "popped", direction: "output", kind: "control", label: "Popped" },
@@ -86,6 +87,7 @@ export const queueNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "items", direction: "output", kind: "data", label: "Items" },
     { id: "item", direction: "output", kind: "data", label: "Item" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -111,9 +113,9 @@ export const queueNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
-      return error("node.queue.missing_name", "queue node requires config.name", ctx.nodeId);
+      return error("node.queue.missing_name", "queue node requires config.name or name input", ctx.nodeId);
     }
 
     const store = asMutableVariableStore(ctx.variables);
@@ -158,6 +160,7 @@ export const queueNode = defineNode({
         [decision.branch]: null,
         items: decision.items,
         item: decision.items[0] ?? null,
+        name,
         state: decision.state,
         count: decision.items.length,
         queueSize,

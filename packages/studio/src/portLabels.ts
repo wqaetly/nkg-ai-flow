@@ -754,6 +754,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       queue: {
         in: "输入",
+        name: "队列名",
         item: "队列项",
         pushed: "已入队",
         popped: "已取出",

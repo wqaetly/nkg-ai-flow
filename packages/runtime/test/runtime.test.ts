@@ -8134,6 +8134,64 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("pushes items into a dynamically named queue", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queueName = flow.node("transform", {
+      id: "queueName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_QUEUE" },
+    });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-2", task: "ship" } },
+    });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 260, y: 0 },
+      config: {
+        maxItems: 10,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "queued:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), queueName.in("in"));
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(item.out("out"), queue.in("in"));
+    flow.connect(queueName.out("output"), queue.in("name"));
+    flow.connect(item.out("output"), queue.in("item"));
+    flow.connect(queue.out("pushed"), report.in("in"));
+    flow.connect(queue.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("queued:ORDER_DYNAMIC_QUEUE");
+    expect(variables.get("ORDER_DYNAMIC_QUEUE")).toMatchObject({
+      items: [{ orderId: "order-2", task: "ship" }],
+      pushedCount: 1,
+      poppedCount: 0,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("pops queue items in FIFO order", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_WORK_QUEUE", {
