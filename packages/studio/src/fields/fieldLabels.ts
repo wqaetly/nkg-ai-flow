@@ -47,6 +47,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       concurrency: "并发数",
       condition: "继续条件",
       default_name: "默认名称",
+      description: "描述",
       durationMs: "等待时长（毫秒）",
       end: "结束值",
       expression: "表达式",
@@ -201,6 +202,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       send_event: {
         event: "发送事件",
+      },
+      state_set: {
+        name: "状态名",
+        value: "静态值",
+        description: "状态描述",
       },
       text_input: {
         value: "输入文本",

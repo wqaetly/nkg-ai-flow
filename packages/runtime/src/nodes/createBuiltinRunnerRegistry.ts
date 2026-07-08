@@ -55,6 +55,7 @@ import {
   loopEndNode,
   sendEventNode,
   startNode,
+  stateSetNode,
   textInputNode,
   toolNode,
   transformNode,
@@ -167,6 +168,7 @@ export function createBuiltinRunnerRegistry(
   });
   installNode(target, eventTriggerNode);
   installNode(target, sendEventNode);
+  installNode(target, stateSetNode);
   installNode(target, foreachBeginNode);
   installNode(target, foreachEndNode);
   installNode(target, forBeginNode);
