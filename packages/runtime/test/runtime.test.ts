@@ -4673,6 +4673,59 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("kept=keep,keep");
   });
 
+  it("concatenates array sources with concat_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "concat_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 120, y: 20 },
+      config: { value: ["a", "b"] },
+    });
+    const second = flow.node("transform", {
+      id: "second",
+      position: { x: 120, y: 140 },
+      config: { value: ["c"] },
+    });
+    const concat = flow.node("concat_items", {
+      id: "concat",
+      position: { x: 280, y: 80 },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 420, y: 80 },
+      config: { template: "${index}:${item}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 560, y: 80 },
+      config: { template: "concat=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 80 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(start.out("out"), second.in("in"));
+    flow.connect(first.out("out"), concat.in("in"));
+    flow.connect(second.out("out"), concat.in("in"));
+    flow.connect(first.out("output"), concat.in("items"));
+    flow.connect(second.out("output"), concat.in("items"));
+    flow.connect(concat.out("out"), map.in("in"));
+    flow.connect(concat.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "concat_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("concat=0:a,1:b,2:c");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

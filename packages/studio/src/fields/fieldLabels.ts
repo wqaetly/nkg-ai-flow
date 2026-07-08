@@ -199,6 +199,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         rightValue: "静态右值",
         caseSensitive: "区分大小写",
       },
+      concat_items: {
+        includeScalars: "包含标量输入",
+      },
       checkpoint: {
         name: "检查点名",
         mode: "模式",

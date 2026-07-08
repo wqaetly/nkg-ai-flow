@@ -24,6 +24,7 @@ const BUILTIN_TYPES = [
   "checkpoint",
   "circuit_breaker",
   "compare_gate",
+  "concat_items",
   "compensation",
   "condition",
   "cooldown_gate",

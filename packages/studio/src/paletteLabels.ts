@@ -57,6 +57,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "比较门控",
         description: "比较两个值，并按匹配或不匹配继续流程。",
       },
+      concat_items: {
+        title: "合并数组",
+        description: "把多个上游数组来源按顺序合并成一个项目列表。",
+      },
       compensation: {
         title: "补偿动作",
         description: "登记或取出 Saga 风格的回滚补偿动作。",

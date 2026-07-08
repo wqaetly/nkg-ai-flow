@@ -222,6 +222,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         result: "结果",
         reason: "原因",
       },
+      concat_items: {
+        items: "合并项",
+        sources: "来源列表",
+        count: "数量",
+        sourceCount: "来源数量",
+      },
       checkpoint: {
         in: "输入",
         snapshot: "快照",
