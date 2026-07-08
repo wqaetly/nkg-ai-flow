@@ -419,8 +419,10 @@ export const loopEndNode = defineNode({
     timeoutOut,
     loopErrorOut,
     { id: "nextState", direction: "input", kind: "data", label: "下一状态" },
+    { id: "condition", direction: "input", kind: "data", label: "继续条件", schema: { type: "string" } },
     { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "finalState", direction: "output", kind: "data", label: "最终状态" },
+    { id: "condition", direction: "output", kind: "data", label: "继续条件", schema: { type: "string" } },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -432,7 +434,8 @@ export const loopEndNode = defineNode({
   run({ input, config }) {
     const nextState = input.nextState ?? input.input ?? null;
     const errors = normalizeErrors(input.errors);
-    const shouldContinue = evaluateCondition(config.condition ?? "", {
+    const condition = String(input.condition ?? config.condition ?? "");
+    const shouldContinue = evaluateCondition(condition, {
       nextState,
       input: nextState,
     });
@@ -441,6 +444,7 @@ export const loopEndNode = defineNode({
       outputs: {
         [shouldContinue ? "maxed" : "done"]: null,
         finalState: nextState,
+        condition,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,

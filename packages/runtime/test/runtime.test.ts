@@ -20661,6 +20661,74 @@ describe("runtime / hello-flow end-to-end", () => {
     ).toHaveLength(1);
   });
 
+  it("uses dynamic loop_end condition for before-check loops", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "loop_dynamic_before_condition_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 0 },
+      config: { value: { continue: true } },
+    });
+    const condition = flow.node("transform", {
+      id: "condition_expr",
+      position: { x: 260, y: 0 },
+      config: { value: "input.continue == true" },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 400, y: 0 },
+      config: { checkMode: "before", maxIterations: 3 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 540, y: 0 },
+      config: { value: { continue: false } },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 680, y: 0 },
+      config: { condition: "false" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 820, y: 0 },
+      config: { template: "final=${input.continue}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 960, y: 0 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), condition.in("in"));
+    flow.connect(condition.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(condition.out("output"), loopEnd.in("condition"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("finalState"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_dynamic_before_condition_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("final=false");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.filter((event) => event.kind === "node_started" && event.nodeId === "body"),
+    ).toHaveLength(1);
+  });
+
   it("isolates loop_begin data scope between while iterations", async () => {
     const stepNode = defineNode({
       type: "loop_scope_step",

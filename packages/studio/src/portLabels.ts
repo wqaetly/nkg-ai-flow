@@ -813,6 +813,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         timeout: "超时",
         error: "错误",
         nextState: "下一状态",
+        condition: "继续条件",
         finalState: "最终状态",
         errors: "错误列表",
         errorCount: "错误数量",

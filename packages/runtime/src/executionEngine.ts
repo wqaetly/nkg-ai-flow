@@ -1368,7 +1368,10 @@ export class ExecutionEngine {
     const timeoutMs = Math.max(0, Math.trunc(numberOr(config.timeoutMs, 0)));
     const startedAt = Date.now();
     const endConfig = asRecord(block.endNode.config ?? {});
-    const condition = String(endConfig.condition ?? "nextState.continue == \"true\"");
+    const endInputs = this.assembleInputs(block.endNode, executionState);
+    const condition = String(
+      endInputs.condition ?? endConfig.condition ?? "nextState.continue == \"true\"",
+    );
     let state = inputs.initialState ?? inputs.input ?? null;
     const loopErrors: RuntimeError[] = [];
     let iterationCount = 0;
