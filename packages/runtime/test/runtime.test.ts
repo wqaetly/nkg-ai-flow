@@ -9988,6 +9988,86 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("sum=10");
   });
 
+  it("reduces array items with numeric and positional reduce_items modes", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "reduce_items_modes_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { amount: 2, label: "first" },
+          { amount: "4", label: "middle" },
+          { amount: 6, label: "last-number" },
+          { amount: "skip", label: "last" },
+        ],
+      },
+    });
+    const average = flow.node("reduce_items", {
+      id: "average",
+      position: { x: 260, y: 0 },
+      config: { mode: "average", path: "amount" },
+    });
+    const min = flow.node("reduce_items", {
+      id: "min",
+      position: { x: 260, y: 100 },
+      config: { mode: "min", path: "amount" },
+    });
+    const max = flow.node("reduce_items", {
+      id: "max",
+      position: { x: 260, y: 200 },
+      config: { mode: "max", path: "amount" },
+    });
+    const first = flow.node("reduce_items", {
+      id: "first",
+      position: { x: 260, y: 300 },
+      config: { mode: "first", path: "label" },
+    });
+    const last = flow.node("reduce_items", {
+      id: "last",
+      position: { x: 260, y: 400 },
+      config: { mode: "last", path: "label" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "avg=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 560, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    for (const reduce of [average, min, max, first, last]) {
+      flow.connect(input.out("out"), reduce.in("in"));
+      flow.connect(input.out("output"), reduce.in("items"));
+    }
+    flow.connect(average.out("out"), report.in("in"));
+    flow.connect(average.out("result"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "reduce_items_modes_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const outputFor = (nodeId: string): Record<string, unknown> | undefined =>
+      (
+        events.find((event) => event.kind === "node_finished" && event.nodeId === nodeId) as
+          | { payload?: { output?: Record<string, unknown> } }
+          | undefined
+      )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("avg=4");
+    expect(outputFor("average")).toMatchObject({ result: 4, count: 4, numericCount: 3 });
+    expect(outputFor("min")).toMatchObject({ result: 2, count: 4, numericCount: 3 });
+    expect(outputFor("max")).toMatchObject({ result: 6, count: 4, numericCount: 3 });
+    expect(outputFor("first")).toMatchObject({ result: "first", count: 4, numericCount: 0 });
+    expect(outputFor("last")).toMatchObject({ result: "last", count: 4, numericCount: 0 });
+  });
+
   it("executes every item in a foreach begin/end block", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
