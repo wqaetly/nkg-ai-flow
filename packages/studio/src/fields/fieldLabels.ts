@@ -393,6 +393,10 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       schema_guard: {
         schema: "校验 Schema",
       },
+      select_path: {
+        path: "读取路径",
+        defaultValue: "默认值",
+      },
       semaphore: {
         name: "信号量状态名",
         owner: "持有者",

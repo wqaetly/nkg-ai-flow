@@ -74,6 +74,7 @@ import {
   retryPolicyNode,
   scheduleWindowNode,
   schemaGuardNode,
+  selectPathNode,
   semaphoreNode,
   sliceItemsNode,
   sortItemsNode,
@@ -228,6 +229,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, retryPolicyNode);
   installNode(target, scheduleWindowNode);
   installNode(target, schemaGuardNode);
+  installNode(target, selectPathNode);
   installNode(target, semaphoreNode);
   installNode(target, sliceItemsNode);
   installNode(target, sortItemsNode);

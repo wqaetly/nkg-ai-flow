@@ -241,6 +241,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "Schema 校验",
         description: "按 JSON Schema 子集校验数据，并路由到有效或无效分支。",
       },
+      select_path: {
+        title: "路径取值",
+        description: "从结构化数据中按路径取出字段，并把缺失路径路由到缺失分支。",
+      },
       semaphore: {
         title: "信号量",
         description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",

@@ -597,6 +597,16 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         issueCount: "问题数量",
         firstIssue: "首个问题",
       },
+      select_path: {
+        value: "数据",
+        found: "已找到",
+        missing: "缺失",
+        source: "来源数据",
+        exists: "是否存在",
+        path: "路径",
+        type: "类型",
+        reason: "原因",
+      },
       semaphore: {
         in: "输入",
         owner: "持有者",

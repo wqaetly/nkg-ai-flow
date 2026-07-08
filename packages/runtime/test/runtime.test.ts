@@ -4944,6 +4944,93 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toContain("BigInt values cannot be represented");
   });
 
+  it("selects nested values by path with select_path", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "select_path_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          order: {
+            items: [
+              { sku: "first" },
+              { sku: "second" },
+            ],
+          },
+        },
+      },
+    });
+    const select = flow.node("select_path", {
+      id: "select",
+      position: { x: 260, y: 0 },
+      config: { path: "order.items[1].sku" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "sku=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), select.in("in"));
+    flow.connect(input.out("output"), select.in("value"));
+    flow.connect(select.out("found"), report.in("in"));
+    flow.connect(select.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "select_path_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sku=second");
+  });
+
+  it("routes missing select_path values with a default", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "select_path_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const select = flow.node("select_path", {
+      id: "select",
+      position: { x: 260, y: 0 },
+      config: { path: "order.customer.name", defaultValue: "anonymous" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "customer=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), select.in("in"));
+    flow.connect(input.out("output"), select.in("value"));
+    flow.connect(select.out("missing"), report.in("in"));
+    flow.connect(select.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "select_path_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("customer=anonymous");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
