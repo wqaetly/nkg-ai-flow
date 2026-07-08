@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "大模型调用",
         description: "使用提示词模板调用模型，并可选择流式输出。",
       },
+      map_items: {
+        title: "映射数组",
+        description: "对数组每一项套用模板并输出新数组。",
+      },
       loop_begin: {
         title: "Loop 开始",
         description: "While / Until 循环块入口，输出状态和轮次。",

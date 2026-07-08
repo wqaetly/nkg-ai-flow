@@ -142,6 +142,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         values: "多路数据",
         count: "数量",
       },
+      map_items: {
+        items: "映射项",
+        count: "数量",
+      },
       llm: {
         result: "结果",
       },

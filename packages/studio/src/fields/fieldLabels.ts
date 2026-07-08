@@ -144,6 +144,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxTokens: "最大输出 Token",
         stream: "流式输出",
       },
+      map_items: {
+        template: "映射模板",
+      },
       loop_begin: {
         maxIterations: "最大循环次数",
         checkMode: "检查时机",

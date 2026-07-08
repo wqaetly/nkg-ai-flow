@@ -39,6 +39,7 @@ import {
   eventTriggerNode,
   httpNode,
   joinNode,
+  mapItemsNode,
   parallelNode,
   foreachBeginNode,
   foreachEndNode,
@@ -149,6 +150,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, filterItemsNode);
   installNode(target, httpNode);
   installNode(target, joinNode);
+  installNode(target, mapItemsNode);
   installNode(target, parallelNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);

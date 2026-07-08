@@ -20,6 +20,7 @@ const BUILTIN_TYPES = [
   "filter_items",
   "http",
   "join",
+  "map_items",
   "parallel",
   "tool",
   "text_input",
