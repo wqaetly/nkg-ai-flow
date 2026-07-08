@@ -672,9 +672,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         values: "到达值",
         met: "达到阈值",
         unmet: "未达阈值",
+        firstValue: "首个值",
+        lastValue: "最后值",
+        metValue: "是否达到",
         count: "到达数量",
         threshold: "阈值",
         remaining: "剩余数量",
+        quorumRate: "达到比例",
         status: "状态",
       },
       race: {

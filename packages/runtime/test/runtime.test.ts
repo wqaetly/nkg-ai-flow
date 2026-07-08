@@ -7760,6 +7760,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("quorum:upper:Flow,lower:Flow");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const quorumOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "quorum") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(quorumOutput).toMatchObject({
+      status: "met",
+      metValue: true,
+      count: 2,
+      threshold: 2,
+      remaining: 0,
+      firstValue: "upper:Flow",
+      lastValue: "lower:Flow",
+      quorumRate: 1,
+    });
   });
 
   it("routes quorum to unmet when all reachable values stay below threshold", async () => {
@@ -7805,6 +7821,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("remaining:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const quorumOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "quorum") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(quorumOutput).toMatchObject({
+      status: "unmet",
+      metValue: false,
+      count: 2,
+      threshold: 3,
+      remaining: 1,
+      firstValue: "upper:Flow",
+      lastValue: "lower:Flow",
+    });
+    expect(quorumOutput?.quorumRate).toBeCloseTo(2 / 3);
   });
 
   it("continues through quorum before slow in-flight siblings finish", async () => {
