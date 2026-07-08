@@ -241,6 +241,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       parallel: {
         branchCount: "分支数量",
       },
+      queue: {
+        name: "队列状态名",
+        mode: "模式",
+        maxItems: "最大保留项数",
+        count: "取出数量",
+      },
       mutex: {
         name: "锁状态名",
         owner: "持有者",

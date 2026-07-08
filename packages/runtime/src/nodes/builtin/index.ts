@@ -31,6 +31,7 @@ export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";
 export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";
+export { queueNode } from "./queue.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";

@@ -31,6 +31,7 @@ const BUILTIN_TYPES = [
   "merge",
   "mutex",
   "parallel",
+  "queue",
   "rate_limit",
   "reduce_items",
   "retry_policy",

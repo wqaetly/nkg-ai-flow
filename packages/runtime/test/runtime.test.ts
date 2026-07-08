@@ -1652,6 +1652,244 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
   });
 
+  it("pushes items into queue", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_push_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-1", task: "charge" } },
+    });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_WORK_QUEUE",
+        maxItems: 10,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "queued:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(item.out("out"), queue.in("in"));
+    flow.connect(item.out("output"), queue.in("item"));
+    flow.connect(queue.out("pushed"), report.in("in"));
+    flow.connect(queue.out("queueSize"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_push_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("queued:1");
+    expect(variables.get("ORDER_WORK_QUEUE")).toMatchObject({
+      items: [{ orderId: "order-1", task: "charge" }],
+      pushedCount: 1,
+      poppedCount: 0,
+    });
+  });
+
+  it("pops queue items in FIFO order", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_WORK_QUEUE", {
+      items: ["order-1", "order-2"],
+      updatedAt: Date.now(),
+      pushedCount: 2,
+      poppedCount: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_pop_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "pop",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "popped:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), queue.in("in"));
+    flow.connect(queue.out("popped"), report.in("in"));
+    flow.connect(queue.out("item"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_pop_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("popped:order-1");
+    expect(variables.get("ORDER_WORK_QUEUE")).toMatchObject({
+      items: ["order-2"],
+      pushedCount: 2,
+      poppedCount: 1,
+    });
+  });
+
+  it("peeks queue items without removing them", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_WORK_QUEUE", {
+      items: ["order-1", "order-2"],
+      updatedAt: Date.now(),
+      pushedCount: 2,
+      poppedCount: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_peek_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "peek",
+        count: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "peeked:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), queue.in("in"));
+    flow.connect(queue.out("peeked"), report.in("in"));
+    flow.connect(queue.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_peek_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("peeked:2");
+    expect(variables.get("ORDER_WORK_QUEUE")).toMatchObject({
+      items: ["order-1", "order-2"],
+      pushedCount: 2,
+      poppedCount: 0,
+    });
+  });
+
+  it("routes empty queue pops to empty", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "pop",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "empty:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), queue.in("in"));
+    flow.connect(queue.out("empty"), report.in("in"));
+    flow.connect(queue.out("queueSize"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("empty:0");
+    expect(variables.has("ORDER_WORK_QUEUE")).toBe(false);
+  });
+
+  it("clears queue state explicitly", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_WORK_QUEUE", {
+      items: ["order-1", "order-2"],
+      updatedAt: Date.now(),
+      pushedCount: 2,
+      poppedCount: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "cleared:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), queue.in("in"));
+    flow.connect(queue.out("cleared"), report.in("in"));
+    flow.connect(queue.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cleared:2");
+    expect(variables.has("ORDER_WORK_QUEUE")).toBe(false);
+  });
+
   it("saves a checkpoint snapshot for later recovery", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

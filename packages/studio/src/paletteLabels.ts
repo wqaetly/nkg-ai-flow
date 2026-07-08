@@ -145,6 +145,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "并行分支",
         description: "把流程扇出到多个命名分支。",
       },
+      queue: {
+        title: "持久队列",
+        description: "把任务项入队、取出、查看或清空，用于显式缓冲和消费。",
+      },
       rate_limit: {
         title: "限流",
         description: "基于持久化滑动窗口配额路由到允许或限流分支。",
