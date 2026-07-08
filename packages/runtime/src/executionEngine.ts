@@ -700,6 +700,10 @@ export class ExecutionEngine {
         ? this.foreachIterations(beginNode)
         : this.forIterations(beginNode);
     const aggregated = new Map<string, unknown[]>();
+    const config = asRecord(this.assembleInputs(beginNode).__config__);
+    const timeoutMs = Math.max(0, Math.trunc(numberOr(config.timeoutMs, 0)));
+    const startedAt = Date.now();
+    let timedOut = false;
 
     for (let iteration = 0; iteration < iterations.length; iteration += 1) {
       const outputs = iterations[iteration]!;
@@ -721,13 +725,28 @@ export class ExecutionEngine {
         return true;
       }
       this.collectLoopEndInputs(block, aggregated, bodyResult.executedNodeIds);
+      if (
+        bodyResult.status !== "break" &&
+        timeoutMs > 0 &&
+        Date.now() - startedAt >= timeoutMs
+      ) {
+        timedOut = true;
+      }
       await this.publishLoopIterationProgress(beginNode, block, {
         phase: "finished",
         iteration,
-        status: bodyResult.status,
+        status: timedOut ? "timeout" : bodyResult.status,
         context: loopIterationContext(outputs),
       });
       if (bodyResult.status === "break") break;
+      if (timedOut) break;
+    }
+
+    if (timedOut) {
+      const outputs = loopTimeoutOutputs(block.endNode, aggregated);
+      this.recordOutputs(block.endNode, outputs);
+      this.enqueueReadyDownstream(block.endNode, outputs, queue);
+      return true;
     }
 
     this.applyLoopEndOverrides(block.endNode, aggregated);
@@ -784,6 +803,8 @@ export class ExecutionEngine {
     const config = asRecord(inputs.__config__);
     const maxIterations = Math.max(1, Math.trunc(numberOr(config.maxIterations, 10)));
     const checkMode = config.checkMode === "before" ? "before" : "after";
+    const timeoutMs = Math.max(0, Math.trunc(numberOr(config.timeoutMs, 0)));
+    const startedAt = Date.now();
     const endConfig = asRecord(block.endNode.config ?? {});
     const condition = String(endConfig.condition ?? "nextState.continue == \"true\"");
     let state = inputs.initialState ?? inputs.input ?? null;
@@ -846,12 +867,19 @@ export class ExecutionEngine {
         const nextState = lastAggregatedValue(aggregated, "nextState");
         if (nextState !== undefined) state = nextState;
         const hitLimit = iteration === maxIterations - 1;
+        const hitTimeout = timeoutMs > 0 && Date.now() - startedAt >= timeoutMs;
         await this.publishLoopIterationProgress(beginNode, block, {
           phase: "finished",
           iteration,
-          status: hitLimit ? "maxed" : "continue",
+          status: hitTimeout ? "timeout" : hitLimit ? "maxed" : "continue",
           context: loopIterationContext(outputs),
         });
+        if (hitTimeout) {
+          const timeoutOutputs = { timeout: null, finalState: state };
+          this.recordOutputs(block.endNode, timeoutOutputs);
+          this.enqueueReadyDownstream(block.endNode, timeoutOutputs, queue);
+          return true;
+        }
         if (hitLimit) {
           const maxedOutputs = { done: null, maxed: null, finalState: state };
           this.recordOutputs(block.endNode, maxedOutputs);
@@ -873,12 +901,26 @@ export class ExecutionEngine {
       const wantsAnotherIteration = "maxed" in endResult.outputs;
       state = endResult.outputs.finalState ?? state;
       const hitLimit = wantsAnotherIteration && iteration === maxIterations - 1;
+      const hitTimeout =
+        wantsAnotherIteration && timeoutMs > 0 && Date.now() - startedAt >= timeoutMs;
       await this.publishLoopIterationProgress(beginNode, block, {
         phase: "finished",
         iteration,
-        status: hitLimit ? "maxed" : wantsAnotherIteration ? "continue" : "completed",
+        status: hitTimeout
+          ? "timeout"
+          : hitLimit
+            ? "maxed"
+            : wantsAnotherIteration
+              ? "continue"
+              : "completed",
         context: loopIterationContext(outputs),
       });
+      if (hitTimeout) {
+        const timeoutOutputs = { timeout: null, finalState: state };
+        this.recordOutputs(block.endNode, timeoutOutputs);
+        this.enqueueReadyDownstream(block.endNode, timeoutOutputs, queue);
+        return true;
+      }
       if (!wantsAnotherIteration || hitLimit) {
         const outputs = hitLimit
           ? { ...endResult.outputs, done: null, maxed: null }
@@ -1186,6 +1228,17 @@ function loopIterationContext(outputs: NodeOutputs): Record<string, unknown> {
     context[key] = value;
   }
   return context;
+}
+
+function loopTimeoutOutputs(endNode: NodeInstance, aggregated: Map<string, unknown[]>): NodeOutputs {
+  const results = aggregated.get("result") ?? [];
+  if (endNode.type === "foreach_end") {
+    return { timeout: null, results, errors: [] };
+  }
+  if (endNode.type === "for_end") {
+    return { timeout: null, results };
+  }
+  return { timeout: null };
 }
 
 /**

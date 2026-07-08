@@ -31,6 +31,13 @@ const maxedOut: PortDefinition = {
   label: "达到上限",
 };
 
+const timeoutOut: PortDefinition = {
+  id: "timeout",
+  direction: "output",
+  kind: "control",
+  label: "超时",
+};
+
 const breakOut: PortDefinition = {
   id: "break",
   direction: "output",
@@ -50,6 +57,12 @@ const foreachBeginConfig = z
     mode: z.enum(["sequential", "parallel"]).default("sequential"),
     concurrency: z.number().int().min(1).default(1),
     batchSize: z.number().int().min(1).default(1),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Maximum loop block duration in milliseconds; 0 disables timeout."),
   })
   .passthrough();
 
@@ -75,6 +88,10 @@ export const foreachBeginNode = defineNode({
     },
     batchSize: {
       label: "批大小",
+      control: "number",
+    },
+    timeoutMs: {
+      label: "Timeout (ms)",
       control: "number",
     },
   },
@@ -110,6 +127,7 @@ export const foreachEndNode = defineNode({
   ports: [
     bodyDoneIn,
     doneOut,
+    timeoutOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
@@ -133,6 +151,12 @@ const forBeginConfig = z
     start: z.number().int().default(0),
     end: z.number().int().default(3),
     step: z.number().int().default(1),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Maximum loop block duration in milliseconds; 0 disables timeout."),
   })
   .passthrough();
 
@@ -147,6 +171,7 @@ export const forBeginNode = defineNode({
     start: { label: "起始值", control: "number" },
     end: { label: "结束值", control: "number" },
     step: { label: "步长", control: "number" },
+    timeoutMs: { label: "Timeout (ms)", control: "number" },
   },
   ports: [
     controlIn,
@@ -180,6 +205,7 @@ export const forEndNode = defineNode({
   ports: [
     bodyDoneIn,
     doneOut,
+    timeoutOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
   ],
@@ -200,6 +226,12 @@ const loopBeginConfig = z
   .object({
     maxIterations: z.number().int().min(1).default(10),
     checkMode: z.enum(["before", "after"]).default("after"),
+    timeoutMs: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Maximum loop block duration in milliseconds; 0 disables timeout."),
   })
   .passthrough();
 
@@ -212,6 +244,7 @@ export const loopBeginNode = defineNode({
   config: loopBeginConfig,
   fieldMeta: {
     maxIterations: { label: "最大循环次数", control: "number" },
+    timeoutMs: { label: "Timeout (ms)", control: "number" },
     checkMode: {
       label: "检查时机",
       control: "select",
@@ -265,6 +298,7 @@ export const loopEndNode = defineNode({
     bodyDoneIn,
     doneOut,
     maxedOut,
+    timeoutOut,
     { id: "nextState", direction: "input", kind: "data", label: "下一状态" },
     { id: "finalState", direction: "output", kind: "data", label: "最终状态" },
   ],
