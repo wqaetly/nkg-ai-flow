@@ -38,6 +38,13 @@ const timeoutOut: PortDefinition = {
   label: "超时",
 };
 
+const loopErrorOut: PortDefinition = {
+  id: "error",
+  direction: "output",
+  kind: "control",
+  label: "错误",
+};
+
 const breakOut: PortDefinition = {
   id: "break",
   direction: "output",
@@ -57,6 +64,10 @@ const foreachBeginConfig = z
     mode: z.enum(["sequential", "parallel"]).default("sequential"),
     concurrency: z.number().int().min(1).default(1),
     batchSize: z.number().int().min(1).default(1),
+    onError: z
+      .enum(["terminate", "continue", "break", "route"])
+      .default("terminate")
+      .describe("Loop-body error policy when the failing node has no local error edge."),
     timeoutMs: z
       .number()
       .int()
@@ -89,6 +100,16 @@ export const foreachBeginNode = defineNode({
     batchSize: {
       label: "批大小",
       control: "number",
+    },
+    onError: {
+      label: "错误策略",
+      control: "select",
+      enumOptions: [
+        { label: "终止运行", value: "terminate" },
+        { label: "跳过当前轮", value: "continue" },
+        { label: "跳出循环", value: "break" },
+        { label: "路由错误", value: "route" },
+      ],
     },
     timeoutMs: {
       label: "Timeout (ms)",
@@ -128,19 +149,26 @@ export const foreachEndNode = defineNode({
     bodyDoneIn,
     doneOut,
     timeoutOut,
+    loopErrorOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
+    { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
+    { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
+    { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
   ],
   validateInput: false,
   run({ input }) {
     const raw = input.result;
+    const errors = normalizeErrors(input.errors);
     return {
       kind: "success",
       outputs: {
         done: null,
         results: raw === undefined ? [] : Array.isArray(raw) ? raw : [raw],
-        errors: [],
+        errors,
+        errorCount: errors.length,
+        firstError: errors[0] ?? null,
       },
     };
   },
@@ -151,6 +179,10 @@ const forBeginConfig = z
     start: z.number().int().default(0),
     end: z.number().int().default(3),
     step: z.number().int().default(1),
+    onError: z
+      .enum(["terminate", "continue", "break", "route"])
+      .default("terminate")
+      .describe("Loop-body error policy when the failing node has no local error edge."),
     timeoutMs: z
       .number()
       .int()
@@ -171,6 +203,16 @@ export const forBeginNode = defineNode({
     start: { label: "起始值", control: "number" },
     end: { label: "结束值", control: "number" },
     step: { label: "步长", control: "number" },
+    onError: {
+      label: "错误策略",
+      control: "select",
+      enumOptions: [
+        { label: "终止运行", value: "terminate" },
+        { label: "跳过当前轮", value: "continue" },
+        { label: "跳出循环", value: "break" },
+        { label: "路由错误", value: "route" },
+      ],
+    },
     timeoutMs: { label: "Timeout (ms)", control: "number" },
   },
   ports: [
@@ -206,17 +248,26 @@ export const forEndNode = defineNode({
     bodyDoneIn,
     doneOut,
     timeoutOut,
+    loopErrorOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
+    { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
+    { id: "errors", direction: "output", kind: "data", label: "错误列表" },
+    { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
+    { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
   ],
   validateInput: false,
   run({ input }) {
     const raw = input.result;
+    const errors = normalizeErrors(input.errors);
     return {
       kind: "success",
       outputs: {
         done: null,
         results: raw === undefined ? [] : Array.isArray(raw) ? raw : [raw],
+        errors,
+        errorCount: errors.length,
+        firstError: errors[0] ?? null,
       },
     };
   },
@@ -226,6 +277,10 @@ const loopBeginConfig = z
   .object({
     maxIterations: z.number().int().min(1).default(10),
     checkMode: z.enum(["before", "after"]).default("after"),
+    onError: z
+      .enum(["terminate", "continue", "break", "route"])
+      .default("terminate")
+      .describe("Loop-body error policy when the failing node has no local error edge."),
     timeoutMs: z
       .number()
       .int()
@@ -245,6 +300,16 @@ export const loopBeginNode = defineNode({
   fieldMeta: {
     maxIterations: { label: "最大循环次数", control: "number" },
     timeoutMs: { label: "Timeout (ms)", control: "number" },
+    onError: {
+      label: "错误策略",
+      control: "select",
+      enumOptions: [
+        { label: "终止运行", value: "terminate" },
+        { label: "跳过当前轮", value: "continue" },
+        { label: "跳出循环", value: "break" },
+        { label: "路由错误", value: "route" },
+      ],
+    },
     checkMode: {
       label: "检查时机",
       control: "select",
@@ -299,12 +364,18 @@ export const loopEndNode = defineNode({
     doneOut,
     maxedOut,
     timeoutOut,
+    loopErrorOut,
     { id: "nextState", direction: "input", kind: "data", label: "下一状态" },
+    { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "finalState", direction: "output", kind: "data", label: "最终状态" },
+    { id: "errors", direction: "output", kind: "data", label: "错误列表" },
+    { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
+    { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
   ],
   validateInput: false,
   run({ input, config }) {
     const nextState = input.nextState ?? input.input ?? null;
+    const errors = normalizeErrors(input.errors);
     const shouldContinue = evaluateCondition(config.condition ?? "", {
       nextState,
       input: nextState,
@@ -314,6 +385,9 @@ export const loopEndNode = defineNode({
       outputs: {
         [shouldContinue ? "maxed" : "done"]: null,
         finalState: nextState,
+        errors,
+        errorCount: errors.length,
+        firstError: errors[0] ?? null,
       },
     };
   },
@@ -350,3 +424,9 @@ export const loopContinueNode = defineNode({
     };
   },
 });
+
+function normalizeErrors(value: unknown): unknown[] {
+  if (value === undefined || value === null) return [];
+  if (!Array.isArray(value)) return [value];
+  return value.flatMap((item) => (Array.isArray(item) ? item : [item]));
+}

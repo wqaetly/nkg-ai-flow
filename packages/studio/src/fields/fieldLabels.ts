@@ -303,11 +303,15 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         start: "起始值",
         end: "结束值",
         step: "步长",
+        onError: "错误策略",
+        timeoutMs: "超时时间（毫秒）",
       },
       foreach_begin: {
         mode: "执行模式",
         concurrency: "并发数",
         batchSize: "批大小",
+        onError: "错误策略",
+        timeoutMs: "超时时间（毫秒）",
       },
       flow_validator: {
         strict: "严格模式",
@@ -352,6 +356,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       loop_begin: {
         maxIterations: "最大循环次数",
         checkMode: "检查时机",
+        onError: "错误策略",
+        timeoutMs: "超时时间（毫秒）",
       },
       loop_end: {
         condition: "继续条件",

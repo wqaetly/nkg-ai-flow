@@ -401,8 +401,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       for_end: {
         body_done: "循环体完成",
         done: "完成",
+        timeout: "超时",
+        error: "错误",
         result: "单次结果",
         results: "结果数组",
+        errors: "错误列表",
+        errorCount: "错误数量",
+        firstError: "首个错误",
       },
       foreach_begin: {
         body: "循环体",
@@ -414,9 +419,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       foreach_end: {
         body_done: "循环体完成",
         done: "完成",
+        timeout: "超时",
+        error: "错误",
         result: "单次结果",
         results: "结果数组",
         errors: "错误列表",
+        errorCount: "错误数量",
+        firstError: "首个错误",
       },
       flow_validator: {
         package: "生成包",
@@ -511,8 +520,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         body_done: "循环体完成",
         done: "完成",
         maxed: "达到上限",
+        timeout: "超时",
+        error: "错误",
         nextState: "下一状态",
         finalState: "最终状态",
+        errors: "错误列表",
+        errorCount: "错误数量",
+        firstError: "首个错误",
       },
       node_designer: {
         skill_def: "Skill 定义",

@@ -6779,6 +6779,126 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("continues foreach iterations after body errors when onError is continue", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_error_continue_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+      config: { onError: "continue" },
+    });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 300, y: 0 },
+      config: {},
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "errors=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), failing.in("in"));
+    flow.connect(failing.out("out"), end.in("body_done"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(end.out("errorCount"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_error_continue_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("errors=2");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const finished = events.filter(
+      (event) =>
+        event.kind === "node_progress" &&
+        event.nodeId === "begin" &&
+        (event.payload as { phase?: string }).phase === "finished",
+    );
+    expect(finished.map((event) => (event.payload as { status: string }).status)).toEqual([
+      "error_continue",
+      "error_continue",
+    ]);
+  });
+
+  it("routes foreach body errors through the loop error branch when onError is route", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_error_route_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+      config: { onError: "route" },
+    });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 300, y: 0 },
+      config: {},
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "error=${input.code}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), failing.in("in"));
+    flow.connect(failing.out("out"), end.in("body_done"));
+    flow.connect(end.out("error"), report.in("in"));
+    flow.connect(end.out("firstError"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_error_route_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("error=node.http.missing_url");
+  });
+
   it("stops a foreach block when loop_break runs inside the body", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
