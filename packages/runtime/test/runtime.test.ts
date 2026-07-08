@@ -8599,9 +8599,16 @@ describe("runtime / hello-flow end-to-end", () => {
       flowId: "filter_items_e2e",
       input: null,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const filterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "filter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("kept=keep,keep");
+    expect(filterOutput).toMatchObject({ count: 2, rejectedCount: 1, total: 3 });
   });
 
   it("evaluates expressions with expression_eval", async () => {

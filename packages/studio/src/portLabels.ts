@@ -401,6 +401,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         items: "保留项",
         rejected: "剔除项",
         count: "保留数量",
+        rejectedCount: "剔除数量",
+        total: "总数量",
       },
       flatten_items: {
         items: "展平项",

@@ -62,6 +62,20 @@ export const filterItemsNode = defineNode({
       label: "Kept count",
       schema: { type: "number" },
     },
+    {
+      id: "rejectedCount",
+      direction: "output",
+      kind: "data",
+      label: "Rejected count",
+      schema: { type: "number" },
+    },
+    {
+      id: "total",
+      direction: "output",
+      kind: "data",
+      label: "Total",
+      schema: { type: "number" },
+    },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -90,6 +104,8 @@ export const filterItemsNode = defineNode({
         items: kept,
         rejected,
         count: kept.length,
+        rejectedCount: rejected.length,
+        total: source.length,
       },
     };
   },
