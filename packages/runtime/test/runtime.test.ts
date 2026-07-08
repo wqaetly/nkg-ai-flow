@@ -2541,6 +2541,69 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("records retry_state failures with a dynamically named state", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const stateName = flow.node("transform", {
+      id: "stateName",
+      position: { x: 120, y: -80 },
+      config: { value: "PAYMENT_DYNAMIC_RETRY" },
+    });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 280, y: 0 },
+      config: {
+        key: "order-2",
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        multiplier: 2,
+        maxDelayMs: 1000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), stateName.in("in"));
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), retry.in("in"));
+    flow.connect(stateName.out("output"), retry.in("name"));
+    flow.connect(source.out("output"), retry.in("error"));
+    flow.connect(retry.out("retry"), report.in("in"));
+    flow.connect(retry.out("stateKey"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:PAYMENT_DYNAMIC_RETRY:order-2");
+    expect(variables.get("PAYMENT_DYNAMIC_RETRY:order-2")).toMatchObject({
+      status: "waiting",
+      attempt: 1,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("persists retry_state unsafe when required idempotency is unknown", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

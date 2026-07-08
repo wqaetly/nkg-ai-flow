@@ -839,6 +839,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       retry_state: {
         in: "输入",
+        name: "重试状态名",
         error: "错误",
         idempotent: "是否幂等",
         key: "业务键",

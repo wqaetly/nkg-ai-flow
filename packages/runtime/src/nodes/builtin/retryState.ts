@@ -146,6 +146,7 @@ export const retryStateNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "error", direction: "input", kind: "data", label: "Error" },
     { id: "idempotent", direction: "input", kind: "data", label: "Idempotent", schema: { type: "boolean" } },
     { id: "key", direction: "input", kind: "data", label: "Key", schema: { type: "string" } },
@@ -156,6 +157,7 @@ export const retryStateNode = defineNode({
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "idle", direction: "output", kind: "control", label: "Idle" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "error", direction: "output", kind: "data", label: "Error" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "attempt", direction: "output", kind: "data", label: "Attempt", schema: { type: "number" } },
@@ -176,11 +178,12 @@ export const retryStateNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const stateKey = buildStateKey(config.name, input.key ?? config.key);
+    const name = String(input.name ?? config.name ?? "").trim();
+    const stateKey = buildStateKey(name, input.key ?? config.key);
     if (stateKey === "") {
       return error(
         "node.retry_state.missing_name",
-        "retry_state node requires config.name",
+        "retry_state node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -253,6 +256,7 @@ export const retryStateNode = defineNode({
       outputs: {
         [decision.branch]: null,
         state: decision.state,
+        name,
         error: decision.state?.lastError ?? null,
         status: decision.branch,
         attempt,
