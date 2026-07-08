@@ -376,6 +376,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         in: "输入",
         name: "冷却键名",
         now: "当前时间",
+        mode: "模式",
+        durationMs: "冷却时长毫秒",
         ready: "可放行",
         cooling: "冷却中",
         reset: "已重置",

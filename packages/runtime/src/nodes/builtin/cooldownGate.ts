@@ -75,11 +75,15 @@ export const cooldownGateNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "now", direction: "input", kind: "data", label: "Now" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "durationMs", direction: "input", kind: "data", label: "Duration ms", schema: { type: "number" } },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "cooling", direction: "output", kind: "control", label: "Cooling" },
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "durationMs", direction: "output", kind: "data", label: "Duration ms", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "remainingMs", direction: "output", kind: "data", label: "Remaining ms", schema: { type: "number" } },
     { id: "readyAt", direction: "output", kind: "data", label: "Ready at", schema: { type: "number" } },
@@ -107,8 +111,8 @@ export const cooldownGateNode = defineNode({
       );
     }
 
-    const mode = readMode(config.mode);
-    const durationMs = Math.max(1, Math.trunc(Number(config.durationMs ?? 60000)));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "consume";
+    const durationMs = readPositiveInteger(input.durationMs) ?? readPositiveInteger(config.durationMs) ?? 60000;
     const now = readTimestamp(input.now) ?? Date.now();
     const previous = readCooldownState(store.get(name), durationMs);
 
@@ -121,6 +125,8 @@ export const cooldownGateNode = defineNode({
         lastAllowedAt: 0,
         allowedCount: previous?.allowedCount ?? 0,
         suppressedCount: previous?.suppressedCount ?? 0,
+        mode,
+        durationMs,
       }, name);
     }
 
@@ -151,6 +157,8 @@ export const cooldownGateNode = defineNode({
       lastAllowedAt: next.lastAllowedAt,
       allowedCount: next.allowedCount,
       suppressedCount: next.suppressedCount,
+      mode,
+      durationMs,
     }, name);
   },
 });
@@ -185,6 +193,8 @@ function success(
     lastAllowedAt: number;
     allowedCount: number;
     suppressedCount: number;
+    mode: CooldownMode;
+    durationMs: number;
   },
   name: string,
 ) {
@@ -194,6 +204,8 @@ function success(
       [branch]: null,
       state,
       name,
+      mode: data.mode,
+      durationMs: data.durationMs,
       status: data.status,
       remainingMs: data.remainingMs,
       readyAt: data.readyAt,
@@ -204,8 +216,12 @@ function success(
   };
 }
 
-function readMode(value: unknown): CooldownMode {
-  return value === "check" || value === "reset" ? value : "consume";
+function readMode(value: unknown): CooldownMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "consume" || normalized === "check" || normalized === "reset"
+    ? normalized
+    : undefined;
 }
 
 function readCooldownState(

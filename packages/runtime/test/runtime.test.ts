@@ -2252,6 +2252,84 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic cooldown_gate policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cooldown_gate_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -80 },
+      config: { value: "consume" },
+    });
+    const duration = flow.node("transform", {
+      id: "duration",
+      position: { x: 120, y: 80 },
+      config: { value: 2500 },
+    });
+    const gate = flow.node("cooldown_gate", {
+      id: "gate",
+      position: { x: 300, y: 0 },
+      config: {
+        name: "ALERT_DYNAMIC_POLICY_COOLDOWN",
+        mode: "reset",
+        durationMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "cooldown:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), duration.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(start.out("runInput"), gate.in("now"));
+    flow.connect(mode.out("output"), gate.in("mode"));
+    flow.connect(duration.out("output"), gate.in("durationMs"));
+    flow.connect(gate.out("ready"), report.in("in"));
+    flow.connect(gate.out("durationMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_dynamic_policy_e2e",
+      input: 10_000,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cooldown:2500");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "ALERT_DYNAMIC_POLICY_COOLDOWN",
+      mode: "consume",
+      durationMs: 2500,
+      status: "ready",
+      remainingMs: 0,
+      readyAt: 12_500,
+      lastAllowedAt: 10_000,
+      allowedCount: 1,
+      suppressedCount: 0,
+    });
+    expect(variables.get("ALERT_DYNAMIC_POLICY_COOLDOWN")).toMatchObject({
+      lastAllowedAt: 10_000,
+      readyAt: 12_500,
+      durationMs: 2500,
+      allowedCount: 1,
+    });
+  });
+
   it("resets cooldown_gate state explicitly", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
