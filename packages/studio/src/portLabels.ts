@@ -334,11 +334,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         failureThreshold: "失败阈值",
         remainingFailures: "剩余失败次数",
         resetTimeoutMs: "重置超时毫秒",
+        failureWindowMs: "失败窗口毫秒",
         isOpen: "是否打开",
         isHalfOpen: "是否半开",
         isClosed: "是否关闭",
         canPass: "是否可通过",
         openedAt: "打开时间",
+        lastFailureAt: "最近失败时间",
         updatedAt: "更新时间",
       },
       compare_gate: {

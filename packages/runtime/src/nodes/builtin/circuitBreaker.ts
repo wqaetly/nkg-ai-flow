@@ -21,6 +21,7 @@ interface CircuitState {
   status: CircuitStatus;
   failureCount: number;
   openedAt: number | null;
+  lastFailureAt: number | null;
   updatedAt: number;
 }
 
@@ -39,6 +40,12 @@ const circuitBreakerConfig = z
       .min(0)
       .default(30000)
       .describe("How long an open circuit stays open before half-open."),
+    failureWindowMs: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe("Rolling window for counting failures; 0 disables expiry."),
     mode: z
       .enum(["check", "record_failure", "record_success", "reset"])
       .default("check")
@@ -70,10 +77,15 @@ export const circuitBreakerNode = defineNode({
       control: "number",
       order: 3,
     },
+    failureWindowMs: {
+      label: "Failure Window (ms)",
+      control: "number",
+      order: 4,
+    },
     mode: {
       label: "Mode",
       control: "select",
-      order: 4,
+      order: 5,
       enumOptions: [
         { label: "Check", value: "check" },
         { label: "Record failure", value: "record_failure" },
@@ -98,6 +110,13 @@ export const circuitBreakerNode = defineNode({
       direction: "input",
       kind: "data",
       label: "Reset Timeout ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "failureWindowMs",
+      direction: "input",
+      kind: "data",
+      label: "Failure Window ms",
       schema: { type: "number" },
     },
     { id: "closed", direction: "output", kind: "control", label: "Closed" },
@@ -147,11 +166,19 @@ export const circuitBreakerNode = defineNode({
       label: "Reset Timeout ms",
       schema: { type: "number" },
     },
+    {
+      id: "failureWindowMs",
+      direction: "output",
+      kind: "data",
+      label: "Failure Window ms",
+      schema: { type: "number" },
+    },
     { id: "isOpen", direction: "output", kind: "data", label: "Is Open", schema: { type: "boolean" } },
     { id: "isHalfOpen", direction: "output", kind: "data", label: "Is Half Open", schema: { type: "boolean" } },
     { id: "isClosed", direction: "output", kind: "data", label: "Is Closed", schema: { type: "boolean" } },
     { id: "canPass", direction: "output", kind: "data", label: "Can Pass", schema: { type: "boolean" } },
     { id: "openedAt", direction: "output", kind: "data", label: "Opened At", schema: { type: "string" } },
+    { id: "lastFailureAt", direction: "output", kind: "data", label: "Last Failure At", schema: { type: "string" } },
     { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
   ],
   validateInput: false,
@@ -183,12 +210,17 @@ export const circuitBreakerNode = defineNode({
       readIntegerAtLeast(input.resetTimeoutMs, 0) ??
       readIntegerAtLeast(config.resetTimeoutMs, 0) ??
       30000;
+    const failureWindowMs =
+      readIntegerAtLeast(input.failureWindowMs, 0) ??
+      readIntegerAtLeast(config.failureWindowMs, 0) ??
+      0;
     const mode = readMode(input.mode) ?? readMode(config.mode) ?? "check";
     const previous = readCircuitState(store.get(name));
     const next = applyMode(previous, {
       mode,
       failureThreshold,
       resetTimeoutMs,
+      failureWindowMs,
       now,
     });
     const remainingMs =
@@ -196,6 +228,7 @@ export const circuitBreakerNode = defineNode({
         ? Math.max(0, resetTimeoutMs - (now - next.openedAt))
         : 0;
     const openedAt = next.openedAt === null ? "" : new Date(next.openedAt).toISOString();
+    const lastFailureAt = next.lastFailureAt === null ? "" : new Date(next.lastFailureAt).toISOString();
     const updatedAt = new Date(next.updatedAt).toISOString();
 
     store.set(name, toVariableValue(next), metadata(ctx.flowId));
@@ -217,6 +250,7 @@ export const circuitBreakerNode = defineNode({
       branch,
       failureCount: next.failureCount,
       failureThreshold,
+      failureWindowMs,
       remainingMs,
     });
 
@@ -233,11 +267,13 @@ export const circuitBreakerNode = defineNode({
         failureThreshold,
         remainingFailures,
         resetTimeoutMs,
+        failureWindowMs,
         isOpen,
         isHalfOpen,
         isClosed,
         canPass,
         openedAt,
+        lastFailureAt,
         updatedAt,
       },
     };
@@ -250,18 +286,26 @@ function applyMode(
     mode: "check" | "record_failure" | "record_success" | "reset";
     failureThreshold: number;
     resetTimeoutMs: number;
+    failureWindowMs: number;
     now: number;
   },
 ): CircuitState {
-  const { mode, failureThreshold, resetTimeoutMs, now } = options;
+  const { mode, failureThreshold, resetTimeoutMs, failureWindowMs, now } = options;
   if (mode === "reset" || mode === "record_success") return closed(now);
   if (mode === "record_failure") {
-    const failureCount = previous.failureCount + 1;
+    const previousFailureCount =
+      failureWindowMs > 0 &&
+      previous.lastFailureAt !== null &&
+      now - previous.lastFailureAt > failureWindowMs
+        ? 0
+        : previous.failureCount;
+    const failureCount = previousFailureCount + 1;
     if (failureCount >= failureThreshold) {
       return {
         status: "open",
         failureCount,
         openedAt: now,
+        lastFailureAt: now,
         updatedAt: now,
       };
     }
@@ -269,6 +313,7 @@ function applyMode(
       status: "closed",
       failureCount,
       openedAt: null,
+      lastFailureAt: now,
       updatedAt: now,
     };
   }
@@ -291,6 +336,7 @@ function closed(now: number): CircuitState {
     status: "closed",
     failureCount: 0,
     openedAt: null,
+    lastFailureAt: null,
     updatedAt: now,
   };
 }
@@ -305,6 +351,10 @@ function readCircuitState(value: unknown): CircuitState {
       openedAt:
         typeof record.openedAt === "number" && Number.isFinite(record.openedAt)
           ? record.openedAt
+          : null,
+      lastFailureAt:
+        typeof record.lastFailureAt === "number" && Number.isFinite(record.lastFailureAt)
+          ? record.lastFailureAt
           : null,
       updatedAt:
         typeof record.updatedAt === "number" && Number.isFinite(record.updatedAt)
@@ -363,6 +413,7 @@ function toVariableValue(state: CircuitState): VariableValue {
     status: state.status,
     failureCount: state.failureCount,
     openedAt: state.openedAt,
+    lastFailureAt: state.lastFailureAt,
     updatedAt: state.updatedAt,
   };
 }

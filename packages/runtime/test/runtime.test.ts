@@ -6154,6 +6154,86 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("expires stale circuit_breaker failures with a dynamic failure window input", async () => {
+    const previousFailureAt = Date.now() - 10_000;
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_FAILURE_WINDOW_CIRCUIT", {
+      status: "closed",
+      failureCount: 2,
+      openedAt: null,
+      lastFailureAt: previousFailureAt,
+      updatedAt: previousFailureAt,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_failure_window_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failureWindow = flow.node("transform", {
+      id: "failure_window",
+      position: { x: 120, y: 0 },
+      config: { value: 1 },
+    });
+    const recordFailure = flow.node("circuit_breaker", {
+      id: "record_failure",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_FAILURE_WINDOW_CIRCUIT",
+        failureThreshold: 3,
+        failureWindowMs: 60_000,
+        mode: "record_failure",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), failureWindow.in("in"));
+    flow.connect(failureWindow.out("out"), recordFailure.in("in"));
+    flow.connect(failureWindow.out("output"), recordFailure.in("failureWindowMs"));
+    flow.connect(recordFailure.out("closed"), report.in("in"));
+    flow.connect(recordFailure.out("failureCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_failure_window_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const breakerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "record_failure") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(breakerOutput).toMatchObject({
+      mode: "record_failure",
+      status: "closed",
+      failureCount: 1,
+      failureThreshold: 3,
+      remainingFailures: 2,
+      failureWindowMs: 1,
+      isClosed: true,
+      isOpen: false,
+      canPass: true,
+      lastFailureAt: expect.any(String),
+    });
+    expect(variables.get("PAYMENT_FAILURE_WINDOW_CIRCUIT")).toMatchObject({
+      status: "closed",
+      failureCount: 1,
+      openedAt: null,
+    });
+    expect((variables.get("PAYMENT_FAILURE_WINDOW_CIRCUIT") as { lastFailureAt: number }).lastFailureAt).toBeGreaterThan(previousFailureAt);
+  });
+
   it("closes a half_open circuit_breaker after a successful probe", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_CIRCUIT", {
