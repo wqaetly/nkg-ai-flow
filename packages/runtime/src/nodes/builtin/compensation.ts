@@ -81,6 +81,9 @@ export const compensationNode = defineNode({
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "actions", direction: "output", kind: "data", label: "Actions" },
     { id: "action", direction: "output", kind: "data", label: "Action" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     {
       id: "count",
       direction: "output",
@@ -88,6 +91,17 @@ export const compensationNode = defineNode({
       label: "Count",
       schema: { type: "number" },
     },
+    {
+      id: "stackCount",
+      direction: "output",
+      kind: "data",
+      label: "Stack Count",
+      schema: { type: "number" },
+    },
+    { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
+    { id: "registeredValue", direction: "output", kind: "data", label: "Registered", schema: { type: "boolean" } },
+    { id: "drainedValue", direction: "output", kind: "data", label: "Drained", schema: { type: "boolean" } },
+    { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
     { id: "state", direction: "output", kind: "data", label: "State" },
   ],
   validateInput: false,
@@ -123,6 +137,8 @@ export const compensationNode = defineNode({
     if (result.kind === "error") return result;
 
     store.set(name, toVariableValue(result.state), metadata(ctx.flowId));
+    const status =
+      mode === "register" ? "registered" : mode === "drain" ? "drained" : "cleared";
     ctx.log.debug("compensation updated stack", {
       name,
       mode,
@@ -135,7 +151,15 @@ export const compensationNode = defineNode({
         out: null,
         actions: result.actions,
         action: result.actions[0] ?? null,
+        name,
+        mode,
+        status,
         count: result.actions.length,
+        stackCount: result.state.actions.length,
+        updatedAt: new Date(result.state.updatedAt).toISOString(),
+        registeredValue: status === "registered",
+        drainedValue: status === "drained",
+        clearedValue: status === "cleared",
         state: result.state,
       },
     };

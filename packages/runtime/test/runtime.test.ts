@@ -3685,6 +3685,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("rollback:refund_payment,release_inventory");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const drainOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "drain") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(drainOutput).toMatchObject({
+      name: "ORDER_COMPENSATIONS",
+      mode: "drain",
+      status: "drained",
+      count: 2,
+      stackCount: 0,
+      updatedAt: expect.any(String),
+      registeredValue: false,
+      drainedValue: true,
+      clearedValue: false,
+    });
     expect(variables.get("ORDER_COMPENSATIONS")).toMatchObject({
       actions: [],
     });
