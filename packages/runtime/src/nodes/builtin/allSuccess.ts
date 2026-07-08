@@ -118,6 +118,20 @@ export const allSuccessNode = defineNode({
     { id: "values", direction: "output", kind: "data", label: "Values" },
     { id: "successes", direction: "output", kind: "data", label: "Successes" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
+    {
+      id: "successIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Success Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
+      id: "failureIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Failure Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
     { id: "firstSuccess", direction: "output", kind: "data", label: "First success" },
     { id: "firstFailure", direction: "output", kind: "data", label: "First failure" },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
@@ -157,6 +171,12 @@ export const allSuccessNode = defineNode({
     const failures = evaluations
       .filter((evaluation) => !evaluation.passed)
       .map((evaluation) => evaluation.result);
+    const successIndexes = evaluations
+      .filter((evaluation) => evaluation.passed)
+      .map((evaluation) => evaluation.index);
+    const failureIndexes = evaluations
+      .filter((evaluation) => !evaluation.passed)
+      .map((evaluation) => evaluation.index);
     const successCount = successes.length;
     const failureCount = failures.length;
     const total = results.length;
@@ -183,6 +203,8 @@ export const allSuccessNode = defineNode({
       hasFailure,
       successRate,
       failureRate,
+      successIndexes,
+      failureIndexes,
     };
 
     ctx.log.debug("all_success classified branch results", summary);
@@ -194,6 +216,8 @@ export const allSuccessNode = defineNode({
         values: results,
         successes,
         failures,
+        successIndexes,
+        failureIndexes,
         firstSuccess: successes[0] ?? null,
         firstFailure: failures[0] ?? null,
         evaluations,
