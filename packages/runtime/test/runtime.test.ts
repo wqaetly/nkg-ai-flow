@@ -16259,6 +16259,87 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("split=0:alpha,1:beta,2:gamma");
   });
 
+  it("uses dynamic split_text policy ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "split_text_dynamic_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: " a || b | c " },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 120 },
+      config: { value: "separator" },
+    });
+    const separator = flow.node("transform", {
+      id: "separator",
+      position: { x: 120, y: 240 },
+      config: { value: "|" },
+    });
+    const limit = flow.node("transform", {
+      id: "limit",
+      position: { x: 120, y: 360 },
+      config: { value: 3 },
+    });
+    const trimItems = flow.node("transform", {
+      id: "trimItems",
+      position: { x: 120, y: 480 },
+      config: { value: true },
+    });
+    const dropEmpty = flow.node("transform", {
+      id: "dropEmpty",
+      position: { x: 120, y: 600 },
+      config: { value: false },
+    });
+    const split = flow.node("split_text", {
+      id: "split",
+      position: { x: 320, y: 0 },
+      config: { mode: "lines", separator: "\n", limit: 0, trimItems: false, dropEmpty: true },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 480, y: 0 },
+      config: { template: "${index}:${item}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 0 },
+      config: { template: "split=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 760, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), separator.in("in"));
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(start.out("out"), trimItems.in("in"));
+    flow.connect(start.out("out"), dropEmpty.in("in"));
+    flow.connect(input.out("out"), split.in("in"));
+    flow.connect(input.out("output"), split.in("text"));
+    flow.connect(mode.out("output"), split.in("mode"));
+    flow.connect(separator.out("output"), split.in("separator"));
+    flow.connect(limit.out("output"), split.in("limit"));
+    flow.connect(trimItems.out("output"), split.in("trimItems"));
+    flow.connect(dropEmpty.out("output"), split.in("dropEmpty"));
+    flow.connect(split.out("out"), map.in("in"));
+    flow.connect(split.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "split_text_dynamic_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("split=0:a,1:,2:b");
+  });
+
   it("parses fenced JSON text and routes structured data with parse_json", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "parse_json_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

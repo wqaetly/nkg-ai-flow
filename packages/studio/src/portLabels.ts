@@ -1167,6 +1167,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       split_text: {
         text: "文本",
+        mode: "模式",
+        separator: "分隔符",
+        limit: "限制数量",
+        trimItems: "裁剪项",
+        dropEmpty: "丢弃空项",
         items: "拆分项",
         count: "数量",
         reason: "原因",

@@ -82,6 +82,11 @@ export const splitTextNode = defineNode({
       label: "Text",
       schema: { type: "string" },
     },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "separator", direction: "input", kind: "data", label: "Separator", schema: { type: "string" } },
+    { id: "limit", direction: "input", kind: "data", label: "Limit", schema: { type: "number" } },
+    { id: "trimItems", direction: "input", kind: "data", label: "Trim items", schema: { type: "boolean" } },
+    { id: "dropEmpty", direction: "input", kind: "data", label: "Drop empty", schema: { type: "boolean" } },
     {
       id: "items",
       direction: "output",
@@ -103,6 +108,11 @@ export const splitTextNode = defineNode({
       label: "Text",
       schema: { type: "string" },
     },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "separator", direction: "output", kind: "data", label: "Separator", schema: { type: "string" } },
+    { id: "limit", direction: "output", kind: "data", label: "Limit", schema: { type: "number" } },
+    { id: "trimItems", direction: "output", kind: "data", label: "Trim items", schema: { type: "boolean" } },
+    { id: "dropEmpty", direction: "output", kind: "data", label: "Drop empty", schema: { type: "boolean" } },
     {
       id: "reason",
       direction: "output",
@@ -114,11 +124,11 @@ export const splitTextNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const text = readText(input);
-    const mode = readMode(config.mode);
-    const separator = decodeSeparator(String(config.separator ?? "\n"));
-    const limit = Math.max(0, Math.trunc(Number(config.limit ?? 0)));
-    const trimItems = config.trimItems !== false;
-    const dropEmpty = config.dropEmpty !== false;
+    const mode = readMode(input.mode ?? config.mode);
+    const separator = decodeSeparator(String(input.separator ?? config.separator ?? "\n"));
+    const limit = readNonNegativeInteger(input.limit) ?? readNonNegativeInteger(config.limit) ?? 0;
+    const trimItems = readBoolean(input.trimItems) ?? readBoolean(config.trimItems) ?? true;
+    const dropEmpty = readBoolean(input.dropEmpty) ?? readBoolean(config.dropEmpty) ?? true;
 
     const split = splitRawText(text, mode, separator);
     const normalized = split.items
@@ -140,6 +150,11 @@ export const splitTextNode = defineNode({
         text,
         items,
         count: items.length,
+        mode,
+        separator,
+        limit,
+        trimItems,
+        dropEmpty,
         reason: split.reason,
       },
     };
@@ -156,6 +171,23 @@ function readMode(value: unknown): SplitMode {
   return value === "separator" || value === "whitespace" || value === "regex"
     ? value
     : "lines";
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return Math.max(0, Math.trunc(numeric));
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function splitRawText(
