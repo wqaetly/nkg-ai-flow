@@ -12179,7 +12179,7 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=beta");
     expect(breakOutput).toMatchObject({ status: "break", reason: "found_beta" });
-    expect(loopOutput).toMatchObject({ status: "break", iterationCount: 2 });
+    expect(loopOutput).toMatchObject({ status: "break", iterationCount: 2, controlReason: "found_beta" });
   });
 
   it("skips the current foreach item when loop_continue runs inside the body", async () => {
@@ -12256,10 +12256,21 @@ describe("runtime / hello-flow end-to-end", () => {
         | { payload?: { output?: Record<string, unknown> } }
         | undefined
     )?.payload?.output;
+    const continueProgress = events.find(
+      (event) =>
+        event.kind === "node_progress" &&
+        event.nodeId === "begin" &&
+        (event.payload as { phase?: string; iteration?: number }).phase === "finished" &&
+        (event.payload as { phase?: string; iteration?: number }).iteration === 1,
+    ) as { payload?: Record<string, unknown> } | undefined;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=gamma");
     expect(continueOutput).toMatchObject({ status: "continue", reason: "skip_beta" });
+    expect(continueProgress?.payload).toMatchObject({
+      status: "continue",
+      controlReason: "skip_beta",
+    });
     expect(loopOutput).toMatchObject({ status: "done", iterationCount: 3 });
   });
 

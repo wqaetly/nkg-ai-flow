@@ -164,6 +164,7 @@ export const foreachEndNode = defineNode({
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
     { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
     { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
+    { id: "controlReason", direction: "output", kind: "data", label: "控制原因", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input }) {
@@ -180,6 +181,7 @@ export const foreachEndNode = defineNode({
         firstError: errors[0] ?? null,
         status: readLoopStatus(input.__status, "done"),
         iterationCount: readLoopIterationCount(input.__iterationCount, results.length),
+        controlReason: readLoopControlReason(input.__controlReason, ""),
       },
     };
   },
@@ -268,6 +270,7 @@ export const forEndNode = defineNode({
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
     { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
     { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
+    { id: "controlReason", direction: "output", kind: "data", label: "控制原因", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input }) {
@@ -284,6 +287,7 @@ export const forEndNode = defineNode({
         firstError: errors[0] ?? null,
         status: readLoopStatus(input.__status, "done"),
         iterationCount: readLoopIterationCount(input.__iterationCount, results.length),
+        controlReason: readLoopControlReason(input.__controlReason, ""),
       },
     };
   },
@@ -389,6 +393,7 @@ export const loopEndNode = defineNode({
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
     { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
     { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
+    { id: "controlReason", direction: "output", kind: "data", label: "控制原因", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -408,6 +413,7 @@ export const loopEndNode = defineNode({
         firstError: errors[0] ?? null,
         status: readLoopStatus(input.__status, shouldContinue ? "maxed" : "done"),
         iterationCount: readLoopIterationCount(input.__iterationCount, 0),
+        controlReason: readLoopControlReason(input.__controlReason, ""),
       },
     };
   },

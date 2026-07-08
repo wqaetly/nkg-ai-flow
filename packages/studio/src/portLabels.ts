@@ -551,6 +551,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         firstError: "首个错误",
         status: "状态",
         iterationCount: "迭代次数",
+        controlReason: "控制原因",
       },
       foreach_begin: {
         body: "循环体",
@@ -571,6 +572,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         firstError: "首个错误",
         status: "状态",
         iterationCount: "迭代次数",
+        controlReason: "控制原因",
       },
       flow_validator: {
         package: "生成包",
@@ -684,6 +686,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         firstError: "首个错误",
         status: "状态",
         iterationCount: "迭代次数",
+        controlReason: "控制原因",
       },
       node_designer: {
         skill_def: "Skill 定义",

@@ -1043,6 +1043,7 @@ export class ExecutionEngine {
     const loopErrors: RuntimeError[] = [];
     let iterationCount = 0;
     let finalStatus = "done";
+    let finalControlReason = "";
 
     for (let iteration = 0; iteration < iterations.length; iteration += 1) {
       const outputs = iterations[iteration]!;
@@ -1114,9 +1115,11 @@ export class ExecutionEngine {
             ? `error_${bodyResult.status}`
             : bodyResult.status,
         context: loopIterationContext(outputs),
+        controlReason: bodyResult.controlReason,
       });
       if (bodyResult.status === "break") {
         finalStatus = "break";
+        finalControlReason = bodyResult.controlReason ?? "";
         break;
       }
       if (timedOut) break;
@@ -1135,7 +1138,7 @@ export class ExecutionEngine {
     }
 
     addLoopErrors(aggregated, loopErrors);
-    addLoopStatus(aggregated, finalStatus, iterationCount);
+    addLoopStatus(aggregated, finalStatus, iterationCount, finalControlReason);
     this.applyLoopEndOverrides(block.endNode, aggregated, state);
     const endResult = await this.executeNode(block.endNode, state);
     this.clearLoopEndOverrides(block.endNode, aggregated, state);
@@ -1210,6 +1213,7 @@ export class ExecutionEngine {
     );
     let iterationCount = 0;
     let finalStatus = "done";
+    let finalControlReason = "";
 
     for (let batchStart = 0; batchStart < iterations.length; batchStart += batchSize) {
       const batch = iterations
@@ -1253,6 +1257,7 @@ export class ExecutionEngine {
         }
         if (result.bodyResult.status === "break") {
           finalStatus = "break";
+          finalControlReason = result.bodyResult.controlReason ?? "";
           shouldBreak = true;
           break;
         }
@@ -1284,7 +1289,7 @@ export class ExecutionEngine {
     }
 
     addLoopErrors(aggregated, loopErrors);
-    addLoopStatus(aggregated, finalStatus, iterationCount);
+    addLoopStatus(aggregated, finalStatus, iterationCount, finalControlReason);
     this.applyLoopEndOverrides(block.endNode, aggregated, state);
     const endResult = await this.executeNode(block.endNode, state);
     this.clearLoopEndOverrides(block.endNode, aggregated, state);
@@ -1338,6 +1343,7 @@ export class ExecutionEngine {
           ? `error_${bodyResult.status}`
           : bodyResult.status,
       context: loopIterationContext(outputs),
+      controlReason: bodyResult.controlReason,
     });
 
     return {
@@ -1448,11 +1454,18 @@ export class ExecutionEngine {
           iteration,
           status: "break",
           context: loopIterationContext(outputs),
+          controlReason: bodyResult.controlReason,
         });
         this.recordOutputs(
           block.endNode,
           withLoopErrors(
-            { done: null, finalState: state, status: "break", iterationCount },
+            {
+              done: null,
+              finalState: state,
+              status: "break",
+              iterationCount,
+              controlReason: bodyResult.controlReason ?? "",
+            },
             loopErrors,
           ),
           executionState,
@@ -1460,7 +1473,13 @@ export class ExecutionEngine {
         this.enqueueReadyDownstream(
           block.endNode,
           withLoopErrors(
-            { done: null, finalState: state, status: "break", iterationCount },
+            {
+              done: null,
+              finalState: state,
+              status: "break",
+              iterationCount,
+              controlReason: bodyResult.controlReason ?? "",
+            },
             loopErrors,
           ),
           queue,
@@ -1484,6 +1503,7 @@ export class ExecutionEngine {
                 ? "error_continue"
                 : "continue",
           context: loopIterationContext(outputs),
+          controlReason: bodyResult.controlReason,
         });
         if (hitTimeout) {
           const timeoutOutputs = withLoopErrors(
@@ -1535,6 +1555,7 @@ export class ExecutionEngine {
                 ? "continue"
                 : "completed",
         context: loopIterationContext(outputs),
+        controlReason: bodyResult.controlReason,
       });
       if (hitTimeout) {
         const timeoutOutputs = withLoopErrors(
@@ -1568,6 +1589,7 @@ export class ExecutionEngine {
       iteration: number;
       status: string;
       context: Record<string, unknown>;
+      controlReason?: string;
     },
   ): Promise<void> {
     const seq = this.nextProgressSeq(beginNode.id);
@@ -1590,6 +1612,9 @@ export class ExecutionEngine {
         iteration: event.iteration,
         status: event.status,
         context: redactInputs(event.context),
+        ...(event.controlReason !== undefined && event.controlReason !== ""
+          ? { controlReason: event.controlReason }
+          : {}),
       },
     });
   }
@@ -1669,11 +1694,21 @@ export class ExecutionEngine {
       }
       if (node.type === "loop_break") {
         this.recordOutputs(node, result.outputs, state);
-        return { status: "break", executedNodeIds, errors: [] };
+        return {
+          status: "break",
+          executedNodeIds,
+          errors: [],
+          controlReason: readLoopControlReason(result.outputs.reason),
+        };
       }
       if (node.type === "loop_continue") {
         this.recordOutputs(node, result.outputs, state);
-        return { status: "continue", executedNodeIds, errors: [] };
+        return {
+          status: "continue",
+          executedNodeIds,
+          errors: [],
+          controlReason: readLoopControlReason(result.outputs.reason),
+        };
       }
       this.recordOutputs(node, result.outputs, state);
       for (const edge of this.outEdges.get(node.id) ?? []) {
@@ -1866,6 +1901,7 @@ interface LoopBodyResult {
   status: LoopBodyStatus;
   executedNodeIds: Set<string>;
   errors: RuntimeError[];
+  controlReason?: string;
 }
 
 interface LoopIterationResult {
@@ -2087,9 +2123,15 @@ function addLoopStatus(
   aggregated: Map<string, unknown[]>,
   status: string,
   iterationCount: number,
+  controlReason = "",
 ): void {
   aggregated.set("__status", [status]);
   aggregated.set("__iterationCount", [iterationCount]);
+  if (controlReason !== "") aggregated.set("__controlReason", [controlReason]);
+}
+
+function readLoopControlReason(value: unknown): string {
+  return typeof value === "string" ? value : value === undefined || value === null ? "" : String(value);
 }
 
 function mergeAggregated(
