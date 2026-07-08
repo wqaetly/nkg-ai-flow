@@ -20852,6 +20852,74 @@ describe("runtime / hello-flow end-to-end", () => {
     ).toMatchObject({ status: "maxed", iterationCount: 2 });
   });
 
+  it("uses dynamic loop_begin max iterations over static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "loop_dynamic_max_iterations_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 80 },
+      config: { value: { continue: true } },
+    });
+    const maxIterations = flow.node("transform", {
+      id: "max_iterations",
+      position: { x: 260, y: 80 },
+      config: { value: 2 },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 400, y: 80 },
+      config: { checkMode: "after", maxIterations: 1 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 540, y: 80 },
+      config: { value: { continue: true } },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 680, y: 80 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 820, y: 80 },
+      config: { template: "maxed=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 960, y: 80 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), maxIterations.in("in"));
+    flow.connect(maxIterations.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(maxIterations.out("output"), begin.in("maxIterations"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("maxed"), report.in("in"));
+    flow.connect(loopEnd.out("iterationCount"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_dynamic_max_iterations_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("maxed=2");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.filter((event) => event.kind === "node_started" && event.nodeId === "body"),
+    ).toHaveLength(2);
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",

@@ -360,17 +360,33 @@ export const loopBeginNode = defineNode({
     controlIn,
     bodyOut,
     { id: "initialState", direction: "input", kind: "data", label: "初始状态" },
+    { id: "maxIterations", direction: "input", kind: "data", label: "最大循环次数", schema: { type: "number" } },
+    { id: "checkMode", direction: "input", kind: "data", label: "检查时机", schema: { type: "string" } },
+    { id: "onError", direction: "input", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "input", kind: "data", label: "超时毫秒", schema: { type: "number" } },
     { id: "state", direction: "output", kind: "data", label: "当前状态" },
     { id: "iteration", direction: "output", kind: "data", label: "轮次" },
+    { id: "maxIterations", direction: "output", kind: "data", label: "最大循环次数", schema: { type: "number" } },
+    { id: "checkMode", direction: "output", kind: "data", label: "检查时机", schema: { type: "string" } },
+    { id: "onError", direction: "output", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "output", kind: "data", label: "超时毫秒", schema: { type: "number" } },
   ],
   validateInput: false,
-  run({ input }) {
+  run({ input, config }) {
+    const maxIterations = Math.max(1, Math.trunc(readNumber(input.maxIterations, Number(config.maxIterations ?? 10))));
+    const checkMode = readCheckMode(input.checkMode ?? config.checkMode);
+    const onError = readLoopErrorPolicyInput(input.onError ?? config.onError);
+    const timeoutMs = Math.max(0, Math.trunc(readNumber(input.timeoutMs, Number(config.timeoutMs ?? 0))));
     return {
       kind: "success",
       outputs: {
         body: null,
         state: input.initialState ?? input.input ?? null,
         iteration: 0,
+        maxIterations,
+        checkMode,
+        onError,
+        timeoutMs,
       },
     };
   },
@@ -525,6 +541,10 @@ function readNumber(value: unknown, fallback: number): number {
 
 function readLoopErrorPolicyInput(value: unknown): string {
   return value === "continue" || value === "break" || value === "route" ? value : "terminate";
+}
+
+function readCheckMode(value: unknown): "before" | "after" {
+  return value === "before" ? "before" : "after";
 }
 
 function forRange(start: number, end: number, step: number): number[] {

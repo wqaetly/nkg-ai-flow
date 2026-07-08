@@ -787,6 +787,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       loop_begin: {
         body: "循环体",
         initialState: "初始状态",
+        maxIterations: "最大循环次数",
+        checkMode: "检查时机",
+        onError: "错误策略",
+        timeoutMs: "超时毫秒",
         state: "当前状态",
         iteration: "轮次",
       },
