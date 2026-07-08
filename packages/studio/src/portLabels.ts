@@ -633,6 +633,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         state: "幂等状态",
         status: "状态",
         stateKey: "状态键",
+        mode: "模式",
+        ttlMs: "TTL 毫秒",
         remainingMs: "剩余毫秒",
       },
       join: {

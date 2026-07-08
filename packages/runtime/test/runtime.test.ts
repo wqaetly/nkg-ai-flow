@@ -4476,6 +4476,81 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes idempotency_key with dynamic policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -80 },
+      config: { value: "start" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 80 },
+      config: { value: 120_000 },
+    });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 300, y: 0 },
+      config: {
+        namespace: "payments",
+        key: "order-dynamic-policy",
+        mode: "reset",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "idem:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), idem.in("in"));
+    flow.connect(mode.out("output"), idem.in("mode"));
+    flow.connect(ttl.out("output"), idem.in("ttlMs"));
+    flow.connect(idem.out("started"), report.in("in"));
+    flow.connect(idem.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("idem:start");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const idemOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "idem") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(idemOutput).toMatchObject({
+      namespace: "payments",
+      key: "order-dynamic-policy",
+      stateKey: "IDEMPOTENCY:payments:order-dynamic-policy",
+      mode: "start",
+      ttlMs: 120_000,
+      status: "started",
+      remainingMs: expect.any(Number),
+    });
+    expect(variables.get("IDEMPOTENCY:payments:order-dynamic-policy")).toMatchObject({
+      key: "order-dynamic-policy",
+      status: "started",
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("routes idempotency_key to replayed for a completed key", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();

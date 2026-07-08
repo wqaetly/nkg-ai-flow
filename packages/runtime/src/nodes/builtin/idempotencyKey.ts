@@ -89,6 +89,8 @@ export const idempotencyKeyNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "namespace", direction: "input", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "input", kind: "data", label: "Key" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
     { id: "started", direction: "output", kind: "control", label: "Started" },
@@ -101,6 +103,14 @@ export const idempotencyKeyNode = defineNode({
     { id: "namespace", direction: "output", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "output", kind: "data", label: "Key" },
     { id: "stateKey", direction: "output", kind: "data", label: "State Key", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
+      schema: { type: "number" },
+    },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "error", direction: "output", kind: "data", label: "Error" },
     {
@@ -134,12 +144,13 @@ export const idempotencyKeyNode = defineNode({
     const namespace = sanitizeSegment(String(input.namespace ?? config.namespace ?? "default"));
     const stateName = `IDEMPOTENCY:${namespace}:${sanitizeSegment(key)}`;
     const now = Date.now();
-    const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 86400000)));
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 86400000;
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "start";
     const owner = `${ctx.flowId}:${ctx.runId}`;
     const previous = normalizeExpired(readState(store.get(stateName)), now);
     const decision = applyMode(previous, {
       key,
-      mode: config.mode ?? "start",
+      mode,
       owner,
       ttlMs,
       now,
@@ -160,7 +171,7 @@ export const idempotencyKeyNode = defineNode({
     ctx.log.debug("idempotency_key selected branch", {
       namespace,
       key,
-      mode: config.mode ?? "start",
+      mode,
       branch: decision.branch,
       status: state?.status ?? "reset",
     });
@@ -174,6 +185,8 @@ export const idempotencyKeyNode = defineNode({
         namespace,
         key,
         stateKey: stateName,
+        mode,
+        ttlMs,
         value: state?.value ?? null,
         error: state?.error ?? null,
         remainingMs,
@@ -301,6 +314,24 @@ function readKey(inputKey: unknown, configKey: unknown): string {
 function sanitizeSegment(value: string): string {
   const trimmed = value.trim();
   return trimmed === "" ? "default" : trimmed.replace(/[^a-zA-Z0-9_.:-]/g, "_");
+}
+
+function readMode(value: unknown): IdempotencyMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "start" ||
+    normalized === "complete" ||
+    normalized === "fail" ||
+    normalized === "reset"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | null {
