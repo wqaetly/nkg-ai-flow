@@ -39,6 +39,7 @@ export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";
 export { policyGateNode } from "./policyGate.js";
 export { queueNode } from "./queue.js";
+export { quorumNode } from "./quorum.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";

@@ -566,7 +566,12 @@ export class ExecutionEngine {
         }
         continue;
       }
-      const value = this.portValues.get(`${edge.from.nodeId}.${edge.from.portId}`);
+      const valueKey = `${edge.from.nodeId}.${edge.from.portId}`;
+      const hasValue = this.portValues.has(valueKey);
+      if (node.type === "quorum" && toPort?.kind === "data" && !hasValue) {
+        continue;
+      }
+      const value = this.portValues.get(valueKey);
       const nextValue = value ?? null;
       if (toPort?.multiple) {
         const prev = inputs[edge.to.portId];
@@ -976,6 +981,10 @@ function requiredInboundCount(
   inboundCount: number,
 ): number {
   if (node?.type === "merge" && inboundCount > 0) return 1;
+  if (node?.type === "quorum" && inboundCount > 0) {
+    const threshold = Math.max(1, Math.trunc(Number(node.config?.threshold ?? 2)));
+    return Math.min(threshold, inboundCount);
+  }
   return inboundCount;
 }
 

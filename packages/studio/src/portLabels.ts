@@ -454,6 +454,15 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         queueSize: "队列大小",
         remaining: "剩余容量",
       },
+      quorum: {
+        values: "到达值",
+        met: "达到阈值",
+        unmet: "未达阈值",
+        count: "到达数量",
+        threshold: "阈值",
+        remaining: "剩余数量",
+        status: "状态",
+      },
       rate_limit: {
         in: "输入",
         allowed: "允许",

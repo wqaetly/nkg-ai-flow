@@ -3942,6 +3942,109 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("joined=upper:Flow,lower:Flow");
   });
 
+  it("continues through quorum once the threshold of values arrives", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "quorum_met_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const upper = flow.node("transform", {
+      id: "upper",
+      position: { x: 120, y: 40 },
+      config: { template: "upper:${input.name}" },
+    });
+    const lower = flow.node("transform", {
+      id: "lower",
+      position: { x: 120, y: 140 },
+      config: { template: "lower:${input.name}" },
+    });
+    const branch = flow.node("condition", {
+      id: "branch",
+      position: { x: 120, y: 240 },
+      config: { expression: "input.enabled" },
+    });
+    const skipped = flow.node("transform", {
+      id: "skipped",
+      position: { x: 280, y: 240 },
+      config: { template: "skipped:${input.name}" },
+    });
+    const quorum = flow.node("quorum", {
+      id: "quorum",
+      position: { x: 440, y: 120 },
+      config: { threshold: 2 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 600, y: 120 },
+      config: { template: "quorum:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 760, y: 120 } });
+
+    flow.connect(start.out("out"), upper.in("in"));
+    flow.connect(start.out("out"), lower.in("in"));
+    flow.connect(start.out("out"), branch.in("in"));
+    flow.connect(branch.out("true"), skipped.in("in"));
+    flow.connect(upper.out("output"), quorum.in("values"));
+    flow.connect(lower.out("output"), quorum.in("values"));
+    flow.connect(skipped.out("output"), quorum.in("values"));
+    flow.connect(quorum.out("met"), report.in("in"));
+    flow.connect(quorum.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "quorum_met_e2e",
+      input: { name: "Flow", enabled: false },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("quorum:upper:Flow,lower:Flow");
+  });
+
+  it("routes quorum to unmet when all reachable values stay below threshold", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "quorum_unmet_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const upper = flow.node("transform", {
+      id: "upper",
+      position: { x: 120, y: 40 },
+      config: { template: "upper:${input.name}" },
+    });
+    const lower = flow.node("transform", {
+      id: "lower",
+      position: { x: 120, y: 140 },
+      config: { template: "lower:${input.name}" },
+    });
+    const quorum = flow.node("quorum", {
+      id: "quorum",
+      position: { x: 300, y: 80 },
+      config: { threshold: 3 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 80 },
+      config: { template: "remaining:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 80 } });
+
+    flow.connect(start.out("out"), upper.in("in"));
+    flow.connect(start.out("out"), lower.in("in"));
+    flow.connect(upper.out("output"), quorum.in("values"));
+    flow.connect(lower.out("output"), quorum.in("values"));
+    flow.connect(quorum.out("unmet"), report.in("in"));
+    flow.connect(quorum.out("remaining"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "quorum_unmet_e2e",
+      input: { name: "Flow" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("remaining:1");
+  });
+
   it("fans out through parallel branches and rejoins selected branches", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "parallel_join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -181,6 +181,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "持久队列",
         description: "把任务项入队、取出、查看或清空，用于显式缓冲和消费。",
       },
+      quorum: {
+        title: "阈值汇聚",
+        description: "当到达值数量达到阈值后继续流程。",
+      },
       rate_limit: {
         title: "限流",
         description: "基于持久化滑动窗口配额路由到允许或限流分支。",

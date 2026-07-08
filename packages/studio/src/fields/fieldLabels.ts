@@ -303,6 +303,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxItems: "最大保留项数",
         count: "取出数量",
       },
+      quorum: {
+        threshold: "达成阈值",
+      },
       mutex: {
         name: "锁状态名",
         owner: "持有者",
