@@ -121,6 +121,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "并行分支",
         description: "把流程扇出到多个命名分支。",
       },
+      rate_limit: {
+        title: "限流",
+        description: "基于持久化滑动窗口配额路由到允许或限流分支。",
+      },
       reduce_items: {
         title: "汇总数组",
         description: "对数组执行计数、求和或拼接汇总。",

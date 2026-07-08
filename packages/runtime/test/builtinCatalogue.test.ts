@@ -25,6 +25,7 @@ const BUILTIN_TYPES = [
   "map_items",
   "merge",
   "parallel",
+  "rate_limit",
   "reduce_items",
   "retry_policy",
   "subflow",

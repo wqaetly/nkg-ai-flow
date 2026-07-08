@@ -44,6 +44,7 @@ import {
   mapItemsNode,
   mergeNode,
   parallelNode,
+  rateLimitNode,
   reduceItemsNode,
   retryPolicyNode,
   subflowNode,
@@ -165,6 +166,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, mapItemsNode);
   installNode(target, mergeNode);
   installNode(target, parallelNode);
+  installNode(target, rateLimitNode);
   installNode(target, reduceItemsNode);
   installNode(target, retryPolicyNode);
   installNode(target, subflowNode);

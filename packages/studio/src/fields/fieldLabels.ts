@@ -63,6 +63,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       inputMode: "输入模式",
       inputValue: "静态输入",
       lint_sources: "校验源码",
+      limit: "额度上限",
       baseDelayMs: "基础等待毫秒",
       max_body_length: "正文长度上限",
       max_concurrency: "最大并发数",
@@ -97,6 +98,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       timeoutMs: "超时时间",
       url: "请求地址",
       value: "值",
+      windowMs: "窗口时长（毫秒）",
       workingDir: "工作目录",
     },
     nodes: {
@@ -199,6 +201,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       parallel: {
         branchCount: "分支数量",
+      },
+      rate_limit: {
+        name: "限流状态名",
+        limit: "额度上限",
+        windowMs: "窗口时长（毫秒）",
+        cost: "本次消耗额度",
       },
       reduce_items: {
         mode: "汇总模式",

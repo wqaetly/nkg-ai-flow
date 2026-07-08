@@ -25,6 +25,7 @@ export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";
 export { parallelNode } from "./parallel.js";
+export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";
 export { subflowNode } from "./subflow.js";

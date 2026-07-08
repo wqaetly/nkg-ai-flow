@@ -205,6 +205,107 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("exhausted:1");
   });
 
+  it("routes rate_limit to allowed and records a sliding-window hit", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "rate_limit_allowed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const limit = flow.node("rate_limit", {
+      id: "limit",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_API_LIMIT",
+        limit: 2,
+        windowMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "allowed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(limit.out("allowed"), report.in("in"));
+    flow.connect(limit.out("remaining"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rate_limit_allowed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("allowed:1");
+    expect(variables.get("PAYMENT_API_LIMIT")).toMatchObject({
+      limit: 2,
+      windowMs: 60_000,
+    });
+    expect(
+      (variables.get("PAYMENT_API_LIMIT") as { timestamps?: unknown[] })
+        .timestamps,
+    ).toHaveLength(1);
+  });
+
+  it("routes rate_limit to limited when the window is full", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_API_LIMIT", {
+      windowStart: Date.now(),
+      windowMs: 60_000,
+      limit: 1,
+      timestamps: [Date.now()],
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "rate_limit_limited_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const limit = flow.node("rate_limit", {
+      id: "limit",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_API_LIMIT",
+        limit: 1,
+        windowMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "limited:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(limit.out("limited"), report.in("in"));
+    flow.connect(limit.out("remaining"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rate_limit_limited_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("limited:0");
+    const state = variables.get("PAYMENT_API_LIMIT") as {
+      timestamps?: unknown[];
+      updatedAt?: number;
+    };
+    expect(state.timestamps).toHaveLength(1);
+    expect(state.updatedAt).toBeGreaterThan(0);
+  });
+
   it("opens a circuit_breaker after recorded failures and routes checks to open", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
