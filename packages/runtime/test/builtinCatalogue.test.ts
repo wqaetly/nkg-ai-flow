@@ -48,6 +48,7 @@ const BUILTIN_TYPES = [
   "llm",
   "agent",
   "event_trigger",
+  "feature_flag",
   "send_event",
   "state_get",
   "state_set",

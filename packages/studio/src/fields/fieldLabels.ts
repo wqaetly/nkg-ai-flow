@@ -206,6 +206,14 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       event_trigger: {
         event: "触发事件",
       },
+      feature_flag: {
+        name: "开关状态名",
+        mode: "模式",
+        enabled: "是否启用",
+        rolloutPercent: "灰度比例",
+        key: "静态灰度键",
+        description: "描述",
+      },
       filter_items: {
         condition: "过滤条件",
       },

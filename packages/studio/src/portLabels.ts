@@ -258,6 +258,20 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       event_trigger: {
         event: "事件",
       },
+      feature_flag: {
+        in: "输入",
+        key: "灰度键",
+        enabled: "已启用",
+        disabled: "已禁用",
+        updated: "已更新",
+        cleared: "已清除",
+        missing: "不存在",
+        state: "开关状态",
+        enabledValue: "是否启用",
+        bucket: "灰度桶",
+        rolloutPercent: "灰度比例",
+        evaluations: "评估次数",
+      },
       filter_items: {
         items: "保留项",
         rejected: "剔除项",

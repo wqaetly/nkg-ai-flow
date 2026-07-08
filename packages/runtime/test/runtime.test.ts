@@ -1955,6 +1955,210 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_APPROVED_COUNT")).toBe(false);
   });
 
+  it("sets feature_flag state", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_set_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "CHECKOUT_V2",
+        mode: "set",
+        enabled: true,
+        rolloutPercent: 25,
+        description: "Checkout v2 gradual rollout",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(flag.out("updated"), report.in("in"));
+    flow.connect(flag.out("rolloutPercent"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_set_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:25");
+    expect(variables.get("CHECKOUT_V2")).toMatchObject({
+      name: "CHECKOUT_V2",
+      enabled: true,
+      rolloutPercent: 25,
+      description: "Checkout v2 gradual rollout",
+    });
+  });
+
+  it("routes enabled feature_flag evaluations to enabled", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CHECKOUT_V2", {
+      name: "CHECKOUT_V2",
+      enabled: true,
+      rolloutPercent: 100,
+      description: "all users",
+      evaluations: 0,
+      lastKey: "",
+      lastBucket: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_enabled_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "CHECKOUT_V2",
+        key: "tenant-a",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(flag.out("enabled"), report.in("in"));
+    flow.connect(flag.out("enabledValue"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_enabled_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:true");
+    expect(variables.get("CHECKOUT_V2")).toMatchObject({
+      evaluations: 1,
+      lastKey: "tenant-a",
+    });
+  });
+
+  it("routes zero-percent feature_flag rollouts to disabled", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CHECKOUT_V2", {
+      name: "CHECKOUT_V2",
+      enabled: true,
+      rolloutPercent: 0,
+      description: "disabled rollout",
+      evaluations: 0,
+      lastKey: "",
+      lastBucket: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_disabled_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "CHECKOUT_V2",
+        key: "tenant-a",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(flag.out("disabled"), report.in("in"));
+    flow.connect(flag.out("enabledValue"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_disabled_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:false");
+    expect(variables.get("CHECKOUT_V2")).toMatchObject({
+      evaluations: 1,
+      lastKey: "tenant-a",
+    });
+  });
+
+  it("clears feature_flag state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CHECKOUT_V2", {
+      name: "CHECKOUT_V2",
+      enabled: true,
+      rolloutPercent: 100,
+      description: "all users",
+      evaluations: 4,
+      lastKey: "tenant-a",
+      lastBucket: 1,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "CHECKOUT_V2",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(flag.out("cleared"), report.in("in"));
+    flow.connect(flag.out("evaluations"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:0");
+    expect(variables.has("CHECKOUT_V2")).toBe(false);
+  });
+
   it("invokes a registered child flow with subflow and returns its output", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -48,6 +48,7 @@ export { textInputNode } from "./textInput.js";
 export { waitSignalNode } from "./waitSignal.js";
 export { agentNode } from "./agent.js";
 export { eventTriggerNode } from "./eventTrigger.js";
+export { featureFlagNode } from "./featureFlag.js";
 export { sendEventNode } from "./sendEvent.js";
 export { stateGetNode } from "./stateGet.js";
 export { stateSetNode } from "./stateSet.js";

@@ -46,6 +46,7 @@ import {
   agentNode,
   endNode,
   eventTriggerNode,
+  featureFlagNode,
   httpNode,
   idempotencyKeyNode,
   joinNode,
@@ -204,6 +205,7 @@ export function createBuiltinRunnerRegistry(
     toolHost: createNodeAgentToolHost(),
   });
   installNode(target, eventTriggerNode);
+  installNode(target, featureFlagNode);
   installNode(target, sendEventNode);
   installNode(target, stateGetNode);
   installNode(target, stateSetNode);

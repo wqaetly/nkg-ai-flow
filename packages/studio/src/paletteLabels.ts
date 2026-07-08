@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "事件触发",
         description: "收到匹配的字符串事件时启动流程。",
       },
+      feature_flag: {
+        title: "功能开关",
+        description: "按开关状态和稳定灰度比例路由发布分支。",
+      },
       filter_items: {
         title: "过滤数组",
         description: "按条件保留数组中的部分元素。",
