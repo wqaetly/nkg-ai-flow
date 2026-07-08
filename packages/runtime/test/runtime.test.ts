@@ -2436,6 +2436,110 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("persists retry_state unsafe when required idempotency is unknown", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const recordFlow = defineFlow({ id: "retry_state_idempotency_unsafe_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const recordStart = recordFlow.node("start", { id: "record_start", position: { x: 0, y: 0 } });
+    const source = recordFlow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const retry = recordFlow.node("retry_state", {
+      id: "retry",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "unsafe-order",
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        requireIdempotency: true,
+      },
+    });
+    const recordReport = recordFlow.node("transform", {
+      id: "record_report",
+      position: { x: 400, y: 0 },
+      config: { template: "unsafe:${input}" },
+    });
+    const recordEnd = recordFlow.node("end", { id: "record_end", position: { x: 540, y: 0 } });
+
+    recordFlow.connect(recordStart.out("out"), source.in("in"));
+    recordFlow.connect(source.out("out"), retry.in("in"));
+    recordFlow.connect(source.out("output"), retry.in("error"));
+    recordFlow.connect(retry.out("unsafe"), recordReport.in("in"));
+    recordFlow.connect(retry.out("blockedByIdempotency"), recordReport.in("input"));
+    recordFlow.connect(recordReport.out("out"), recordEnd.in("in"));
+
+    const checkFlow = defineFlow({ id: "retry_state_idempotency_unsafe_check_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const checkStart = checkFlow.node("start", { id: "check_start", position: { x: 0, y: 0 } });
+    const check = checkFlow.node("retry_state", {
+      id: "check",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "unsafe-order",
+        mode: "check",
+      },
+    });
+    const checkReport = checkFlow.node("transform", {
+      id: "check_report",
+      position: { x: 260, y: 0 },
+      config: { template: "check:${input}" },
+    });
+    const checkEnd = checkFlow.node("end", { id: "check_end", position: { x: 400, y: 0 } });
+
+    checkFlow.connect(checkStart.out("out"), check.in("in"));
+    checkFlow.connect(check.out("unsafe"), checkReport.in("in"));
+    checkFlow.connect(check.out("stateStatus"), checkReport.in("input"));
+    checkFlow.connect(checkReport.out("out"), checkEnd.in("in"));
+
+    await registerAndPromote(rt, recordFlow);
+    await registerAndPromote(rt, checkFlow);
+
+    const recordResult = await rt.invocationRouter.invoke({
+      flowId: "retry_state_idempotency_unsafe_e2e",
+      input: null,
+    });
+    const checkResult = await rt.invocationRouter.invoke({
+      flowId: "retry_state_idempotency_unsafe_check_e2e",
+      input: null,
+    });
+    const recordEvents = await rt.eventBus.store.read(recordResult.runRecord.runId);
+    const retryOutput = (
+      recordEvents.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(recordResult.succeeded).toBe(true);
+    expect(recordResult.output).toBe("unsafe:true");
+    expect(checkResult.succeeded).toBe(true);
+    expect(checkResult.output).toBe("check:unsafe");
+    expect(retryOutput).toMatchObject({
+      status: "unsafe",
+      stateStatus: "unsafe",
+      retryable: true,
+      requiresIdempotency: true,
+      blockedByIdempotency: true,
+      exhaustedValue: false,
+      unsafeValue: true,
+      delayMs: 0,
+    });
+    expect(variables.get("PAYMENT_RETRY:unsafe-order")).toMatchObject({
+      status: "unsafe",
+      attempt: 1,
+      retryable: true,
+      idempotent: null,
+      requiresIdempotency: true,
+      blockedByIdempotency: true,
+      lastError: { code: "payment.timeout", retryable: true },
+    });
+  });
+
   it("records retry_state retries when error code matches a wildcard policy", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

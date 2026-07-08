@@ -15,14 +15,17 @@ import type {
 } from "@ai-native-flow/variable-store";
 
 type RetryStateMode = "record_failure" | "record_success" | "check" | "reset";
-type RetryStateBranch = "retry" | "waiting" | "exhausted" | "reset" | "idle";
-type RetryStatus = "retry" | "waiting" | "exhausted";
+type RetryStateBranch = "retry" | "waiting" | "exhausted" | "unsafe" | "reset" | "idle";
+type RetryStatus = "retry" | "waiting" | "exhausted" | "unsafe";
 
 interface PersistedRetryState {
   status: RetryStatus;
   attempt: number;
   maxAttempts: number;
   retryable: boolean | null;
+  idempotent: boolean | null;
+  requiresIdempotency: boolean;
+  blockedByIdempotency: boolean;
   lastError: VariableValue | null;
   nextRetryAt: number | null;
   exhaustedAt: number | null;
@@ -82,6 +85,10 @@ const retryStateConfig = z
       .string()
       .default("retryAfterAt")
       .describe("Dotted path to an absolute retry-after timestamp."),
+    requireIdempotency: z
+      .boolean()
+      .default(false)
+      .describe("When true, persist non-idempotent or unknown operations as unsafe instead of retrying."),
   })
   .passthrough();
 
@@ -135,14 +142,17 @@ export const retryStateNode = defineNode({
       order: 12,
       placeholder: "retryAfterAt",
     },
+    requireIdempotency: { label: "Require Idempotency", control: "switch", order: 13 },
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
+    { id: "idempotent", direction: "input", kind: "data", label: "Idempotent", schema: { type: "boolean" } },
     { id: "key", direction: "input", kind: "data", label: "Key", schema: { type: "string" } },
     { id: "retry", direction: "output", kind: "control", label: "Retry" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "exhausted", direction: "output", kind: "control", label: "Exhausted" },
+    { id: "unsafe", direction: "output", kind: "control", label: "Unsafe" },
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "idle", direction: "output", kind: "control", label: "Idle" },
     { id: "state", direction: "output", kind: "data", label: "State" },
@@ -154,10 +164,14 @@ export const retryStateNode = defineNode({
     { id: "retryAfterMs", direction: "output", kind: "data", label: "Retry after ms", schema: { type: "number" } },
     { id: "nextRetryAt", direction: "output", kind: "data", label: "Next Retry At", schema: { type: "string" } },
     { id: "retryable", direction: "output", kind: "data", label: "Retryable", schema: { type: "boolean" } },
+    { id: "idempotent", direction: "output", kind: "data", label: "Idempotent", schema: { type: "boolean" } },
+    { id: "requiresIdempotency", direction: "output", kind: "data", label: "Requires Idempotency", schema: { type: "boolean" } },
+    { id: "blockedByIdempotency", direction: "output", kind: "data", label: "Blocked By Idempotency", schema: { type: "boolean" } },
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
     { id: "maxAttempts", direction: "output", kind: "data", label: "Max Attempts", schema: { type: "number" } },
     { id: "remainingAttempts", direction: "output", kind: "data", label: "Remaining Attempts", schema: { type: "number" } },
     { id: "exhaustedValue", direction: "output", kind: "data", label: "Exhausted", schema: { type: "boolean" } },
+    { id: "unsafeValue", direction: "output", kind: "data", label: "Unsafe", schema: { type: "boolean" } },
     { id: "stateKey", direction: "output", kind: "data", label: "State Key", schema: { type: "string" } },
   ],
   validateInput: false,
@@ -185,6 +199,8 @@ export const retryStateNode = defineNode({
     const decision = applyMode(previous, {
       mode: config.mode ?? "record_failure",
       error: input.error ?? null,
+      idempotent: input.idempotent,
+      requireIdempotency: config.requireIdempotency === true,
       retryableOnly: config.retryableOnly !== false,
       maxAttempts: readPositiveInteger(config.maxAttempts, 3),
       baseDelayMs: readNonNegativeInteger(config.baseDelayMs, 1000),
@@ -221,6 +237,8 @@ export const retryStateNode = defineNode({
     const stateStatus = decision.state?.status ?? decision.branch;
     const exhaustedValue =
       decision.branch === "exhausted" || decision.state?.status === "exhausted";
+    const unsafeValue =
+      decision.branch === "unsafe" || decision.state?.status === "unsafe";
 
     ctx.log.debug("retry_state selected branch", {
       stateKey,
@@ -243,10 +261,14 @@ export const retryStateNode = defineNode({
         retryAfterMs,
         nextRetryAt,
         retryable: decision.state?.retryable ?? null,
+        idempotent: decision.state?.idempotent ?? null,
+        requiresIdempotency: decision.state?.requiresIdempotency ?? config.requireIdempotency === true,
+        blockedByIdempotency: decision.state?.blockedByIdempotency ?? false,
         stateStatus,
         maxAttempts,
         remainingAttempts,
         exhaustedValue,
+        unsafeValue,
         stateKey,
       },
     };
@@ -258,6 +280,8 @@ function applyMode(
   options: {
     mode: RetryStateMode;
     error: unknown;
+    idempotent: unknown;
+    requireIdempotency: boolean;
     retryableOnly: boolean;
     maxAttempts: number;
     baseDelayMs: number;
@@ -283,6 +307,9 @@ function applyMode(
     if (previous.status === "exhausted") {
       return { kind: "success", branch: "exhausted", state: previous, delayMs: 0 };
     }
+    if (previous.status === "unsafe") {
+      return { kind: "success", branch: "unsafe", state: previous, delayMs: 0 };
+    }
     if (previous.nextRetryAt !== null && now < previous.nextRetryAt) {
       return { kind: "success", branch: "waiting", state: previous, delayMs: 0 };
     }
@@ -303,7 +330,29 @@ function applyMode(
     );
   }
   const retryable = readRetryable(options.error, options.retryableCodes);
+  const idempotent = readIdempotent(options.idempotent, options.error);
+  const blockedByIdempotency = options.requireIdempotency && idempotent !== true;
   const attempt = (previous?.attempt ?? 0) + 1;
+  if (blockedByIdempotency) {
+    return {
+      kind: "success",
+      branch: "unsafe",
+      delayMs: 0,
+      state: {
+        status: "unsafe",
+        attempt,
+        maxAttempts: options.maxAttempts,
+        retryable: retryable ?? null,
+        idempotent: idempotent ?? null,
+        requiresIdempotency: true,
+        blockedByIdempotency: true,
+        lastError: convertedError,
+        nextRetryAt: null,
+        exhaustedAt: now,
+        updatedAt: now,
+      },
+    };
+  }
   const canRetry =
     attempt < options.maxAttempts && (!options.retryableOnly || retryable === true);
   if (!canRetry) {
@@ -316,6 +365,9 @@ function applyMode(
         attempt,
         maxAttempts: options.maxAttempts,
         retryable: retryable ?? null,
+        idempotent: idempotent ?? null,
+        requiresIdempotency: options.requireIdempotency,
+        blockedByIdempotency: false,
         lastError: convertedError,
         nextRetryAt: null,
         exhaustedAt: now,
@@ -334,6 +386,9 @@ function applyMode(
       attempt,
       maxAttempts: options.maxAttempts,
       retryable: retryable ?? null,
+      idempotent: idempotent ?? null,
+      requiresIdempotency: options.requireIdempotency,
+      blockedByIdempotency: false,
       lastError: convertedError,
       nextRetryAt: now + delayMs,
       exhaustedAt: null,
@@ -426,6 +481,14 @@ function readRetryable(error: unknown, retryableCodes: unknown): boolean | undef
   return typeof retryable === "boolean" ? retryable : undefined;
 }
 
+function readIdempotent(inputValue: unknown, error: unknown): boolean | undefined {
+  if (typeof inputValue === "boolean") return inputValue;
+  const direct = readPath(error, ["idempotent"]);
+  if (typeof direct === "boolean") return direct;
+  const context = readPath(error, ["context", "idempotent"]);
+  return typeof context === "boolean" ? context : undefined;
+}
+
 function matchesRetryableCodes(error: unknown, retryableCodes: unknown): boolean | undefined {
   const patterns = parseCodePatterns(retryableCodes);
   if (patterns.length === 0) return undefined;
@@ -460,6 +523,9 @@ function readRetryState(value: unknown): PersistedRetryState | null {
     attempt: readPositiveInteger(record.attempt, 0),
     maxAttempts: readPositiveInteger(record.maxAttempts, 1),
     retryable: typeof record.retryable === "boolean" ? record.retryable : null,
+    idempotent: typeof record.idempotent === "boolean" ? record.idempotent : null,
+    requiresIdempotency: record.requiresIdempotency === true,
+    blockedByIdempotency: record.blockedByIdempotency === true,
     lastError: lastError ?? null,
     nextRetryAt: readTimestamp(record.nextRetryAt),
     exhaustedAt: readTimestamp(record.exhaustedAt),
@@ -468,7 +534,7 @@ function readRetryState(value: unknown): PersistedRetryState | null {
 }
 
 function readStatus(value: unknown): RetryStatus {
-  return value === "retry" || value === "waiting" || value === "exhausted"
+  return value === "retry" || value === "waiting" || value === "exhausted" || value === "unsafe"
     ? value
     : "waiting";
 }
@@ -548,6 +614,9 @@ function toVariableValue(state: PersistedRetryState): VariableValue {
     attempt: state.attempt,
     maxAttempts: state.maxAttempts,
     retryable: state.retryable,
+    idempotent: state.idempotent,
+    requiresIdempotency: state.requiresIdempotency,
+    blockedByIdempotency: state.blockedByIdempotency,
     lastError: state.lastError,
     nextRetryAt: state.nextRetryAt,
     exhaustedAt: state.exhaustedAt,

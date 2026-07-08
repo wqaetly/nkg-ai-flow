@@ -469,6 +469,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         retryableCodes: "可重试错误码",
         retryAfterMsPath: "Retry-After 毫秒路径",
         retryAfterAtPath: "Retry-After 时间路径",
+        requireIdempotency: "要求幂等",
       },
       resume_point: {
         name: "恢复状态名",
