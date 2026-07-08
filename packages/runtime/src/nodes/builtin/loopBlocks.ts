@@ -226,13 +226,13 @@ export const forBeginNode = defineNode({
     const start = Number(config.start ?? 0);
     const end = Number(config.end ?? start);
     const step = Number(config.step ?? 1) || 1;
-    const count = Math.max(0, Math.ceil((end - start) / step));
+    const values = forRange(start, end, step);
     return {
       kind: "success",
       outputs: {
         body: null,
-        index: start,
-        count,
+        index: values[0] ?? start,
+        count: values.length,
       },
     };
   },
@@ -429,4 +429,14 @@ function normalizeErrors(value: unknown): unknown[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) return [value];
   return value.flatMap((item) => (Array.isArray(item) ? item : [item]));
+}
+
+function forRange(start: number, end: number, step: number): number[] {
+  const values: number[] = [];
+  if (step > 0) {
+    for (let index = start; index < end; index += step) values.push(index);
+  } else {
+    for (let index = start; index > end; index += step) values.push(index);
+  }
+  return values;
 }
