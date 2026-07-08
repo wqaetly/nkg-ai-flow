@@ -216,6 +216,7 @@ export const subflowTemplateNode = defineNode({
     { id: "childStartedAt", direction: "output", kind: "data", label: "Child Started At", schema: { type: "string" } },
     { id: "childFinishedAt", direction: "output", kind: "data", label: "Child Finished At", schema: { type: "string" } },
     { id: "childDurationMs", direction: "output", kind: "data", label: "Child Duration Ms", schema: { type: "number" } },
+    { id: "childTraceId", direction: "output", kind: "data", label: "Child Trace Id", schema: { type: "string" } },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     { id: "inputMode", direction: "output", kind: "data", label: "Input Mode", schema: { type: "string" } },
@@ -242,6 +243,7 @@ export const subflowTemplateNode = defineNode({
       Math.trunc(Number((ctx as { subflowDepth?: number }).subflowDepth ?? 0)),
     );
     const policy = readTemplatePolicy(input, config);
+    const childTraceId = `${ctx.runId}:${ctx.nodeId}:${templateId}`;
 
     const templates = readTemplates(input.templates ?? config.templates);
     if (templates instanceof Error) {
@@ -265,6 +267,7 @@ export const subflowTemplateNode = defineNode({
           flowId: "",
           flowVersion: "",
           ...childRunTiming(null),
+          childTraceId,
           subflowDepth,
           childDepth: subflowDepth,
           inputMode: policy.inputMode,
@@ -343,6 +346,7 @@ export const subflowTemplateNode = defineNode({
         templateId,
         flowId: template.flowId,
         flowVersion: template.flowVersion,
+        childTraceId,
         subflowDepth,
         childDepth,
         localScope,
@@ -356,7 +360,7 @@ export const subflowTemplateNode = defineNode({
         flowId: template.flowId,
         ...(template.flowVersion === "" ? {} : { flowVersion: template.flowVersion }),
         input: payload,
-        traceId: `${ctx.runId}:${ctx.nodeId}:${templateId}`,
+        traceId: childTraceId,
         subflowDepth: childDepth,
         variables: childVariables,
         secrets: childVariables,
@@ -384,6 +388,7 @@ export const subflowTemplateNode = defineNode({
       flowId: template.flowId,
       flowVersion: result.runRecord.flowVersion,
       ...childRunTiming(result.runRecord),
+      childTraceId,
       subflowDepth,
       childDepth,
       inputMode: policy.inputMode,
@@ -415,6 +420,7 @@ export const subflowTemplateNode = defineNode({
             templateId,
             flowId: template.flowId,
             flowVersion: result.runRecord.flowVersion,
+            childTraceId,
             subflowDepth,
             childDepth,
             localScope,
@@ -598,6 +604,7 @@ function contractFailure(args: {
   templateId: string;
   flowId: string;
   flowVersion: string;
+  childTraceId: string;
   subflowDepth: number;
   childDepth: number;
   localScope: boolean;
@@ -623,6 +630,7 @@ function contractFailure(args: {
         flowId: args.flowId,
         flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
         ...childRunTiming(args.runRecord),
+        childTraceId: args.childTraceId,
         subflowDepth: args.subflowDepth,
         childDepth: args.childDepth,
         contractStage: args.stage,

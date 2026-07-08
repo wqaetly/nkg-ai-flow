@@ -10696,9 +10696,11 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.status).toBe("succeeded");
     expect(childRuns[0]?.output).toBe("child:Ada");
     expect(childRuns[0]?.subflowDepth).toBe(1);
+    expect(childRuns[0]?.traceId).toBe(`${result.runRecord.runId}:call_child`);
     expect(callOutput).toMatchObject({
       flowId: "child_echo",
       flowVersion: "1.0.0",
+      childTraceId: `${result.runRecord.runId}:call_child`,
       childStartedAt: expect.any(String),
       childFinishedAt: expect.any(String),
       childDurationMs: expect.any(Number),
@@ -10919,7 +10921,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.flowVersion).toBe("1.0.0");
     expect(childRuns[0]?.subflowDepth).toBe(1);
+    expect(childRuns[0]?.traceId).toBe(`${result.runRecord.runId}:call_template:echo_order`);
     expect(callOutput).toMatchObject({
+      childTraceId: `${result.runRecord.runId}:call_template:echo_order`,
       childStartedAt: expect.any(String),
       childFinishedAt: expect.any(String),
       childDurationMs: expect.any(Number),
