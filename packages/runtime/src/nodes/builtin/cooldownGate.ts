@@ -73,11 +73,13 @@ export const cooldownGateNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "now", direction: "input", kind: "data", label: "Now" },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "cooling", direction: "output", kind: "control", label: "Cooling" },
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "remainingMs", direction: "output", kind: "data", label: "Remaining ms", schema: { type: "number" } },
     { id: "readyAt", direction: "output", kind: "data", label: "Ready at", schema: { type: "number" } },
@@ -87,11 +89,11 @@ export const cooldownGateNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.cooldown_gate.missing_name",
-        "cooldown_gate requires config.name",
+        "cooldown_gate requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -119,7 +121,7 @@ export const cooldownGateNode = defineNode({
         lastAllowedAt: 0,
         allowedCount: previous?.allowedCount ?? 0,
         suppressedCount: previous?.suppressedCount ?? 0,
-      });
+      }, name);
     }
 
     const cooling = previous ? now < previous.readyAt : false;
@@ -149,7 +151,7 @@ export const cooldownGateNode = defineNode({
       lastAllowedAt: next.lastAllowedAt,
       allowedCount: next.allowedCount,
       suppressedCount: next.suppressedCount,
-    });
+    }, name);
   },
 });
 
@@ -184,12 +186,14 @@ function success(
     allowedCount: number;
     suppressedCount: number;
   },
+  name: string,
 ) {
   return {
     kind: "success" as const,
     outputs: {
       [branch]: null,
       state,
+      name,
       status: data.status,
       remainingMs: data.remainingMs,
       readyAt: data.readyAt,

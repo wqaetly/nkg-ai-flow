@@ -1820,6 +1820,59 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(third.output).toBe("ready:ready");
   });
 
+  it("routes a dynamically named cooldown_gate to ready", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cooldown_gate_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gateName = flow.node("transform", {
+      id: "gateName",
+      position: { x: 120, y: -80 },
+      config: { value: "ALERT_DYNAMIC_COOLDOWN" },
+    });
+    const gate = flow.node("cooldown_gate", {
+      id: "gate",
+      position: { x: 260, y: 0 },
+      config: {
+        durationMs: 1000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "ready:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), gateName.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(start.out("runInput"), gate.in("now"));
+    flow.connect(gateName.out("output"), gate.in("name"));
+    flow.connect(gate.out("ready"), report.in("in"));
+    flow.connect(gate.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_dynamic_name_e2e",
+      input: 1000,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("ready:ALERT_DYNAMIC_COOLDOWN");
+    expect(variables.get("ALERT_DYNAMIC_COOLDOWN")).toMatchObject({
+      lastAllowedAt: 1000,
+      readyAt: 2000,
+      durationMs: 1000,
+      allowedCount: 1,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("resets cooldown_gate state explicitly", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

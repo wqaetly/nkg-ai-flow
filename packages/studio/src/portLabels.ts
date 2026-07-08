@@ -352,6 +352,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       cooldown_gate: {
         in: "输入",
+        name: "冷却键名",
         now: "当前时间",
         ready: "可放行",
         cooling: "冷却中",
