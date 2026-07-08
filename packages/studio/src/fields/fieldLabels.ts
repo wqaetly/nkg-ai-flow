@@ -319,6 +319,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       map_items: {
         template: "映射模板",
       },
+      merge_object: {
+        mode: "合并模式",
+        nullMode: "空值模式",
+        nonObjectMode: "非对象模式",
+        scalarKey: "标量字段名",
+      },
       metric: {
         name: "指标名",
         mode: "模式",

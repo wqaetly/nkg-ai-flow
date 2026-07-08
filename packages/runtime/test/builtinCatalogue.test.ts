@@ -43,6 +43,7 @@ const BUILTIN_TYPES = [
   "join",
   "map_items",
   "merge",
+  "merge_object",
   "metric",
   "mutex",
   "parallel",

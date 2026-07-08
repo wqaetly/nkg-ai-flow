@@ -457,6 +457,15 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         values: "到达数据列表",
         count: "到达数量",
       },
+      merge_object: {
+        objects: "对象列表",
+        value: "合并对象",
+        sources: "来源对象",
+        skipped: "跳过来源",
+        keys: "字段键",
+        sourceCount: "来源数量",
+        skippedCount: "跳过数量",
+      },
       metric: {
         in: "输入",
         value: "指标值",

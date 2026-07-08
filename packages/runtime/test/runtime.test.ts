@@ -5324,6 +5324,101 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("skipped=empty_path");
   });
 
+  it("deep merges object sources with merge_object", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "merge_object_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const base = flow.node("transform", {
+      id: "base",
+      position: { x: 120, y: 20 },
+      config: { value: { order: { id: "ord_1", status: "new" }, tags: ["base"] } },
+    });
+    const patch = flow.node("transform", {
+      id: "patch",
+      position: { x: 120, y: 140 },
+      config: { value: { order: { status: "paid", total: 42 }, customer: { id: "cus_1" } } },
+    });
+    const merge = flow.node("merge_object", {
+      id: "merge_object",
+      position: { x: 280, y: 80 },
+      config: { mode: "deep" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 420, y: 80 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 560, y: 80 },
+      config: { template: "merged=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 80 } });
+
+    flow.connect(start.out("out"), base.in("in"));
+    flow.connect(start.out("out"), patch.in("in"));
+    flow.connect(base.out("out"), merge.in("in"));
+    flow.connect(patch.out("out"), merge.in("in"));
+    flow.connect(base.out("output"), merge.in("objects"));
+    flow.connect(patch.out("output"), merge.in("objects"));
+    flow.connect(merge.out("out"), stringify.in("in"));
+    flow.connect(merge.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "merge_object_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe(
+      'merged={"customer":{"id":"cus_1"},"order":{"id":"ord_1","status":"paid","total":42},"tags":["base"]}',
+    );
+  });
+
+  it("reports skipped non-object sources with merge_object", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "merge_object_skipped_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: [{ a: 1 }, "skip-me", { b: 2 }] },
+    });
+    const merge = flow.node("merge_object", {
+      id: "merge_object",
+      position: { x: 260, y: 0 },
+      config: { nonObjectMode: "skip" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "skipped=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), merge.in("in"));
+    flow.connect(input.out("output"), merge.in("objects"));
+    flow.connect(merge.out("out"), report.in("in"));
+    flow.connect(merge.out("skippedCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "merge_object_skipped_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("skipped=1");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

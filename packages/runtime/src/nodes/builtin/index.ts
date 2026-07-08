@@ -43,6 +43,7 @@ export { idempotencyKeyNode } from "./idempotencyKey.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";
+export { mergeObjectNode } from "./mergeObject.js";
 export { metricNode } from "./metric.js";
 export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";

@@ -177,6 +177,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "合流",
         description: "任一输入分支到达后继续流程。",
       },
+      merge_object: {
+        title: "合并对象",
+        description: "把多个对象来源合并成一个结构化载荷。",
+      },
       metric: {
         title: "指标",
         description: "更新、读取或重置流程中的业务数值指标。",
