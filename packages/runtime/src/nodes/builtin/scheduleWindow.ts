@@ -66,6 +66,16 @@ export const scheduleWindowNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "now", direction: "input", kind: "data", label: "Now" },
+    { id: "startTime", direction: "input", kind: "data", label: "Start Time", schema: { type: "string" } },
+    { id: "endTime", direction: "input", kind: "data", label: "End Time", schema: { type: "string" } },
+    { id: "days", direction: "input", kind: "data", label: "Days", schema: { type: "string" } },
+    {
+      id: "timezoneOffsetMinutes",
+      direction: "input",
+      kind: "data",
+      label: "Timezone Offset Minutes",
+      schema: { type: "number" },
+    },
     { id: "open", direction: "output", kind: "control", label: "Open" },
     { id: "closed", direction: "output", kind: "control", label: "Closed" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -122,8 +132,11 @@ export const scheduleWindowNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const startMinute = readTime(config.startTime);
-    const endMinute = readTime(config.endTime);
+    const startTime = String(input.startTime ?? config.startTime ?? "09:00");
+    const endTime = String(input.endTime ?? config.endTime ?? "17:00");
+    const daysValue = String(input.days ?? config.days ?? "1,2,3,4,5");
+    const startMinute = readTime(startTime);
+    const endMinute = readTime(endTime);
     if (startMinute === undefined || endMinute === undefined) {
       return error(
         "node.schedule_window.invalid_time",
@@ -132,7 +145,7 @@ export const scheduleWindowNode = defineNode({
       );
     }
 
-    const days = readDays(config.days);
+    const days = readDays(daysValue);
     if (days.size === 0) {
       return error(
         "node.schedule_window.invalid_days",
@@ -142,7 +155,8 @@ export const scheduleWindowNode = defineNode({
     }
 
     const now = readTimestamp(input.now ?? input.input ?? input.in) ?? Date.now();
-    const offsetMinutes = Math.trunc(Number(config.timezoneOffsetMinutes ?? 0));
+    const offsetMinutes =
+      readInteger(input.timezoneOffsetMinutes) ?? readInteger(config.timezoneOffsetMinutes) ?? 0;
     const local = localParts(now, offsetMinutes);
     const open = isWindowOpen(local.day, local.minuteOfDay, startMinute, endMinute, days);
     const nextOpenInMs = open
@@ -150,9 +164,6 @@ export const scheduleWindowNode = defineNode({
       : computeNextOpenInMs(local.absoluteMinute, startMinute, endMinute, days);
     const nextOpenAt = now + nextOpenInMs;
     const status = open ? "open" : "closed";
-    const startTime = String(config.startTime ?? "09:00");
-    const endTime = String(config.endTime ?? "17:00");
-    const daysValue = String(config.days ?? "1,2,3,4,5");
 
     ctx.log.debug("schedule_window selected branch", {
       status,
@@ -263,6 +274,11 @@ function readTimestamp(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function readInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.trunc(number) : undefined;
 }
 
 function previousDay(day: number): number {

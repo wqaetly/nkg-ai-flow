@@ -1050,6 +1050,100 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic schedule_window policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "schedule_window_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 180 } });
+    const now = flow.node("transform", {
+      id: "now",
+      position: { x: 140, y: 40 },
+      config: { value: Date.UTC(2026, 6, 6, 10, 0) },
+    });
+    const startTime = flow.node("transform", {
+      id: "start_time",
+      position: { x: 140, y: 140 },
+      config: { value: "09:00" },
+    });
+    const endTime = flow.node("transform", {
+      id: "end_time",
+      position: { x: 140, y: 240 },
+      config: { value: "17:00" },
+    });
+    const days = flow.node("transform", {
+      id: "days",
+      position: { x: 140, y: 340 },
+      config: { value: "1,2,3,4,5" },
+    });
+    const timezoneOffset = flow.node("transform", {
+      id: "timezone_offset",
+      position: { x: 140, y: 440 },
+      config: { value: 0 },
+    });
+    const window = flow.node("schedule_window", {
+      id: "window",
+      position: { x: 380, y: 240 },
+      config: {
+        startTime: "11:00",
+        endTime: "12:00",
+        days: "2",
+        timezoneOffsetMinutes: 60,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 580, y: 240 },
+      config: { template: "window:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 760, y: 240 } });
+
+    flow.connect(start.out("out"), now.in("in"));
+    flow.connect(start.out("out"), startTime.in("in"));
+    flow.connect(start.out("out"), endTime.in("in"));
+    flow.connect(start.out("out"), days.in("in"));
+    flow.connect(start.out("out"), timezoneOffset.in("in"));
+    flow.connect(now.out("out"), window.in("in"));
+    flow.connect(now.out("output"), window.in("now"));
+    flow.connect(startTime.out("output"), window.in("startTime"));
+    flow.connect(endTime.out("output"), window.in("endTime"));
+    flow.connect(days.out("output"), window.in("days"));
+    flow.connect(timezoneOffset.out("output"), window.in("timezoneOffsetMinutes"));
+    flow.connect(window.out("open"), report.in("in"));
+    flow.connect(window.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schedule_window_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("window:open");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const windowOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "window") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(windowOutput).toMatchObject({
+      status: "open",
+      startTime: "09:00",
+      endTime: "17:00",
+      days: "1,2,3,4,5",
+      timezoneOffsetMinutes: 0,
+      nextOpenInMs: 0,
+      nextOpenAt: Date.UTC(2026, 6, 6, 10, 0),
+      openValue: true,
+      closedValue: false,
+      overnightValue: false,
+    });
+  });
+
   it("keeps schedule_window open for overnight windows", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schedule_window_overnight_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
