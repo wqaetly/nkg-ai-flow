@@ -181,7 +181,17 @@ export const subflowTemplateNode = defineNode({
   ports: [
     controlIn,
     { id: "templateId", direction: "input", kind: "data", label: "Template Id", schema: { type: "string" } },
+    { id: "templates", direction: "input", kind: "data", label: "Templates" },
     { id: "input", direction: "input", kind: "data", label: "Input" },
+    { id: "inputMode", direction: "input", kind: "data", label: "Input Mode", schema: { type: "string" } },
+    { id: "inputValue", direction: "input", kind: "data", label: "Input Value" },
+    { id: "inputSchema", direction: "input", kind: "data", label: "Input Schema" },
+    { id: "outputSchema", direction: "input", kind: "data", label: "Output Schema" },
+    { id: "contractMode", direction: "input", kind: "data", label: "Contract Mode", schema: { type: "string" } },
+    { id: "maxDepth", direction: "input", kind: "data", label: "Max Depth", schema: { type: "number" } },
+    { id: "localScope", direction: "input", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
+    { id: "localVariables", direction: "input", kind: "data", label: "Local Variables" },
+    { id: "failOnError", direction: "input", kind: "data", label: "Fail On Error", schema: { type: "boolean" } },
     { id: "succeeded", direction: "output", kind: "control", label: "Succeeded" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
     {
@@ -208,6 +218,10 @@ export const subflowTemplateNode = defineNode({
     { id: "childDurationMs", direction: "output", kind: "data", label: "Child Duration Ms", schema: { type: "number" } },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
+    { id: "inputMode", direction: "output", kind: "data", label: "Input Mode", schema: { type: "string" } },
+    { id: "contractMode", direction: "output", kind: "data", label: "Contract Mode", schema: { type: "string" } },
+    { id: "maxDepth", direction: "output", kind: "data", label: "Max Depth", schema: { type: "number" } },
+    { id: "failOnError", direction: "output", kind: "data", label: "Fail On Error", schema: { type: "boolean" } },
     { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
     { id: "localScope", direction: "output", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
     errorOut,
@@ -227,8 +241,9 @@ export const subflowTemplateNode = defineNode({
       0,
       Math.trunc(Number((ctx as { subflowDepth?: number }).subflowDepth ?? 0)),
     );
+    const policy = readTemplatePolicy(input, config);
 
-    const templates = readTemplates(config.templates);
+    const templates = readTemplates(input.templates ?? config.templates);
     if (templates instanceof Error) {
       return error(
         "node.subflow_template.invalid_templates",
@@ -252,6 +267,12 @@ export const subflowTemplateNode = defineNode({
           ...childRunTiming(null),
           subflowDepth,
           childDepth: subflowDepth,
+          inputMode: policy.inputMode,
+          contractMode: policy.contractMode,
+          maxDepth: policy.maxDepth,
+          failOnError: policy.failOnError,
+          localScope: false,
+          localVariableCount: 0,
         },
       };
     }
@@ -276,7 +297,7 @@ export const subflowTemplateNode = defineNode({
       );
     }
 
-    const maxDepth = Math.max(0, Math.trunc(Number(config.maxDepth ?? 10)));
+    const maxDepth = policy.maxDepth;
     if (subflowDepth >= maxDepth) {
       return error(
         "node.subflow_template.max_depth_exceeded",
@@ -286,7 +307,7 @@ export const subflowTemplateNode = defineNode({
     }
     const childDepth = subflowDepth + 1;
 
-    const configLocalVariables = readLocalVariables(config.localVariables, "subflow_template localVariables");
+    const configLocalVariables = readLocalVariables(policy.localVariables, "subflow_template localVariables");
     if (configLocalVariables instanceof Error) {
       return error(
         "node.subflow_template.invalid_local_variables",
@@ -296,14 +317,14 @@ export const subflowTemplateNode = defineNode({
     }
     const localVariables = [...template.localVariables, ...configLocalVariables];
     const hasLocalVariables = localVariables.length > 0;
-    const localScope = config.localScope === true || hasLocalVariables;
+    const localScope = policy.localScope || hasLocalVariables;
     const parentVariables = (ctx as unknown as { variables: VariableStore }).variables;
     const childVariables = localScope
       ? new LocalVariableOverlay(parentVariables, localVariables)
       : parentVariables;
 
-    const payload = childInput(input, config, template);
-    const inputContract = validateContract(config.inputSchema, payload, "input");
+    const payload = childInput(input, policy, template);
+    const inputContract = validateContract(policy.inputSchema, payload, "input");
     if (inputContract instanceof Error) {
       return error(
         "node.subflow_template.invalid_input_schema",
@@ -313,7 +334,7 @@ export const subflowTemplateNode = defineNode({
     }
     if (inputContract.issues.length > 0) {
       return contractFailure({
-        config,
+        policy,
         ctxNodeId: ctx.nodeId,
         stage: "input",
         issues: inputContract.issues,
@@ -365,13 +386,17 @@ export const subflowTemplateNode = defineNode({
       ...childRunTiming(result.runRecord),
       subflowDepth,
       childDepth,
+      inputMode: policy.inputMode,
+      contractMode: policy.contractMode,
+      maxDepth,
+      failOnError: policy.failOnError,
       localScope,
       localVariableCount: localVariables.length,
     };
 
-    if (status === "succeeded" || config.failOnError === false) {
+    if (status === "succeeded" || !policy.failOnError) {
       if (status === "succeeded") {
-        const outputContract = validateContract(config.outputSchema, result.output ?? null, "output");
+        const outputContract = validateContract(policy.outputSchema, result.output ?? null, "output");
         if (outputContract instanceof Error) {
           return error(
             "node.subflow_template.invalid_output_schema",
@@ -381,7 +406,7 @@ export const subflowTemplateNode = defineNode({
         }
         if (outputContract.issues.length > 0) {
           return contractFailure({
-            config,
+            policy,
             ctxNodeId: ctx.nodeId,
             stage: "output",
             issues: outputContract.issues,
@@ -476,19 +501,71 @@ function parseJson(value: string): unknown | Error {
 
 function childInput(
   input: Record<string, unknown>,
-  config: { inputMode?: string; inputValue?: unknown },
+  policy: { inputMode: "input" | "runInput" | "literal" | "template"; inputValue?: unknown },
   template: TemplateDefinition,
 ): unknown {
-  switch (config.inputMode) {
+  switch (policy.inputMode) {
     case "runInput":
       return input.__runInput__ ?? null;
     case "literal":
-      return config.inputValue ?? null;
+      return input.inputValue ?? policy.inputValue ?? null;
     case "template":
       return template.input;
     default:
       return input.input ?? input.in ?? input.__runInput__ ?? template.input;
   }
+}
+
+function readTemplatePolicy(
+  input: Record<string, unknown>,
+  config: {
+    inputMode?: unknown;
+    inputValue?: unknown;
+    inputSchema?: unknown;
+    outputSchema?: unknown;
+    contractMode?: unknown;
+    maxDepth?: unknown;
+    localScope?: unknown;
+    localVariables?: unknown;
+    failOnError?: unknown;
+  },
+): {
+  inputMode: "input" | "runInput" | "literal" | "template";
+  inputValue?: unknown;
+  inputSchema?: unknown;
+  outputSchema?: unknown;
+  contractMode: "fail" | "route";
+  maxDepth: number;
+  localScope: boolean;
+  localVariables?: unknown;
+  failOnError: boolean;
+} {
+  return {
+    inputMode:
+      readInputMode(input.inputMode) ??
+      readInputMode(config.inputMode) ??
+      "input",
+    inputValue: input.inputValue ?? config.inputValue,
+    inputSchema: input.inputSchema ?? config.inputSchema,
+    outputSchema: input.outputSchema ?? config.outputSchema,
+    contractMode:
+      readContractMode(input.contractMode) ??
+      readContractMode(config.contractMode) ??
+      "fail",
+    maxDepth:
+      readIntegerAtLeast(input.maxDepth, 0) ??
+      readIntegerAtLeast(config.maxDepth, 0) ??
+      10,
+    localScope:
+      readBoolean(input.localScope) ??
+      readBoolean(config.localScope) ??
+      false,
+    localVariables: input.localVariables ?? config.localVariables,
+    failOnError:
+      readBoolean(input.failOnError) ??
+      readBoolean(config.failOnError) ??
+      true,
+  };
 }
 
 function validateContract(
@@ -507,7 +584,12 @@ function validateContract(
 }
 
 function contractFailure(args: {
-  config: { contractMode?: string };
+  policy: {
+    inputMode: string;
+    contractMode: "fail" | "route";
+    maxDepth: number;
+    failOnError: boolean;
+  };
   ctxNodeId: string;
   stage: "input" | "output";
   issues: SchemaIssue[];
@@ -528,7 +610,7 @@ function contractFailure(args: {
   error: { code: string; message: string; [key: string]: unknown };
 } {
   const firstIssue = args.issues[0]?.message ?? "";
-  if (args.config.contractMode === "route") {
+  if (args.policy.contractMode === "route") {
     return {
       kind: "success",
       outputs: {
@@ -547,6 +629,10 @@ function contractFailure(args: {
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,
         firstContractIssue: firstIssue,
+        inputMode: args.policy.inputMode,
+        contractMode: args.policy.contractMode,
+        maxDepth: args.policy.maxDepth,
+        failOnError: args.policy.failOnError,
         localScope: args.localScope,
         localVariableCount: args.localVariableCount,
       },
@@ -573,6 +659,39 @@ function childRunTiming(runRecord: SubflowInvokeResult["runRecord"] | null): {
       ? Math.max(0, finishedMs - startedMs)
       : null;
   return { childStartedAt, childFinishedAt, childDurationMs };
+}
+
+function readInputMode(
+  value: unknown,
+): "input" | "runInput" | "literal" | "template" | undefined {
+  if (typeof value !== "string") return undefined;
+  const mode = value.trim();
+  return mode === "input" ||
+    mode === "runInput" ||
+    mode === "literal" ||
+    mode === "template"
+    ? mode
+    : undefined;
+}
+
+function readContractMode(value: unknown): "fail" | "route" | undefined {
+  if (typeof value !== "string") return undefined;
+  const mode = value.trim();
+  return mode === "fail" || mode === "route" ? mode : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? Math.trunc(number) : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function readLocalVariables(value: unknown, label: string): VariableEntry[] | Error {

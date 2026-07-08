@@ -8237,6 +8237,85 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("invokes a dynamically supplied subflow_template definition", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "template_dynamic_child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const childTransform = child.node("transform", {
+      id: "child_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child:${input.name}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), childTransform.in("in"));
+    child.connect(childTransform.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_calls_dynamic_template", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const templates = parent.node("transform", {
+      id: "templates",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          dynamic_echo: {
+            flowId: "template_dynamic_child_echo",
+            flowVersion: "1.0.0",
+            input: { name: "Ada" },
+          },
+        },
+      },
+    });
+    const inputMode = parent.node("transform", {
+      id: "input_mode",
+      position: { x: 260, y: 0 },
+      config: { value: "template" },
+    });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 400, y: 0 },
+      config: {
+        templateId: "dynamic_echo",
+        inputMode: "runInput",
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 560, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 700, y: 0 } });
+    parent.connect(start.out("out"), templates.in("in"));
+    parent.connect(templates.out("out"), inputMode.in("in"));
+    parent.connect(inputMode.out("out"), call.in("in"));
+    parent.connect(templates.out("output"), call.in("templates"));
+    parent.connect(inputMode.out("output"), call.in("inputMode"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_calls_dynamic_template",
+      input: { name: "RunInput" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:child:Ada");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      templateId: "dynamic_echo",
+      inputMode: "template",
+      status: "succeeded",
+    });
+  });
+
   it("routes subflow_template to missing when the template id is absent", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_missing_template", version: "1.0.0", registry: rt.nodeTypeRegistry });
@@ -8346,6 +8425,75 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.status).toBe("failed");
   });
 
+  it("routes failed subflow_template child runs with dynamic failOnError input", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "template_child_dynamic_fail_policy", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const broken = child.node("http", {
+      id: "broken_http",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), broken.in("in"));
+    child.connect(broken.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_template_dynamic_failed_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failOnError = parent.node("transform", {
+      id: "fail_on_error",
+      position: { x: 120, y: 0 },
+      config: { value: false },
+    });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 260, y: 0 },
+      config: {
+        templateId: "broken_template",
+        failOnError: true,
+        templates: {
+          broken_template: {
+            flowId: "template_child_dynamic_fail_policy",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "child:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 560, y: 0 } });
+    parent.connect(start.out("out"), failOnError.in("in"));
+    parent.connect(failOnError.out("out"), call.in("in"));
+    parent.connect(failOnError.out("output"), call.in("failOnError"));
+    parent.connect(call.out("failed"), report.in("in"));
+    parent.connect(call.out("status"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_dynamic_failed_child",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("child:failed");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      status: "failed",
+      failOnError: false,
+    });
+  });
+
   it("routes subflow_template input contract failures without invoking the child flow", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_template_input_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
@@ -8408,6 +8556,88 @@ describe("runtime / hello-flow end-to-end", () => {
       childDepth: 1,
     });
     expect(await rt.runStore.listByFlow("template_input_contract_child")).toEqual([]);
+  });
+
+  it("routes subflow_template input contract failures with dynamic contract policy inputs", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_template_dynamic_input_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const schema = parent.node("transform", {
+      id: "schema",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          type: "object",
+          required: ["name"],
+          properties: { name: { type: "string", minLength: 1 } },
+        },
+      },
+    });
+    const contractMode = parent.node("transform", {
+      id: "contract_mode",
+      position: { x: 260, y: 0 },
+      config: { value: "route" },
+    });
+    const maxDepth = parent.node("transform", {
+      id: "max_depth",
+      position: { x: 400, y: 0 },
+      config: { value: 7 },
+    });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 540, y: 0 },
+      config: {
+        templateId: "contract_child",
+        contractMode: "fail",
+        maxDepth: 1,
+        templates: {
+          contract_child: {
+            flowId: "template_dynamic_input_contract_child",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 700, y: 0 },
+      config: { template: "template-input-contract:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 840, y: 0 } });
+
+    parent.connect(start.out("out"), schema.in("in"));
+    parent.connect(schema.out("out"), contractMode.in("in"));
+    parent.connect(contractMode.out("out"), maxDepth.in("in"));
+    parent.connect(maxDepth.out("out"), call.in("in"));
+    parent.connect(schema.out("output"), call.in("inputSchema"));
+    parent.connect(contractMode.out("output"), call.in("contractMode"));
+    parent.connect(maxDepth.out("output"), call.in("maxDepth"));
+    parent.connect(call.out("contract_failed"), report.in("in"));
+    parent.connect(call.out("contractIssueCount"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_dynamic_input_contract",
+      input: { id: "missing-name" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("template-input-contract:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      status: "contract_failed",
+      contractMode: "route",
+      maxDepth: 7,
+      childStartedAt: null,
+    });
+    expect(await rt.runStore.listByFlow("template_dynamic_input_contract_child")).toEqual([]);
   });
 
   it("routes subflow_template output contract failures after a successful child run", async () => {
@@ -8557,6 +8787,88 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("parent:tenant=template");
     expect(variables.get("TENANT")).toBe("global");
     expect(variables.has("TEMPLATE_CHILD_TMP")).toBe(false);
+  });
+
+  it("passes dynamic subflow_template local variables as child-scoped overrides", async () => {
+    const variables = new InMemoryVariableStore([
+      { name: "TENANT", value: "global" },
+    ]);
+    const rt = newRuntime({ variables });
+    const child = defineFlow({ id: "template_child_dynamic_local_state", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const getTenant = child.node("state_get", {
+      id: "get_tenant",
+      position: { x: 120, y: 0 },
+      config: { name: "TENANT" },
+    });
+    const childReport = child.node("transform", {
+      id: "child_report",
+      position: { x: 260, y: 0 },
+      config: { template: "tenant=${input}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 400, y: 0 } });
+    child.connect(childStart.out("out"), getTenant.in("in"));
+    child.connect(getTenant.out("out"), childReport.in("in"));
+    child.connect(getTenant.out("value"), childReport.in("input"));
+    child.connect(childReport.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_template_dynamic_local_scope", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const localVars = parent.node("transform", {
+      id: "local_vars",
+      position: { x: 120, y: 0 },
+      config: { value: { TENANT: "dynamic" } },
+    });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 260, y: 0 },
+      config: {
+        templateId: "local_child",
+        inputMode: "template",
+        templates: {
+          local_child: {
+            flowId: "template_child_dynamic_local_state",
+            flowVersion: "1.0.0",
+            input: null,
+            localVariables: { TENANT: "template" },
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 560, y: 0 } });
+    parent.connect(start.out("out"), localVars.in("in"));
+    parent.connect(localVars.out("out"), call.in("in"));
+    parent.connect(localVars.out("output"), call.in("localVariables"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_dynamic_local_scope",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:tenant=dynamic");
+    expect(variables.get("TENANT")).toBe("global");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      localScope: true,
+      localVariableCount: 2,
+    });
   });
 
   it("blocks subflow_template direct recursive calls to the same flow version", async () => {
