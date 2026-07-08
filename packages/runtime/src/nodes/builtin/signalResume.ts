@@ -76,6 +76,13 @@ export const signalResumeNode = defineNode({
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "signal", direction: "input", kind: "data", label: "Signal" },
     { id: "expected", direction: "input", kind: "data", label: "Expected", schema: { type: "string" } },
+    {
+      id: "createIfMissing",
+      direction: "input",
+      kind: "data",
+      label: "Create If Missing",
+      schema: { type: "boolean" },
+    },
     { id: "resumed", direction: "output", kind: "control", label: "Resumed" },
     { id: "ignored", direction: "output", kind: "control", label: "Ignored" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
@@ -88,6 +95,13 @@ export const signalResumeNode = defineNode({
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
     { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
     { id: "matched", direction: "output", kind: "data", label: "Matched", schema: { type: "boolean" } },
+    {
+      id: "createIfMissing",
+      direction: "output",
+      kind: "data",
+      label: "Create If Missing",
+      schema: { type: "boolean" },
+    },
     { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
     { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
     {
@@ -136,11 +150,13 @@ export const signalResumeNode = defineNode({
     const previous = readWaitSignalState(store.get(name));
     const expectedOverride = String(input.expected ?? config.expected ?? "").trim();
     const expected = expectedOverride || previous?.expected || String(signal);
+    const createIfMissing =
+      readBoolean(input.createIfMissing) ?? (config.createIfMissing === true);
     const decision = applySignal(previous, {
       signal,
       expected,
       now,
-      createIfMissing: config.createIfMissing === true,
+      createIfMissing,
     });
 
     if (decision.state) {
@@ -164,6 +180,7 @@ export const signalResumeNode = defineNode({
       status: decision.status,
       expected,
       matched,
+      createIfMissing,
     });
 
     return {
@@ -178,6 +195,7 @@ export const signalResumeNode = defineNode({
         stateStatus,
         stateExists: decision.state !== null,
         matched,
+        createIfMissing,
         requestedAt,
         expiresAt,
         remainingMs,
@@ -285,6 +303,15 @@ function readWaitSignalState(value: unknown): WaitSignalState | null {
 
 function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {

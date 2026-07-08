@@ -5559,6 +5559,70 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("creates a missing wait_signal checkpoint with a dynamic createIfMissing input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_dynamic_create_if_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const createFlag = flow.node("transform", {
+      id: "create_flag",
+      position: { x: 120, y: 0 },
+      config: { value: true },
+    });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_CREATE_IF_MISSING",
+        signal: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), createFlag.in("in"));
+    flow.connect(createFlag.out("out"), resume.in("in"));
+    flow.connect(createFlag.out("output"), resume.in("createIfMissing"));
+    flow.connect(resume.out("resumed"), report.in("in"));
+    flow.connect(resume.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_dynamic_create_if_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:resumed");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resumeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "resumed",
+      stateStatus: "received",
+      stateExists: true,
+      matched: true,
+      createIfMissing: true,
+    });
+    expect(variables.get("ORDER_APPROVAL_CREATE_IF_MISSING")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+    });
+  });
+
   it("routes signal_resume to missing when the wait state is absent", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

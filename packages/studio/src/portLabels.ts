@@ -1123,6 +1123,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         stateStatus: "持久状态",
         stateExists: "状态是否存在",
         matched: "是否匹配",
+        createIfMissing: "缺失时创建",
         requestedAt: "请求时间",
         expiresAt: "过期时间",
         remainingMs: "剩余毫秒",
