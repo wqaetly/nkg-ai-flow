@@ -120,6 +120,91 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("routes node errors through retry_policy with backoff metadata", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        multiplier: 2,
+        maxDelayMs: 1000,
+        retryableOnly: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), failing.in("in"));
+    flow.connect(failing.out("error"), policy.in("error"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:100");
+  });
+
+  it("routes exhausted retry_policy errors to the exhausted branch", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_exhausted_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 1,
+        retryableOnly: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "exhausted:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), failing.in("in"));
+    flow.connect(failing.out("error"), policy.in("error"));
+    flow.connect(policy.out("exhausted"), report.in("in"));
+    flow.connect(policy.out("attempt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_exhausted_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("exhausted:1");
+  });
+
   it("writes state for downstream variable resolution with state_set", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

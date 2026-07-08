@@ -24,6 +24,7 @@ export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";
 export { parallelNode } from "./parallel.js";
 export { reduceItemsNode } from "./reduceItems.js";
+export { retryPolicyNode } from "./retryPolicy.js";
 export { switchCaseNode } from "./switchCase.js";
 export { toolNode } from "./tool.js";
 export { llmNode } from "./llm.js";

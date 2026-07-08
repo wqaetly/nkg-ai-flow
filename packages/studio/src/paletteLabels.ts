@@ -117,6 +117,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "汇总数组",
         description: "对数组执行计数、求和或拼接汇总。",
       },
+      retry_policy: {
+        title: "重试策略",
+        description: "根据错误、尝试次数和重试标记路由到重试或耗尽分支。",
+      },
       switch_case: {
         title: "多路分支",
         description: "根据输入值路由到 case 或 default 分支。",

@@ -43,6 +43,7 @@ import {
   mergeNode,
   parallelNode,
   reduceItemsNode,
+  retryPolicyNode,
   switchCaseNode,
   foreachBeginNode,
   foreachEndNode,
@@ -159,6 +160,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, mergeNode);
   installNode(target, parallelNode);
   installNode(target, reduceItemsNode);
+  installNode(target, retryPolicyNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);

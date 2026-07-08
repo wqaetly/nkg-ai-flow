@@ -24,6 +24,7 @@ const BUILTIN_TYPES = [
   "merge",
   "parallel",
   "reduce_items",
+  "retry_policy",
   "switch_case",
   "tool",
   "text_input",
