@@ -54,6 +54,13 @@ export const stateSetNode = defineNode({
   },
   ports: [
     {
+      id: "name",
+      direction: "input",
+      kind: "data",
+      label: "Name",
+      schema: { type: "string" },
+    },
+    {
       id: "value",
       direction: "input",
       kind: "data",
@@ -88,11 +95,11 @@ export const stateSetNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.state_set.missing_name",
-        "state_set node requires config.name",
+        "state_set node requires config.name or name input",
         ctx.nodeId,
       );
     }

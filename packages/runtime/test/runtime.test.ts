@@ -8185,6 +8185,71 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("writes state with a dynamically named state_set", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "state_set_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const stateName = flow.node("transform", {
+      id: "stateName",
+      position: { x: 120, y: -80 },
+      config: { value: "FLOW_DYNAMIC_STATE_VALUE" },
+    });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { status: "dynamic-ready" } },
+    });
+    const setState = flow.node("state_set", {
+      id: "set_state",
+      position: { x: 280, y: 0 },
+      config: {
+        description: "Value written through a dynamic state_set name.",
+      },
+    });
+    const getState = flow.node("state_get", {
+      id: "get_state",
+      position: { x: 440, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 600, y: 0 },
+      config: { template: "state=${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 760, y: 0 } });
+
+    flow.connect(start.out("out"), stateName.in("in"));
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), setState.in("in"));
+    flow.connect(stateName.out("output"), setState.in("name"));
+    flow.connect(input.out("output"), setState.in("value"));
+    flow.connect(setState.out("out"), getState.in("in"));
+    flow.connect(setState.out("name"), getState.in("name"));
+    flow.connect(getState.out("out"), report.in("in"));
+    flow.connect(getState.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "state_set_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("state=dynamic-ready");
+    expect(variables.get("FLOW_DYNAMIC_STATE_VALUE")).toEqual({ status: "dynamic-ready" });
+    expect(variables.describe("FLOW_DYNAMIC_STATE_VALUE")?.metadata).toMatchObject({
+      description: "Value written through a dynamic state_set name.",
+      source: "runtime",
+      scope: { flowId: "state_set_dynamic_name_e2e" },
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("reads state as explicit data with state_get", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
