@@ -507,6 +507,16 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         branch4: "分支 4",
         value: "透传数据",
       },
+      parse_json: {
+        text: "文本",
+        parsed: "已解析",
+        invalid: "无效",
+        value: "解析值",
+        raw: "原始值",
+        status: "状态",
+        type: "类型",
+        errorMessage: "错误信息",
+      },
       policy_gate: {
         in: "输入",
         input: "策略输入",

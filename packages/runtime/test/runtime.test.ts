@@ -4772,6 +4772,89 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("split=0:alpha,1:beta,2:gamma");
   });
 
+  it("parses fenced JSON text and routes structured data with parse_json", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parse_json_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: '```json\n{"kind":"order","items":["a","b"]}\n```' },
+    });
+    const parse = flow.node("parse_json", {
+      id: "parse",
+      position: { x: 260, y: 0 },
+    });
+    const route = flow.node("switch_case", {
+      id: "route",
+      position: { x: 400, y: 0 },
+      config: { path: "value.kind", case1: "order" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "order=${input.items}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), parse.in("in"));
+    flow.connect(input.out("output"), parse.in("text"));
+    flow.connect(parse.out("parsed"), route.in("in"));
+    flow.connect(parse.out("value"), route.in("value"));
+    flow.connect(route.out("case1"), report.in("in"));
+    flow.connect(route.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parse_json_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("order=a,b");
+  });
+
+  it("routes invalid JSON text through parse_json invalid branch", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parse_json_invalid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: "{ invalid json" },
+    });
+    const parse = flow.node("parse_json", {
+      id: "parse",
+      position: { x: 260, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "bad=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), parse.in("in"));
+    flow.connect(input.out("output"), parse.in("text"));
+    flow.connect(parse.out("invalid"), report.in("in"));
+    flow.connect(parse.out("errorMessage"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parse_json_invalid_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toContain("bad=");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

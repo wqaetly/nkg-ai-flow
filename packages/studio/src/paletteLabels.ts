@@ -205,6 +205,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "并行分支",
         description: "把流程扇出到多个命名分支。",
       },
+      parse_json: {
+        title: "解析 JSON",
+        description: "把 JSON 文本解析成结构化数据，并把非法输入路由到失败分支。",
+      },
       policy_gate: {
         title: "策略门禁",
         description: "按多条业务规则允许或拒绝流程继续。",

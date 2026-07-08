@@ -45,6 +45,7 @@ const BUILTIN_TYPES = [
   "metric",
   "mutex",
   "parallel",
+  "parse_json",
   "policy_gate",
   "queue",
   "quorum",

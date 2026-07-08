@@ -340,6 +340,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       parallel: {
         branchCount: "分支数量",
       },
+      parse_json: {
+        path: "读取路径",
+        trim: "裁剪空白",
+        unwrapCodeFence: "剥离代码块",
+        acceptNonString: "接受非字符串",
+      },
       policy_gate: {
         mode: "匹配模式",
         rules: "策略规则",
