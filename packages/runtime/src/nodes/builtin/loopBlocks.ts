@@ -38,6 +38,13 @@ const breakOut: PortDefinition = {
   label: "跳出循环",
 };
 
+const continueOut: PortDefinition = {
+  id: "continue",
+  direction: "output",
+  kind: "control",
+  label: "继续下一轮",
+};
+
 const foreachBeginConfig = z
   .object({
     mode: z.enum(["sequential", "parallel"]).default("sequential"),
@@ -290,6 +297,22 @@ export const loopBreakNode = defineNode({
     return {
       kind: "success",
       outputs: { break: null },
+    };
+  },
+});
+
+export const loopContinueNode = defineNode({
+  type: "loop_continue",
+  typeVersion: "1.0.0",
+  title: "Loop Continue",
+  description: "在循环体内跳过当前迭代剩余步骤，继续下一轮。",
+  kind: "pseudo",
+  ports: [controlIn, continueOut],
+  validateInput: false,
+  run() {
+    return {
+      kind: "success",
+      outputs: { continue: null },
     };
   },
 });

@@ -31,6 +31,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       batchSize: "批大小",
       checkMode: "检查时机",
       concurrency: "并发数",
+      continue: "继续下一轮",
       count: "总数",
       done: "完成",
       empty: "空集合",
@@ -130,6 +131,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       loop_break: {
         break: "跳出循环",
+      },
+      loop_continue: {
+        continue: "继续下一轮",
       },
       loop_end: {
         body_done: "循环体完成",

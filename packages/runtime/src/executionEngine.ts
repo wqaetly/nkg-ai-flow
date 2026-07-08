@@ -671,10 +671,10 @@ export class ExecutionEngine {
 
     for (const outputs of iterations) {
       this.recordOutputs(beginNode, outputs);
-      const bodyStatus = await this.executeLoopBody(block, queue);
-      if (bodyStatus === "failed") return true;
-      this.collectLoopEndInputs(block, aggregated);
-      if (bodyStatus === "break") break;
+      const bodyResult = await this.executeLoopBody(block, queue);
+      if (bodyResult.status === "failed") return true;
+      this.collectLoopEndInputs(block, aggregated, bodyResult.executedNodeIds);
+      if (bodyResult.status === "break") break;
     }
 
     this.applyLoopEndOverrides(block.endNode, aggregated);
@@ -738,12 +738,12 @@ export class ExecutionEngine {
         state,
         iteration,
       });
-      const bodyStatus = await this.executeLoopBody(block, queue);
-      if (bodyStatus === "failed") return true;
+      const bodyResult = await this.executeLoopBody(block, queue);
+      if (bodyResult.status === "failed") return true;
 
       const aggregated = new Map<string, unknown[]>();
-      this.collectLoopEndInputs(block, aggregated);
-      if (bodyStatus === "break") {
+      this.collectLoopEndInputs(block, aggregated, bodyResult.executedNodeIds);
+      if (bodyResult.status === "break") {
         const nextState = lastAggregatedValue(aggregated, "nextState");
         if (nextState !== undefined) state = nextState;
         this.recordOutputs(block.endNode, { done: null, finalState: state });
@@ -781,9 +781,10 @@ export class ExecutionEngine {
   private async executeLoopBody(
     block: LoopBlock,
     queue: string[],
-  ): Promise<LoopBodyStatus> {
+  ): Promise<LoopBodyResult> {
     const localQueue = [...block.bodyStartNodeIds];
     const seen = new Set<string>();
+    const executedNodeIds = new Set<string>();
     while (localQueue.length > 0) {
       const nodeId = localQueue.shift()!;
       if (seen.has(nodeId)) continue;
@@ -792,14 +793,21 @@ export class ExecutionEngine {
       if (!node) continue;
       const result = await this.executeNode(node);
       if (result.kind === "skip") continue;
+      executedNodeIds.add(node.id);
       if (result.kind === "error") {
-        return (await this.routeErrorOrFail(node, result.error, queue))
-          ? "completed"
-          : "failed";
+        const handled = await this.routeErrorOrFail(node, result.error, queue);
+        return {
+          status: handled ? "completed" : "failed",
+          executedNodeIds,
+        };
       }
       if (node.type === "loop_break") {
         this.recordOutputs(node, result.outputs);
-        return "break";
+        return { status: "break", executedNodeIds };
+      }
+      if (node.type === "loop_continue") {
+        this.recordOutputs(node, result.outputs);
+        return { status: "continue", executedNodeIds };
       }
       this.recordOutputs(node, result.outputs);
       for (const edge of this.outEdges.get(node.id) ?? []) {
@@ -810,15 +818,17 @@ export class ExecutionEngine {
         localQueue.push(edge.to.nodeId);
       }
     }
-    return "completed";
+    return { status: "completed", executedNodeIds };
   }
 
   private collectLoopEndInputs(
     block: LoopBlock,
     aggregated: Map<string, unknown[]>,
+    executedNodeIds?: ReadonlySet<string>,
   ): void {
     for (const edge of this.inEdges.get(block.endNode.id) ?? []) {
       if (!block.bodyNodeIds.has(edge.from.nodeId)) continue;
+      if (executedNodeIds && !executedNodeIds.has(edge.from.nodeId)) continue;
       const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
       if (toPort?.kind !== "data") continue;
       const value = this.portValues.get(`${edge.from.nodeId}.${edge.from.portId}`);
@@ -947,7 +957,12 @@ interface LoopBlock {
   bodyStartNodeIds: string[];
 }
 
-type LoopBodyStatus = "completed" | "break" | "failed";
+type LoopBodyStatus = "completed" | "break" | "continue" | "failed";
+
+interface LoopBodyResult {
+  status: LoopBodyStatus;
+  executedNodeIds: Set<string>;
+}
 
 function loopSpecFor(type: string): { endType: string } | undefined {
   switch (type) {

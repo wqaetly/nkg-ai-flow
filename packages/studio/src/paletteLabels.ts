@@ -77,6 +77,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "跳出循环",
         description: "在循环体内提前结束 foreach / for / loop 块。",
       },
+      loop_continue: {
+        title: "继续下一轮",
+        description: "跳过当前迭代剩余步骤并继续下一轮循环。",
+      },
       loop_end: {
         title: "Loop 结束",
         description: "While / Until 循环块出口，输出最终状态或上限分支。",
