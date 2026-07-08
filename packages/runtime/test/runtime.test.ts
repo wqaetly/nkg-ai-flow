@@ -4769,6 +4769,55 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("sorted=high,middle");
   });
 
+  it("slices array items with slice_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "slice_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: ["a", "b", "c", "d", "e"] },
+    });
+    const slice = flow.node("slice_items", {
+      id: "slice",
+      position: { x: 260, y: 0 },
+      config: {
+        start: 1,
+        count: 3,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${index}:${item}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "slice=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), slice.in("in"));
+    flow.connect(input.out("output"), slice.in("items"));
+    flow.connect(slice.out("out"), map.in("in"));
+    flow.connect(slice.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "slice_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("slice=0:b,1:c,2:d");
+  });
+
   it("reduces array items with reduce_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

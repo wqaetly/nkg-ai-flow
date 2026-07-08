@@ -580,6 +580,14 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         capacity: "容量",
         remainingMs: "剩余毫秒",
       },
+      slice_items: {
+        items: "截取项",
+        count: "数量",
+        total: "总数",
+        start: "起点",
+        end: "终点",
+        hasMore: "还有更多",
+      },
       sort_items: {
         items: "排序项",
         keys: "排序键",

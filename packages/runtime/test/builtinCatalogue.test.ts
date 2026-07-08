@@ -51,6 +51,7 @@ const BUILTIN_TYPES = [
   "schedule_window",
   "schema_guard",
   "semaphore",
+  "slice_items",
   "sort_items",
   "subflow",
   "switch_case",

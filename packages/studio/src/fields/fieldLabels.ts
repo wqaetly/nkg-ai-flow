@@ -381,6 +381,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         ttlMs: "TTL（毫秒）",
         mode: "模式",
       },
+      slice_items: {
+        start: "起始索引",
+        end: "结束索引",
+        count: "截取数量",
+        fromEnd: "从末尾截取",
+      },
       sort_items: {
         path: "排序字段路径",
         direction: "排序方向",
