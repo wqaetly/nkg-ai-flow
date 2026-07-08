@@ -203,6 +203,9 @@ export const subflowTemplateNode = defineNode({
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
+    { id: "childStartedAt", direction: "output", kind: "data", label: "Child Started At", schema: { type: "string" } },
+    { id: "childFinishedAt", direction: "output", kind: "data", label: "Child Finished At", schema: { type: "string" } },
+    { id: "childDurationMs", direction: "output", kind: "data", label: "Child Duration Ms", schema: { type: "number" } },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
@@ -246,6 +249,7 @@ export const subflowTemplateNode = defineNode({
           templateId,
           flowId: "",
           flowVersion: "",
+          ...childRunTiming(null),
           subflowDepth,
           childDepth: subflowDepth,
         },
@@ -358,6 +362,7 @@ export const subflowTemplateNode = defineNode({
       templateId,
       flowId: template.flowId,
       flowVersion: result.runRecord.flowVersion,
+      ...childRunTiming(result.runRecord),
       subflowDepth,
       childDepth,
       localScope,
@@ -535,6 +540,7 @@ function contractFailure(args: {
         templateId: args.templateId,
         flowId: args.flowId,
         flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
+        ...childRunTiming(args.runRecord),
         subflowDepth: args.subflowDepth,
         childDepth: args.childDepth,
         contractStage: args.stage,
@@ -551,6 +557,22 @@ function contractFailure(args: {
     `subflow_template ${args.stage} contract failed: ${firstIssue}`,
     args.ctxNodeId,
   );
+}
+
+function childRunTiming(runRecord: SubflowInvokeResult["runRecord"] | null): {
+  childStartedAt: string | null;
+  childFinishedAt: string | null;
+  childDurationMs: number | null;
+} {
+  const childStartedAt = typeof runRecord?.startedAt === "string" ? runRecord.startedAt : null;
+  const childFinishedAt = typeof runRecord?.finishedAt === "string" ? runRecord.finishedAt : null;
+  const startedMs = childStartedAt === null ? NaN : Date.parse(childStartedAt);
+  const finishedMs = childFinishedAt === null ? NaN : Date.parse(childFinishedAt);
+  const childDurationMs =
+    Number.isFinite(startedMs) && Number.isFinite(finishedMs)
+      ? Math.max(0, finishedMs - startedMs)
+      : null;
+  return { childStartedAt, childFinishedAt, childDurationMs };
 }
 
 function readLocalVariables(value: unknown, label: string): VariableEntry[] | Error {

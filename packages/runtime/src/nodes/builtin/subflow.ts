@@ -180,6 +180,9 @@ export const subflowNode = defineNode({
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
+    { id: "childStartedAt", direction: "output", kind: "data", label: "Child Started At", schema: { type: "string" } },
+    { id: "childFinishedAt", direction: "output", kind: "data", label: "Child Finished At", schema: { type: "string" } },
+    { id: "childDurationMs", direction: "output", kind: "data", label: "Child Duration Ms", schema: { type: "number" } },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
@@ -302,6 +305,7 @@ export const subflowNode = defineNode({
       runId: result.runRecord.runId,
       status,
       runRecord: result.runRecord,
+      ...childRunTiming(result.runRecord),
       subflowDepth,
       childDepth,
       localScope,
@@ -437,6 +441,7 @@ function contractFailure(args: {
         runId: args.runRecord?.runId ?? null,
         status: "contract_failed",
         runRecord: args.runRecord,
+        ...childRunTiming(args.runRecord),
         contractStage: args.stage,
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,
@@ -458,6 +463,22 @@ function contractFailure(args: {
       contractIssueCount: args.issues.length,
     },
   );
+}
+
+function childRunTiming(runRecord: SubflowInvokeResult["runRecord"] | null): {
+  childStartedAt: string | null;
+  childFinishedAt: string | null;
+  childDurationMs: number | null;
+} {
+  const childStartedAt = typeof runRecord?.startedAt === "string" ? runRecord.startedAt : null;
+  const childFinishedAt = typeof runRecord?.finishedAt === "string" ? runRecord.finishedAt : null;
+  const startedMs = childStartedAt === null ? NaN : Date.parse(childStartedAt);
+  const finishedMs = childFinishedAt === null ? NaN : Date.parse(childFinishedAt);
+  const childDurationMs =
+    Number.isFinite(startedMs) && Number.isFinite(finishedMs)
+      ? Math.max(0, finishedMs - startedMs)
+      : null;
+  return { childStartedAt, childFinishedAt, childDurationMs };
 }
 
 function readLocalVariables(value: unknown): VariableEntry[] | Error {

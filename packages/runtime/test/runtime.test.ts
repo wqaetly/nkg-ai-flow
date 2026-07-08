@@ -5757,11 +5757,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("parent:child:Ada");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_child") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     const childRuns = await rt.runStore.listByFlow("child_echo");
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.status).toBe("succeeded");
     expect(childRuns[0]?.output).toBe("child:Ada");
     expect(childRuns[0]?.subflowDepth).toBe(1);
+    expect(callOutput).toMatchObject({
+      childStartedAt: expect.any(String),
+      childFinishedAt: expect.any(String),
+      childDurationMs: expect.any(Number),
+    });
   });
 
   it("invokes a reusable child flow with subflow_template defaults", async () => {
@@ -5825,7 +5836,13 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.flowVersion).toBe("1.0.0");
     expect(childRuns[0]?.subflowDepth).toBe(1);
-    expect(callOutput).toMatchObject({ subflowDepth: 0, childDepth: 1 });
+    expect(callOutput).toMatchObject({
+      childStartedAt: expect.any(String),
+      childFinishedAt: expect.any(String),
+      childDurationMs: expect.any(Number),
+      subflowDepth: 0,
+      childDepth: 1,
+    });
   });
 
   it("routes subflow_template to missing when the template id is absent", async () => {
@@ -5871,7 +5888,14 @@ describe("runtime / hello-flow end-to-end", () => {
         | { payload?: { output?: Record<string, unknown> } }
         | undefined
     )?.payload?.output;
-    expect(callOutput).toMatchObject({ status: "missing", subflowDepth: 0, childDepth: 0 });
+    expect(callOutput).toMatchObject({
+      status: "missing",
+      childStartedAt: null,
+      childFinishedAt: null,
+      childDurationMs: null,
+      subflowDepth: 0,
+      childDepth: 0,
+    });
     expect(await rt.runStore.listByFlow("template_child_echo")).toEqual([]);
   });
 
@@ -5985,6 +6009,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(callOutput).toMatchObject({
       status: "contract_failed",
       contractStage: "input",
+      childStartedAt: null,
+      childFinishedAt: null,
+      childDurationMs: null,
       subflowDepth: 0,
       childDepth: 1,
     });
@@ -6060,6 +6087,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(callOutput).toMatchObject({
       status: "contract_failed",
       contractStage: "output",
+      childStartedAt: expect.any(String),
+      childFinishedAt: expect.any(String),
+      childDurationMs: expect.any(Number),
       subflowDepth: 0,
       childDepth: 1,
     });
