@@ -8964,6 +8964,122 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("error=node.http.missing_url");
   });
 
+  it("routes foreach body errors into compensation and rollback branches", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({
+      id: "foreach_error_compensation_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const reserveInventory = flow.node("compensation", {
+      id: "reserve_inventory",
+      position: { x: 100, y: 0 },
+      config: {
+        name: "LOOP_COMPENSATIONS",
+        mode: "register",
+        action: "release_inventory",
+        payload: { sku: "book", quantity: 1 },
+      },
+    });
+    const chargePayment = flow.node("compensation", {
+      id: "charge_payment",
+      position: { x: 200, y: 0 },
+      config: {
+        name: "LOOP_COMPENSATIONS",
+        mode: "register",
+        action: "refund_payment",
+        payload: { paymentId: "pay_1" },
+      },
+    });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 300, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 400, y: 0 },
+      config: { onError: "route" },
+    });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 500, y: 0 },
+      config: {},
+    });
+    const loopEnd = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 600, y: 0 },
+    });
+    const drain = flow.node("compensation", {
+      id: "drain",
+      position: { x: 700, y: 0 },
+      config: {
+        name: "LOOP_COMPENSATIONS",
+        mode: "drain",
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 800, y: 0 },
+      config: { mode: "plan" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 900, y: 0 },
+      config: { template: "rollback=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 1000, y: 0 } });
+
+    flow.connect(start.out("out"), reserveInventory.in("in"));
+    flow.connect(reserveInventory.out("out"), chargePayment.in("in"));
+    flow.connect(chargePayment.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), failing.in("in"));
+    flow.connect(failing.out("out"), loopEnd.in("body_done"));
+    flow.connect(loopEnd.out("error"), drain.in("in"));
+    flow.connect(drain.out("out"), rollback.in("in"));
+    flow.connect(drain.out("actions"), rollback.in("actions"));
+    flow.connect(rollback.out("rollback"), report.in("in"));
+    flow.connect(rollback.out("count"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_error_compensation_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("rollback=2");
+    expect(variables.get("LOOP_COMPENSATIONS")).toMatchObject({
+      actions: [],
+    });
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(events.some((event) => event.kind === "node_started" && event.nodeId === "rollback")).toBe(
+      true,
+    );
+    expect(
+      events.find(
+        (event) =>
+          event.kind === "node_progress" &&
+          event.nodeId === "begin" &&
+          (event.payload as { phase?: string }).phase === "finished",
+      )?.payload,
+    ).toMatchObject({
+      type: "loop_iteration",
+      iteration: 0,
+      status: "error",
+    });
+  });
+
   it("terminates a foreach block on body errors by default", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
