@@ -237,6 +237,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "阈值汇聚",
         description: "当到达值数量达到阈值后继续流程。",
       },
+      race: {
+        title: "竞速汇聚",
+        description: "任一分支率先到达后继续，并输出第一个可用值。",
+      },
       rate_limit: {
         title: "限流",
         description: "基于持久化滑动窗口配额路由到允许或限流分支。",

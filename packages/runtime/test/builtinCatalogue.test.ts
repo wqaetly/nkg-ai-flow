@@ -53,6 +53,7 @@ const BUILTIN_TYPES = [
   "policy_gate",
   "queue",
   "quorum",
+  "race",
   "rate_limit",
   "reduce_items",
   "retry_policy",

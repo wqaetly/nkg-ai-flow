@@ -568,7 +568,11 @@ export class ExecutionEngine {
       }
       const valueKey = `${edge.from.nodeId}.${edge.from.portId}`;
       const hasValue = this.portValues.has(valueKey);
-      if (node.type === "quorum" && toPort?.kind === "data" && !hasValue) {
+      if (
+        (node.type === "quorum" || node.type === "race") &&
+        toPort?.kind === "data" &&
+        !hasValue
+      ) {
         continue;
       }
       const value = this.portValues.get(valueKey);
@@ -981,6 +985,7 @@ function requiredInboundCount(
   inboundCount: number,
 ): number {
   if (node?.type === "merge" && inboundCount > 0) return 1;
+  if (node?.type === "race" && inboundCount > 0) return 1;
   if (node?.type === "quorum" && inboundCount > 0) {
     const threshold = Math.max(1, Math.trunc(Number(node.config?.threshold ?? 2)));
     return Math.min(threshold, inboundCount);

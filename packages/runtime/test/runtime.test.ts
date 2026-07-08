@@ -4481,6 +4481,83 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("remaining:1");
   });
 
+  it("races the first reachable branch without waiting for unreachable siblings", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "race_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const fast = flow.node("transform", {
+      id: "fast",
+      position: { x: 140, y: 40 },
+      config: { value: "fast" },
+    });
+    const gate = flow.node("condition", {
+      id: "gate",
+      position: { x: 140, y: 200 },
+      config: { expression: "input.runSlow" },
+    });
+    const slow = flow.node("transform", {
+      id: "slow",
+      position: { x: 300, y: 200 },
+      config: { value: "slow" },
+    });
+    const race = flow.node("race", { id: "race", position: { x: 460, y: 120 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 120 },
+      config: { template: "winner=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 780, y: 120 } });
+
+    flow.connect(start.out("out"), fast.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("true"), slow.in("in"));
+    flow.connect(fast.out("out"), race.in("in"));
+    flow.connect(slow.out("out"), race.in("in"));
+    flow.connect(fast.out("output"), race.in("values"));
+    flow.connect(slow.out("output"), race.in("values"));
+    flow.connect(race.out("winner"), report.in("in"));
+    flow.connect(race.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "race_e2e",
+      input: { runSlow: false },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("winner=fast");
+  });
+
+  it("routes race to empty when no value has arrived", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "race_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const race = flow.node("race", { id: "race", position: { x: 160, y: 0 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 320, y: 0 },
+      config: { template: "status=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 480, y: 0 } });
+
+    flow.connect(start.out("out"), race.in("in"));
+    flow.connect(race.out("empty"), report.in("in"));
+    flow.connect(race.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "race_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("status=empty");
+  });
+
   it("fans out through parallel branches and rejoins selected branches", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "parallel_join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
