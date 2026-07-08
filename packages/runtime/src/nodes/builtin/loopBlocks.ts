@@ -59,6 +59,12 @@ const continueOut: PortDefinition = {
   label: "继续下一轮",
 };
 
+const loopControlConfig = z
+  .object({
+    reason: z.string().default("").describe("Optional break/continue reason for trace and downstream data."),
+  })
+  .passthrough();
+
 const foreachBeginConfig = z
   .object({
     mode: z.enum(["sequential", "parallel"]).default("sequential"),
@@ -413,12 +419,27 @@ export const loopBreakNode = defineNode({
   title: "Loop Break",
   description: "在循环体内提前结束 foreach / for / loop 块。",
   kind: "pseudo",
-  ports: [controlIn, breakOut],
+  config: loopControlConfig,
+  fieldMeta: {
+    reason: {
+      label: "Reason",
+      control: "input",
+      placeholder: "stop_when_found",
+    },
+  },
+  ports: [
+    controlIn,
+    { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    breakOut,
+    { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+  ],
   validateInput: false,
-  run() {
+  run({ input, config }) {
+    const reason = readLoopControlReason(input.reason, config.reason);
     return {
       kind: "success",
-      outputs: { break: null },
+      outputs: { break: null, reason, status: "break" },
     };
   },
 });
@@ -429,12 +450,27 @@ export const loopContinueNode = defineNode({
   title: "Loop Continue",
   description: "在循环体内跳过当前迭代剩余步骤，继续下一轮。",
   kind: "pseudo",
-  ports: [controlIn, continueOut],
+  config: loopControlConfig,
+  fieldMeta: {
+    reason: {
+      label: "Reason",
+      control: "input",
+      placeholder: "skip_current_item",
+    },
+  },
+  ports: [
+    controlIn,
+    { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    continueOut,
+    { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+  ],
   validateInput: false,
-  run() {
+  run({ input, config }) {
+    const reason = readLoopControlReason(input.reason, config.reason);
     return {
       kind: "success",
-      outputs: { continue: null },
+      outputs: { continue: null, reason, status: "continue" },
     };
   },
 });
@@ -452,6 +488,11 @@ function readLoopStatus(value: unknown, fallback: string): string {
 function readLoopIterationCount(value: unknown, fallback: number): number {
   const parsed = Math.trunc(Number(value ?? fallback));
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function readLoopControlReason(inputReason: unknown, configReason: unknown): string {
+  const value = inputReason ?? configReason ?? "";
+  return typeof value === "string" ? value : String(value);
 }
 
 function forRange(start: number, end: number, step: number): number[] {

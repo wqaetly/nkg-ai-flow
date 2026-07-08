@@ -594,10 +594,16 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         iteration: "轮次",
       },
       loop_break: {
+        in: "输入",
         break: "跳出循环",
+        reason: "原因",
+        status: "状态",
       },
       loop_continue: {
+        in: "输入",
         continue: "继续下一轮",
+        reason: "原因",
+        status: "状态",
       },
       loop_end: {
         body_done: "循环体完成",

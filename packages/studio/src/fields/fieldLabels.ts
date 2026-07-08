@@ -375,6 +375,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         onError: "错误策略",
         timeoutMs: "超时时间（毫秒）",
       },
+      loop_break: {
+        reason: "原因",
+      },
+      loop_continue: {
+        reason: "原因",
+      },
       loop_end: {
         condition: "继续条件",
       },

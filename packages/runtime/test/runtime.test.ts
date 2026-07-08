@@ -11500,6 +11500,7 @@ describe("runtime / hello-flow end-to-end", () => {
     const breaker = flow.node("loop_break", {
       id: "break",
       position: { x: 500, y: -80 },
+      config: { reason: "found_beta" },
     });
     const end = flow.node("foreach_end", {
       id: "loop_end",
@@ -11537,9 +11538,15 @@ describe("runtime / hello-flow end-to-end", () => {
         | { payload?: { output?: Record<string, unknown> } }
         | undefined
     )?.payload?.output;
+    const breakOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "break") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=beta");
+    expect(breakOutput).toMatchObject({ status: "break", reason: "found_beta" });
     expect(loopOutput).toMatchObject({ status: "break", iterationCount: 2 });
   });
 
@@ -11569,6 +11576,7 @@ describe("runtime / hello-flow end-to-end", () => {
     const continuer = flow.node("loop_continue", {
       id: "continue",
       position: { x: 400, y: -80 },
+      config: { reason: "skip_beta" },
     });
     const emit = flow.node("transform", {
       id: "emit",
@@ -11611,9 +11619,15 @@ describe("runtime / hello-flow end-to-end", () => {
         | { payload?: { output?: Record<string, unknown> } }
         | undefined
     )?.payload?.output;
+    const continueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "continue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=gamma");
+    expect(continueOutput).toMatchObject({ status: "continue", reason: "skip_beta" });
     expect(loopOutput).toMatchObject({ status: "done", iterationCount: 3 });
   });
 
