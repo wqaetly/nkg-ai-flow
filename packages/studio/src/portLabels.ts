@@ -811,6 +811,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         contractIssues: "契约问题",
         contractIssueCount: "契约问题数量",
         firstContractIssue: "首个契约问题",
+        localVariableCount: "局部变量数量",
+        localScope: "局部变量作用域",
       },
       switch_case: {
         in: "输入",

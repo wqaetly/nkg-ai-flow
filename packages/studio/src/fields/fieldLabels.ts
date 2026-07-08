@@ -541,6 +541,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         outputSchema: "输出契约 Schema",
         contractMode: "契约失败模式",
         maxDepth: "最大子流程深度",
+        localScope: "启用局部变量",
+        localVariables: "局部变量",
         failOnError: "失败时中断",
       },
       switch_case: {

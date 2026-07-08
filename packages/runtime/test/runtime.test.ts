@@ -5095,6 +5095,78 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.status).toBe("succeeded");
   });
 
+  it("keeps subflow_template local variables and state writes isolated", async () => {
+    const variables = new InMemoryVariableStore([
+      { name: "TENANT", value: "global" },
+    ]);
+    const rt = newRuntime({ variables });
+    const child = defineFlow({ id: "template_child_local_state", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const getTenant = child.node("state_get", {
+      id: "get_tenant",
+      position: { x: 120, y: 0 },
+      config: { name: "TENANT" },
+    });
+    const setState = child.node("state_set", {
+      id: "set_tmp",
+      position: { x: 260, y: 0 },
+      config: { name: "TEMPLATE_CHILD_TMP", value: "local-write" },
+    });
+    const childReport = child.node("transform", {
+      id: "child_report",
+      position: { x: 400, y: 0 },
+      config: { template: "tenant=${input}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 540, y: 0 } });
+    child.connect(childStart.out("out"), getTenant.in("in"));
+    child.connect(getTenant.out("out"), setState.in("in"));
+    child.connect(setState.out("out"), childReport.in("in"));
+    child.connect(getTenant.out("value"), childReport.in("input"));
+    child.connect(childReport.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_template_local_scope", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "local_child",
+        inputMode: "template",
+        templates: {
+          local_child: {
+            flowId: "template_child_local_state",
+            flowVersion: "1.0.0",
+            input: null,
+            localVariables: { TENANT: "template" },
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_local_scope",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:tenant=template");
+    expect(variables.get("TENANT")).toBe("global");
+    expect(variables.has("TEMPLATE_CHILD_TMP")).toBe(false);
+  });
+
   it("blocks subflow invocation when maxDepth is reached", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_depth_limit", version: "1.0.0", registry: rt.nodeTypeRegistry });

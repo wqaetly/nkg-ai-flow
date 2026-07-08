@@ -9,7 +9,14 @@
 import { z } from "zod";
 import { createRuntimeError } from "@ai-native-flow/flow-ir";
 import { defineNode } from "@ai-native-flow/node-sdk";
-import type { VariableValue } from "@ai-native-flow/variable-store";
+import {
+  InMemoryVariableStore,
+  type MutableVariableStore,
+  type VariableEntry,
+  type VariableMetadata,
+  type VariableStore,
+  type VariableValue,
+} from "@ai-native-flow/variable-store";
 import { controlIn, errorOut } from "./_helpers.js";
 import { readSchema, validateValue, type SchemaIssue } from "./schemaGuard.js";
 
@@ -32,6 +39,8 @@ type SubflowInvokeFlow = (args: {
   input: unknown;
   traceId?: string;
   subflowDepth?: number;
+  variables?: unknown;
+  secrets?: unknown;
 }) => Promise<SubflowInvokeResult>;
 
 interface TemplateDefinition {
@@ -39,6 +48,7 @@ interface TemplateDefinition {
   flowId: string;
   flowVersion: string;
   input: VariableValue | null;
+  localVariables: VariableEntry[];
 }
 
 const subflowTemplateConfig = z
@@ -74,6 +84,14 @@ const subflowTemplateConfig = z
       .min(0)
       .default(10)
       .describe("Maximum allowed nested subflow depth."),
+    localScope: z
+      .boolean()
+      .default(false)
+      .describe("When true, child variable writes are isolated to the child run."),
+    localVariables: z
+      .unknown()
+      .optional()
+      .describe("Optional JSON object used as child-local variable overrides."),
     failOnError: z
       .boolean()
       .default(true)
@@ -143,10 +161,21 @@ export const subflowTemplateNode = defineNode({
       control: "number",
       order: 8,
     },
+    localScope: {
+      label: "Local Scope",
+      control: "switch",
+      order: 9,
+    },
+    localVariables: {
+      label: "Local Variables",
+      control: "textarea",
+      order: 10,
+      placeholder: '{ "TENANT": "acme" }',
+    },
     failOnError: {
       label: "Fail On Error",
       control: "switch",
-      order: 9,
+      order: 11,
     },
   },
   ports: [
@@ -174,6 +203,8 @@ export const subflowTemplateNode = defineNode({
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
+    { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
+    { id: "localScope", direction: "output", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
     errorOut,
   ],
   validateInput: false,
@@ -234,6 +265,22 @@ export const subflowTemplateNode = defineNode({
       );
     }
 
+    const configLocalVariables = readLocalVariables(config.localVariables, "subflow_template localVariables");
+    if (configLocalVariables instanceof Error) {
+      return error(
+        "node.subflow_template.invalid_local_variables",
+        configLocalVariables.message,
+        ctx.nodeId,
+      );
+    }
+    const localVariables = [...template.localVariables, ...configLocalVariables];
+    const hasLocalVariables = localVariables.length > 0;
+    const localScope = config.localScope === true || hasLocalVariables;
+    const parentVariables = (ctx as unknown as { variables: VariableStore }).variables;
+    const childVariables = localScope
+      ? new LocalVariableOverlay(parentVariables, localVariables)
+      : parentVariables;
+
     const payload = childInput(input, config, template);
     const inputContract = validateContract(config.inputSchema, payload, "input");
     if (inputContract instanceof Error) {
@@ -254,6 +301,8 @@ export const subflowTemplateNode = defineNode({
         templateId,
         flowId: template.flowId,
         flowVersion: template.flowVersion,
+        localScope,
+        localVariableCount: localVariables.length,
       });
     }
 
@@ -265,6 +314,8 @@ export const subflowTemplateNode = defineNode({
         input: payload,
         traceId: `${ctx.runId}:${ctx.nodeId}:${templateId}`,
         subflowDepth: subflowDepth + 1,
+        variables: childVariables,
+        secrets: childVariables,
       });
     } catch (cause) {
       return error(
@@ -288,6 +339,8 @@ export const subflowTemplateNode = defineNode({
       templateId,
       flowId: template.flowId,
       flowVersion: result.runRecord.flowVersion,
+      localScope,
+      localVariableCount: localVariables.length,
     };
 
     if (status === "succeeded" || config.failOnError === false) {
@@ -311,6 +364,8 @@ export const subflowTemplateNode = defineNode({
             templateId,
             flowId: template.flowId,
             flowVersion: result.runRecord.flowVersion,
+            localScope,
+            localVariableCount: localVariables.length,
           });
         }
       }
@@ -361,11 +416,17 @@ function readTemplates(value: unknown): Map<string, TemplateDefinition> | Error 
     if (input === undefined) {
       return new Error(`subflow_template templates.${id}.input must be JSON-compatible.`);
     }
+    const localVariables = readLocalVariables(
+      record.localVariables,
+      `subflow_template templates.${id}.localVariables`,
+    );
+    if (localVariables instanceof Error) return localVariables;
     templates.set(id, {
       id,
       flowId,
       flowVersion: typeof record.flowVersion === "string" ? record.flowVersion.trim() : "",
       input,
+      localVariables,
     });
   }
   return templates;
@@ -427,6 +488,8 @@ function contractFailure(args: {
   templateId: string;
   flowId: string;
   flowVersion: string;
+  localScope: boolean;
+  localVariableCount: number;
 }): {
   kind: "success";
   outputs: Record<string, unknown>;
@@ -451,6 +514,8 @@ function contractFailure(args: {
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,
         firstContractIssue: firstIssue,
+        localScope: args.localScope,
+        localVariableCount: args.localVariableCount,
       },
     };
   }
@@ -459,6 +524,50 @@ function contractFailure(args: {
     `subflow_template ${args.stage} contract failed: ${firstIssue}`,
     args.ctxNodeId,
   );
+}
+
+function readLocalVariables(value: unknown, label: string): VariableEntry[] | Error {
+  if (value === undefined || value === null || value === "") return [];
+  const raw = typeof value === "string" ? parseLocalVariables(value, label) : value;
+  if (raw instanceof Error) return raw;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return new Error(`${label} must be a JSON object.`);
+  }
+  const entries: VariableEntry[] = [];
+  for (const [name, item] of Object.entries(raw as Record<string, unknown>)) {
+    const trimmed = name.trim();
+    if (trimmed === "") {
+      return new Error(`${label} cannot contain an empty name.`);
+    }
+    const value = toJsonValue(item);
+    if (value === undefined) {
+      return new Error(`${label}.${trimmed} must be JSON-compatible.`);
+    }
+    entries.push({
+      name: trimmed,
+      value,
+      metadata: {
+        source: "runtime",
+        scope: { flowId: "subflow_template_local" },
+        description: "Subflow template-local variable",
+      },
+    });
+  }
+  return entries;
+}
+
+function parseLocalVariables(value: string, label: string): unknown | Error {
+  const trimmed = value.trim();
+  if (trimmed === "") return {};
+  try {
+    return JSON.parse(trimmed);
+  } catch (cause) {
+    return new Error(
+      `${label} must be valid JSON: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+  }
 }
 
 function toJsonValue(value: unknown): VariableValue | undefined {
@@ -486,6 +595,85 @@ function toJsonValue(value: unknown): VariableValue | undefined {
     return out;
   }
   return undefined;
+}
+
+class LocalVariableOverlay implements MutableVariableStore {
+  private readonly local: InMemoryVariableStore;
+
+  constructor(
+    parent: VariableStore,
+    initial: readonly VariableEntry[],
+  ) {
+    this.parent = parent;
+    this.local = new InMemoryVariableStore(initial);
+  }
+
+  private readonly parent: VariableStore;
+
+  get(name: string): VariableValue | undefined {
+    return this.local.has(name) ? this.local.get(name) : this.parent.get(name);
+  }
+
+  getRequired(name: string): VariableValue {
+    const value = this.get(name);
+    if (value === undefined) throw new Error(`variable ${name} is not defined`);
+    return value;
+  }
+
+  getString(name: string): string | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value !== "string") throw new Error(`variable ${name} is not a string`);
+    return value;
+  }
+
+  getNumber(name: string): number | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    throw new Error(`variable ${name} is not a number`);
+  }
+
+  getBoolean(name: string): boolean | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const lower = value.toLowerCase();
+      if (lower === "true" || lower === "1") return true;
+      if (lower === "false" || lower === "0") return false;
+    }
+    throw new Error(`variable ${name} is not a boolean`);
+  }
+
+  has(name: string): boolean {
+    return this.local.has(name) || this.parent.has(name);
+  }
+
+  list(): readonly VariableEntry[] {
+    const seen = new Map<string, VariableEntry>();
+    for (const entry of this.local.list()) seen.set(entry.name, entry);
+    for (const entry of this.parent.list()) {
+      if (!seen.has(entry.name)) seen.set(entry.name, entry);
+    }
+    return [...seen.values()];
+  }
+
+  describe(name: string): VariableEntry | undefined {
+    return this.local.describe(name) ?? this.parent.describe(name);
+  }
+
+  set(name: string, value: VariableValue, metadata?: VariableMetadata): void {
+    this.local.set(name, value, metadata);
+  }
+
+  delete(name: string): boolean {
+    return this.local.delete(name);
+  }
 }
 
 function error(
