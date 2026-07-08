@@ -16501,6 +16501,123 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe('json={"a":{"c":3,"d":4},"b":2}');
   });
 
+  it("uses dynamic stringify_json path indent and sortKeys ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "stringify_json_dynamic_format_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { payload: { b: 2, a: 1 } } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "value.payload" },
+    });
+    const indent = flow.node("transform", {
+      id: "indent",
+      position: { x: 120, y: 240 },
+      config: { value: 2 },
+    });
+    const sortKeys = flow.node("transform", {
+      id: "sortKeys",
+      position: { x: 120, y: 360 },
+      config: { value: true },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 320, y: 0 },
+      config: { path: "value.missing", indent: 0, sortKeys: false },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "json=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), indent.in("in"));
+    flow.connect(start.out("out"), sortKeys.in("in"));
+    flow.connect(input.out("out"), stringify.in("in"));
+    flow.connect(input.out("output"), stringify.in("value"));
+    flow.connect(path.out("output"), stringify.in("path"));
+    flow.connect(indent.out("output"), stringify.in("indent"));
+    flow.connect(sortKeys.out("output"), stringify.in("sortKeys"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "stringify_json_dynamic_format_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('json={\n  "a": 1,\n  "b": 2\n}');
+  });
+
+  it("uses dynamic stringify_json bigintMode ahead of static config", async () => {
+    const emitBigIntNode = defineNode({
+      type: "emit_dynamic_bigint",
+      typeVersion: "1.0.0",
+      title: "Emit Dynamic BigInt",
+      ports: [
+        { id: "value", direction: "output", kind: "data", label: "Value" },
+      ],
+      validateInput: false,
+      run() {
+        return {
+          kind: "success",
+          outputs: { out: null, value: 1n },
+        };
+      },
+    });
+    const rt = newRuntime({ nodes: [emitBigIntNode] });
+    const flow = defineFlow({ id: "stringify_json_dynamic_bigint_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("emit_dynamic_bigint", { id: "input", position: { x: 120, y: 0 } });
+    const bigintMode = flow.node("transform", {
+      id: "bigintMode",
+      position: { x: 120, y: 120 },
+      config: { value: "string" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 300, y: 0 },
+      config: { bigintMode: "error" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "json=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), bigintMode.in("in"));
+    flow.connect(input.out("out"), stringify.in("in"));
+    flow.connect(input.out("value"), stringify.in("value"));
+    flow.connect(bigintMode.out("output"), stringify.in("bigintMode"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "stringify_json_dynamic_bigint_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('json="1"');
+  });
+
   it("routes stringify_json failures without failing the run", async () => {
     const emitBigIntNode = defineNode({
       type: "emit_bigint",

@@ -72,6 +72,10 @@ export const stringifyJsonNode = defineNode({
   ports: [
     controlIn,
     { id: "value", direction: "input", kind: "data", label: "Value" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "indent", direction: "input", kind: "data", label: "Indent", schema: { type: "number" } },
+    { id: "sortKeys", direction: "input", kind: "data", label: "Sort keys", schema: { type: "boolean" } },
+    { id: "bigintMode", direction: "input", kind: "data", label: "BigInt mode", schema: { type: "string" } },
     { id: "stringified", direction: "output", kind: "control", label: "Stringified" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
     {
@@ -82,6 +86,10 @@ export const stringifyJsonNode = defineNode({
       schema: { type: "string" },
     },
     { id: "value", direction: "output", kind: "data", label: "Value" },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "indent", direction: "output", kind: "data", label: "Indent", schema: { type: "number" } },
+    { id: "sortKeys", direction: "output", kind: "data", label: "Sort keys", schema: { type: "boolean" } },
+    { id: "bigintMode", direction: "output", kind: "data", label: "BigInt mode", schema: { type: "string" } },
     {
       id: "status",
       direction: "output",
@@ -106,10 +114,12 @@ export const stringifyJsonNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const value = readValue(input, String(config.path ?? ""));
-    const indent = Math.max(0, Math.min(10, Math.trunc(Number(config.indent ?? 0))));
-    const sortKeys = config.sortKeys === true;
-    const bigintMode = readBigIntMode(config.bigintMode);
+    const path = String(input.path ?? config.path ?? "").trim();
+    const value = readValue(input, path);
+    const indent = readIndent(input.indent) ?? readIndent(config.indent) ?? 0;
+    const sortKeys = readBoolean(input.sortKeys) ?? readBoolean(config.sortKeys) ?? false;
+    const bigintMode = readBigIntMode(input.bigintMode ?? config.bigintMode);
+    const metadata = { path, indent, sortKeys, bigintMode };
 
     try {
       const normalized = sortKeys ? sortJsonKeys(value) : value;
@@ -121,11 +131,11 @@ export const stringifyJsonNode = defineNode({
         sortKeys,
       });
 
-      return success("stringified", value, text, "stringified");
+      return success("stringified", value, text, "stringified", "", metadata);
     } catch (cause) {
       const errorMessage = cause instanceof Error ? cause.message : "Unable to stringify JSON.";
       ctx.log.debug("stringify_json failed", { errorMessage });
-      return success("failed", value, "", "failed", errorMessage);
+      return success("failed", value, "", "failed", errorMessage, metadata);
     }
   },
 });
@@ -134,6 +144,23 @@ function readValue(input: Record<string, unknown>, path: string): unknown {
   const trimmed = path.trim();
   if (trimmed !== "") return readPath(input, trimmed);
   return input.value ?? input.input ?? input.in ?? input.__runInput__ ?? null;
+}
+
+function readIndent(value: unknown): number | undefined {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return undefined;
+  return Math.max(0, Math.min(10, Math.trunc(numeric)));
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function readBigIntMode(value: unknown): BigIntMode {
@@ -187,7 +214,13 @@ function success(
   value: unknown,
   text: string,
   status: string,
-  errorMessage = "",
+  errorMessage: string,
+  metadata: {
+    path: string;
+    indent: number;
+    sortKeys: boolean;
+    bigintMode: BigIntMode;
+  },
 ) {
   return {
     kind: "success" as const,
@@ -196,6 +229,10 @@ function success(
       text,
       value,
       status,
+      path: metadata.path,
+      indent: metadata.indent,
+      sortKeys: metadata.sortKeys,
+      bigintMode: metadata.bigintMode,
       length: text.length,
       errorMessage,
     },
