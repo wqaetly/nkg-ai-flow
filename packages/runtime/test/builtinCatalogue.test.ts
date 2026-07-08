@@ -49,6 +49,7 @@ const BUILTIN_TYPES = [
   "metric",
   "mutex",
   "parallel",
+  "partial_success",
   "parse_json",
   "policy_gate",
   "queue",

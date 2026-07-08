@@ -49,6 +49,7 @@ export { mergeObjectNode } from "./mergeObject.js";
 export { metricNode } from "./metric.js";
 export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";
+export { partialSuccessNode } from "./partialSuccess.js";
 export { parseJsonNode } from "./parseJson.js";
 export { policyGateNode } from "./policyGate.js";
 export { queueNode } from "./queue.js";

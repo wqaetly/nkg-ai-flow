@@ -4558,6 +4558,103 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("status=empty");
   });
 
+  it("routes partial_success to partial when enough branches pass", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "partial_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const okA = flow.node("transform", {
+      id: "ok_a",
+      position: { x: 140, y: 20 },
+      config: { value: { status: "ok", label: "a" } },
+    });
+    const failed = flow.node("transform", {
+      id: "failed",
+      position: { x: 140, y: 120 },
+      config: { value: { status: "failed", error: "branch failed", label: "b" } },
+    });
+    const okC = flow.node("transform", {
+      id: "ok_c",
+      position: { x: 140, y: 220 },
+      config: { value: { status: "ready", label: "c" } },
+    });
+    const partial = flow.node("partial_success", {
+      id: "partial",
+      position: { x: 320, y: 120 },
+      config: { mode: "status", minSuccess: 2 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 120 },
+      config: { template: "partial=${input.successCount}/${input.total}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 120 } });
+
+    flow.connect(start.out("out"), okA.in("in"));
+    flow.connect(start.out("out"), failed.in("in"));
+    flow.connect(start.out("out"), okC.in("in"));
+    flow.connect(okA.out("output"), partial.in("results"));
+    flow.connect(failed.out("output"), partial.in("results"));
+    flow.connect(okC.out("output"), partial.in("results"));
+    flow.connect(partial.out("partial"), report.in("in"));
+    flow.connect(partial.out("summary"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "partial_success_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("partial=2/3");
+  });
+
+  it("routes partial_success to failed when too few branches pass", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "partial_success_failed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const ok = flow.node("transform", {
+      id: "ok",
+      position: { x: 140, y: 20 },
+      config: { value: { ok: true, label: "a" } },
+    });
+    const bad = flow.node("transform", {
+      id: "bad",
+      position: { x: 140, y: 140 },
+      config: { value: { ok: false, error: "bad", label: "b" } },
+    });
+    const partial = flow.node("partial_success", {
+      id: "partial",
+      position: { x: 320, y: 80 },
+      config: { mode: "ok", minSuccess: 2 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 80 },
+      config: { template: "failed=${input.successCount}/${input.total}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 80 } });
+
+    flow.connect(start.out("out"), ok.in("in"));
+    flow.connect(start.out("out"), bad.in("in"));
+    flow.connect(ok.out("output"), partial.in("results"));
+    flow.connect(bad.out("output"), partial.in("results"));
+    flow.connect(partial.out("failed"), report.in("in"));
+    flow.connect(partial.out("summary"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "partial_success_failed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed=1/2");
+  });
+
   it("fans out through parallel branches and rejoins selected branches", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "parallel_join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

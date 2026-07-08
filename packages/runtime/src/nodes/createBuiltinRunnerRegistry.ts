@@ -69,6 +69,7 @@ import {
   metricNode,
   mutexNode,
   parallelNode,
+  partialSuccessNode,
   parseJsonNode,
   policyGateNode,
   queueNode,
@@ -230,6 +231,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, metricNode);
   installNode(target, mutexNode);
   installNode(target, parallelNode);
+  installNode(target, partialSuccessNode);
   installNode(target, parseJsonNode);
   installNode(target, policyGateNode);
   installNode(target, queueNode);

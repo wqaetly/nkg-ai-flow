@@ -221,6 +221,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "并行分支",
         description: "把流程扇出到多个命名分支。",
       },
+      partial_success: {
+        title: "部分成功",
+        description: "统计多分支结果，并按全成功、部分成功或失败继续流程。",
+      },
       parse_json: {
         title: "解析 JSON",
         description: "把 JSON 文本解析成结构化数据，并把非法输入路由到失败分支。",

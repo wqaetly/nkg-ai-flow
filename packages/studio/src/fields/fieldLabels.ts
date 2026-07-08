@@ -357,6 +357,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       parallel: {
         branchCount: "分支数量",
       },
+      partial_success: {
+        mode: "成功判定模式",
+        minSuccess: "最少成功数",
+        statusPath: "状态字段路径",
+        successValues: "成功状态值",
+        errorPath: "错误字段路径",
+      },
       parse_json: {
         path: "读取路径",
         trim: "裁剪空白",
