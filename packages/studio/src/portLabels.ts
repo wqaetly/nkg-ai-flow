@@ -403,6 +403,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         in: "输入",
         deadlineAt: "截止时间",
         startedAt: "开始时间",
+        durationMs: "持续毫秒",
         on_time: "准时",
         overdue: "已超时",
         status: "状态",

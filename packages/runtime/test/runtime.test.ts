@@ -554,6 +554,82 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic deadline duration policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "deadline_dynamic_duration_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const startedAtValue = Date.now();
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const startedAt = flow.node("transform", {
+      id: "started_at",
+      position: { x: 140, y: 40 },
+      config: { value: startedAtValue },
+    });
+    const durationMs = flow.node("transform", {
+      id: "duration_ms",
+      position: { x: 140, y: 140 },
+      config: { value: 60_000 },
+    });
+    const graceMs = flow.node("transform", {
+      id: "grace_ms",
+      position: { x: 140, y: 240 },
+      config: { value: 250 },
+    });
+    const deadline = flow.node("deadline", {
+      id: "deadline",
+      position: { x: 360, y: 140 },
+      config: { deadlineAt: "", durationMs: 0, graceMs: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 140 },
+      config: { template: "deadline:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 720, y: 140 } });
+
+    flow.connect(start.out("out"), startedAt.in("in"));
+    flow.connect(start.out("out"), durationMs.in("in"));
+    flow.connect(start.out("out"), graceMs.in("in"));
+    flow.connect(start.out("out"), deadline.in("in"));
+    flow.connect(startedAt.out("output"), deadline.in("startedAt"));
+    flow.connect(durationMs.out("output"), deadline.in("durationMs"));
+    flow.connect(graceMs.out("output"), deadline.in("graceMs"));
+    flow.connect(deadline.out("on_time"), report.in("in"));
+    flow.connect(deadline.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "deadline_dynamic_duration_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("deadline:on_time");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadlineOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "deadline") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadlineOutput).toMatchObject({
+      status: "on_time",
+      deadlineAt: startedAtValue + 60_000,
+      effectiveDeadlineAt: startedAtValue + 60_250,
+      durationMs: 60_000,
+      graceMs: 250,
+      overdueByMs: 0,
+      onTimeValue: true,
+      overdueValue: false,
+      now: expect.any(Number),
+    });
+    expect(Number(deadlineOutput?.remainingMs)).toBeGreaterThan(0);
+  });
+
   it("routes deadline to overdue after the deadline", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "deadline_overdue_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

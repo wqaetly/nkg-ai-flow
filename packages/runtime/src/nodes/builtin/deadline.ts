@@ -52,6 +52,20 @@ export const deadlineNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "deadlineAt", direction: "input", kind: "data", label: "Deadline At" },
     { id: "startedAt", direction: "input", kind: "data", label: "Started At" },
+    {
+      id: "durationMs",
+      direction: "input",
+      kind: "data",
+      label: "Duration ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "graceMs",
+      direction: "input",
+      kind: "data",
+      label: "Grace ms",
+      schema: { type: "number" },
+    },
     { id: "on_time", direction: "output", kind: "control", label: "On time" },
     { id: "overdue", direction: "output", kind: "control", label: "Overdue" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
@@ -74,6 +88,13 @@ export const deadlineNode = defineNode({
       direction: "output",
       kind: "data",
       label: "Grace ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "durationMs",
+      direction: "output",
+      kind: "data",
+      label: "Duration ms",
       schema: { type: "number" },
     },
     {
@@ -115,11 +136,12 @@ export const deadlineNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const now = Date.now();
-    const graceMs = Math.max(0, Math.trunc(Number(config.graceMs ?? 0)));
+    const durationMs = readIntegerAtLeast(input.durationMs, 0) ?? readIntegerAtLeast(config.durationMs, 0) ?? 0;
+    const graceMs = readIntegerAtLeast(input.graceMs, 0) ?? readIntegerAtLeast(config.graceMs, 0) ?? 0;
     const deadlineAt =
       readTimestamp(input.deadlineAt) ??
       readTimestamp(config.deadlineAt) ??
-      relativeDeadline(input.startedAt, config.durationMs, now);
+      relativeDeadline(input.startedAt, durationMs, now);
 
     if (deadlineAt === undefined) {
       return error(
@@ -137,6 +159,7 @@ export const deadlineNode = defineNode({
 
     ctx.log.debug("deadline selected branch", {
       deadlineAt,
+      durationMs,
       graceMs,
       status,
       remainingMs,
@@ -151,6 +174,7 @@ export const deadlineNode = defineNode({
         deadlineAt,
         effectiveDeadlineAt: effectiveDeadline,
         graceMs,
+        durationMs,
         remainingMs,
         overdueByMs,
         onTimeValue: !overdue,
@@ -169,6 +193,13 @@ function relativeDeadline(
   const durationMs = Math.trunc(Number(durationMsValue ?? 0));
   if (!Number.isFinite(durationMs) || durationMs <= 0) return undefined;
   return (readTimestamp(startedAtValue) ?? now) + durationMs;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | undefined {
