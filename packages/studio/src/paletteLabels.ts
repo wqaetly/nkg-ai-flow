@@ -229,6 +229,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "信号量",
         description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",
       },
+      sort_items: {
+        title: "排序数组",
+        description: "按字段、方向和类型稳定排序数组，并可限制输出数量。",
+      },
       subflow: {
         title: "子流程",
         description: "调用另一个已注册 Flow，并根据子运行状态继续流程。",

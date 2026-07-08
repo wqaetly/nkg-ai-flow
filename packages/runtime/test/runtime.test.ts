@@ -4712,6 +4712,63 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("mapped=0:alpha,1:beta,2:gamma");
   });
 
+  it("sorts array items with sort_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "sort_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "low", priority: 1 },
+          { id: "high", priority: 3 },
+          { id: "middle", priority: 2 },
+        ],
+      },
+    });
+    const sort = flow.node("sort_items", {
+      id: "sort",
+      position: { x: 260, y: 0 },
+      config: {
+        path: "priority",
+        direction: "desc",
+        type: "number",
+        limit: 2,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${item.id}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "sorted=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), sort.in("in"));
+    flow.connect(input.out("output"), sort.in("items"));
+    flow.connect(sort.out("out"), map.in("in"));
+    flow.connect(sort.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "sort_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sorted=high,middle");
+  });
+
   it("reduces array items with reduce_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

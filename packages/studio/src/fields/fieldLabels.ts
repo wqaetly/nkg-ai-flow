@@ -381,6 +381,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         ttlMs: "TTL（毫秒）",
         mode: "模式",
       },
+      sort_items: {
+        path: "排序字段路径",
+        direction: "排序方向",
+        type: "排序类型",
+        nulls: "空值位置",
+        limit: "输出数量上限",
+      },
       subflow: {
         flowId: "流程 ID",
         flowVersion: "流程版本",

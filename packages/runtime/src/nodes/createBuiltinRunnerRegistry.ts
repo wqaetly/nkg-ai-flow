@@ -71,6 +71,7 @@ import {
   scheduleWindowNode,
   schemaGuardNode,
   semaphoreNode,
+  sortItemsNode,
   subflowNode,
   switchCaseNode,
   foreachBeginNode,
@@ -216,6 +217,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, scheduleWindowNode);
   installNode(target, schemaGuardNode);
   installNode(target, semaphoreNode);
+  installNode(target, sortItemsNode);
   installNode(target, subflowNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);

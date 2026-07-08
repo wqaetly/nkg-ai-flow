@@ -580,6 +580,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         capacity: "容量",
         remainingMs: "剩余毫秒",
       },
+      sort_items: {
+        items: "排序项",
+        keys: "排序键",
+        first: "第一项",
+        last: "最后一项",
+        count: "数量",
+      },
       subflow: {
         in: "输入",
         input: "子流程输入",

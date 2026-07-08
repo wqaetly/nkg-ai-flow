@@ -51,6 +51,7 @@ export { retryPolicyNode } from "./retryPolicy.js";
 export { scheduleWindowNode } from "./scheduleWindow.js";
 export { schemaGuardNode } from "./schemaGuard.js";
 export { semaphoreNode } from "./semaphore.js";
+export { sortItemsNode } from "./sortItems.js";
 export { subflowNode } from "./subflow.js";
 export { switchCaseNode } from "./switchCase.js";
 export { toolNode } from "./tool.js";
