@@ -83,12 +83,22 @@ export const mutexNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "owner", direction: "input", kind: "data", label: "Owner" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "acquired", direction: "output", kind: "control", label: "Acquired" },
     { id: "locked", direction: "output", kind: "control", label: "Locked" },
     { id: "released", direction: "output", kind: "control", label: "Released" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "owner", direction: "output", kind: "data", label: "Owner" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
+      schema: { type: "number" },
+    },
     {
       id: "remainingMs",
       direction: "output",
@@ -125,8 +135,8 @@ export const mutexNode = defineNode({
     }
 
     const now = Date.now();
-    const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 300000)));
-    const mode = config.mode ?? "acquire";
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 300000;
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "acquire";
     const owner = readOwner(input.owner, config.owner, `${ctx.flowId}:${ctx.runId}`);
     const previous = normalizeExpired(readMutexState(store.get(name), now), now);
     const decision = applyMode(previous, { mode, owner, ttlMs, now });
@@ -148,6 +158,8 @@ export const mutexNode = defineNode({
         state: decision.state,
         name,
         owner: decision.state.owner,
+        mode,
+        ttlMs,
         remainingMs,
         expiresAt: decision.state.expiresAt,
       },
@@ -245,6 +257,24 @@ function readOwner(inputOwner: unknown, configOwner: unknown, fallback: string):
   if (fromInput !== "") return fromInput;
   const fromConfig = typeof configOwner === "string" ? configOwner.trim() : "";
   return fromConfig !== "" ? fromConfig : fallback;
+}
+
+function readMode(value: unknown): MutexMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "acquire" ||
+    normalized === "release" ||
+    normalized === "refresh" ||
+    normalized === "force_release"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | null {

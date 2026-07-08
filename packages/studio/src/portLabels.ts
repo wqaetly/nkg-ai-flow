@@ -693,6 +693,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         locked: "已锁定",
         released: "已释放",
         state: "锁状态",
+        mode: "模式",
+        ttlMs: "TTL 毫秒",
         remainingMs: "剩余毫秒",
         expiresAt: "过期时间",
       },

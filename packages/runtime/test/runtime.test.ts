@@ -3891,6 +3891,80 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("routes mutex with dynamic policy inputs to acquired", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -80 },
+      config: { value: "acquire" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 80 },
+      config: { value: 45_000 },
+    });
+    const mutex = flow.node("mutex", {
+      id: "lock",
+      position: { x: 300, y: 0 },
+      config: {
+        name: "ORDER_DYNAMIC_POLICY_LOCK",
+        owner: "worker-policy",
+        mode: "release",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "mutex:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(mode.out("output"), mutex.in("mode"));
+    flow.connect(ttl.out("output"), mutex.in("ttlMs"));
+    flow.connect(mutex.out("acquired"), report.in("in"));
+    flow.connect(mutex.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("mutex:acquire");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const lockOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "lock") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(lockOutput).toMatchObject({
+      name: "ORDER_DYNAMIC_POLICY_LOCK",
+      owner: "worker-policy",
+      mode: "acquire",
+      ttlMs: 45_000,
+      remainingMs: expect.any(Number),
+      expiresAt: expect.any(Number),
+    });
+    expect(variables.get("ORDER_DYNAMIC_POLICY_LOCK")).toMatchObject({
+      locked: true,
+      owner: "worker-policy",
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("routes mutex to locked when another owner holds an active lock", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();
