@@ -2650,6 +2650,98 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic distinct_until_changed policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({
+      id: "distinct_until_changed_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: -160 },
+      config: { value: "status.current" },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -80 },
+      config: { value: "string" },
+    });
+    const emitInitial = flow.node("transform", {
+      id: "emitInitial",
+      position: { x: 120, y: 80 },
+      config: { value: false },
+    });
+    const distinct = flow.node("distinct_until_changed", {
+      id: "distinct",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "ORDER_DYNAMIC_POLICY_STATUS_STREAM",
+        path: "status.previous",
+        mode: "json",
+        emitInitial: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "dynamic:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), emitInitial.in("in"));
+    flow.connect(start.out("out"), distinct.in("in"));
+    flow.connect(start.out("runInput"), distinct.in("value"));
+    flow.connect(path.out("output"), distinct.in("path"));
+    flow.connect(mode.out("output"), distinct.in("mode"));
+    flow.connect(emitInitial.out("output"), distinct.in("emitInitial"));
+    flow.connect(distinct.out("unchanged"), report.in("in"));
+    flow.connect(distinct.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_dynamic_policy_e2e",
+      input: {
+        status: {
+          previous: "closed",
+          current: "open",
+        },
+      },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dynamic:unchanged");
+    expect(variables.get("ORDER_DYNAMIC_POLICY_STATUS_STREAM")).toMatchObject({
+      value: "open",
+      fingerprint: "open",
+      evaluations: 1,
+      changes: 1,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const distinctOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "distinct") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(distinctOutput).toMatchObject({
+      path: "status.current",
+      mode: "string",
+      emitInitial: false,
+      value: "open",
+      status: "unchanged",
+      changedValue: true,
+    });
+  });
+
   it("can record the first distinct_until_changed value without emitting changed", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

@@ -88,10 +88,22 @@ export const distinctUntilChangedNode = defineNode({
   ports: [
     controlIn,
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "emitInitial", direction: "input", kind: "data", label: "Emit initial", schema: { type: "boolean" } },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "changed", direction: "output", kind: "control", label: "Changed" },
     { id: "unchanged", direction: "output", kind: "control", label: "Unchanged" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "emitInitial",
+      direction: "output",
+      kind: "data",
+      label: "Emit initial",
+      schema: { type: "boolean" },
+    },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "previous", direction: "output", kind: "data", label: "Previous" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -121,7 +133,8 @@ export const distinctUntilChangedNode = defineNode({
     }
 
     const payload = input.value ?? config.value ?? input.input ?? input.in ?? input.__runInput__ ?? null;
-    const selected = selectValue(payload, String(config.path ?? ""));
+    const path = String(input.path ?? config.path ?? "");
+    const selected = selectValue(payload, path);
     const value = toVariableValue(selected);
     if (value === undefined) {
       return error(
@@ -132,13 +145,14 @@ export const distinctUntilChangedNode = defineNode({
       );
     }
 
-    const mode = config.mode === "string" ? "string" : "json";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "json";
+    const emitInitial = readBoolean(input.emitInitial) ?? readBoolean(config.emitInitial) ?? true;
     const fingerprint = fingerprintValue(value, mode);
     const previous = readState(store.get(name));
     const firstObservation = !previous;
     const valueChanged = !previous || previous.fingerprint !== fingerprint;
     const routeChanged = firstObservation
-      ? Boolean(config.emitInitial ?? true)
+      ? emitInitial
       : valueChanged;
     const status = routeChanged ? "changed" : "unchanged";
     const now = Date.now();
@@ -171,6 +185,9 @@ export const distinctUntilChangedNode = defineNode({
       outputs: {
         [status]: null,
         name,
+        path,
+        mode,
+        emitInitial,
         value,
         previous: previous?.value ?? null,
         status,
@@ -182,6 +199,21 @@ export const distinctUntilChangedNode = defineNode({
     };
   },
 });
+
+function readMode(value: unknown): CompareMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "json" || normalized === "string" ? normalized : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+}
 
 function selectValue(payload: unknown, path: string): unknown {
   const trimmed = path.trim();

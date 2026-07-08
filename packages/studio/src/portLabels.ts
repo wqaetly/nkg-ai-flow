@@ -470,6 +470,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       distinct_until_changed: {
         in: "输入",
         name: "状态键名",
+        path: "路径",
+        mode: "模式",
+        emitInitial: "首次是否触发",
         value: "比较值",
         changed: "已变化",
         unchanged: "未变化",
