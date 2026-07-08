@@ -9,6 +9,14 @@
 import { z } from "zod";
 import { createRuntimeError } from "@ai-native-flow/flow-ir";
 import { defineNode } from "@ai-native-flow/node-sdk";
+import {
+  InMemoryVariableStore,
+  type MutableVariableStore,
+  type VariableEntry,
+  type VariableMetadata,
+  type VariableStore,
+  type VariableValue,
+} from "@ai-native-flow/variable-store";
 import { controlIn, errorOut } from "./_helpers.js";
 import { readSchema, validateValue, type SchemaIssue } from "./schemaGuard.js";
 
@@ -68,6 +76,14 @@ const subflowConfig = z
       .min(0)
       .default(10)
       .describe("Maximum allowed nested subflow depth. Root runs start at depth 0."),
+    localScope: z
+      .boolean()
+      .default(false)
+      .describe("When true, child variable writes are isolated to the child run."),
+    localVariables: z
+      .unknown()
+      .optional()
+      .describe("Optional JSON object used as child-local variable overrides."),
     failOnError: z
       .boolean()
       .default(true)
@@ -124,7 +140,14 @@ export const subflowNode = defineNode({
       ],
     },
     maxDepth: { label: "Max Depth", control: "number", order: 8 },
-    failOnError: { label: "Fail On Error", control: "switch", order: 9 },
+    localScope: { label: "Local Scope", control: "switch", order: 9 },
+    localVariables: {
+      label: "Local Variables",
+      control: "textarea",
+      order: 10,
+      placeholder: '{ "TENANT": "acme" }',
+    },
+    failOnError: { label: "Fail On Error", control: "switch", order: 11 },
   },
   ports: [
     controlIn,
@@ -159,6 +182,8 @@ export const subflowNode = defineNode({
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
+    { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
+    { id: "localScope", direction: "output", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
     errorOut,
   ],
   validateInput: false,
@@ -208,6 +233,21 @@ export const subflowNode = defineNode({
     }
     const childDepth = subflowDepth + 1;
 
+    const parentVariables = (ctx as unknown as { variables: VariableStore }).variables;
+    const localVariables = readLocalVariables(config.localVariables);
+    if (localVariables instanceof Error) {
+      return error(
+        "node.subflow.invalid_local_variables",
+        localVariables.message,
+        ctx.nodeId,
+      );
+    }
+    const hasLocalVariables = localVariables.length > 0;
+    const localScope = config.localScope === true || hasLocalVariables;
+    const childVariables = localScope
+      ? new LocalVariableOverlay(parentVariables, localVariables)
+      : parentVariables;
+
     const payload = childInput(input, config);
     const inputContract = validateContract(config.inputSchema, payload, "input");
     if (inputContract instanceof Error) {
@@ -227,6 +267,8 @@ export const subflowNode = defineNode({
         runRecord: null,
         subflowDepth,
         childDepth,
+        localScope,
+        localVariableCount: localVariables.length,
       });
     }
 
@@ -238,8 +280,8 @@ export const subflowNode = defineNode({
         input: payload,
         traceId: `${ctx.runId}:${ctx.nodeId}`,
         subflowDepth: childDepth,
-        variables: ctx.variables,
-        secrets: ctx.secrets,
+        variables: childVariables,
+        secrets: childVariables,
       });
     } catch (cause) {
       return error(
@@ -262,6 +304,8 @@ export const subflowNode = defineNode({
       runRecord: result.runRecord,
       subflowDepth,
       childDepth,
+      localScope,
+      localVariableCount: localVariables.length,
     };
 
     if (status === "succeeded") {
@@ -290,6 +334,8 @@ export const subflowNode = defineNode({
           runRecord: result.runRecord,
           subflowDepth,
           childDepth,
+          localScope,
+          localVariableCount: localVariables.length,
         });
       }
 
@@ -372,6 +418,8 @@ function contractFailure(args: {
   runRecord: SubflowInvokeResult["runRecord"] | null;
   subflowDepth: number;
   childDepth: number;
+  localScope: boolean;
+  localVariableCount: number;
 }): {
   kind: "success";
   outputs: Record<string, unknown>;
@@ -395,6 +443,8 @@ function contractFailure(args: {
         firstContractIssue: firstIssue,
         subflowDepth: args.subflowDepth,
         childDepth: args.childDepth,
+        localScope: args.localScope,
+        localVariableCount: args.localVariableCount,
       },
     };
   }
@@ -408,6 +458,156 @@ function contractFailure(args: {
       contractIssueCount: args.issues.length,
     },
   );
+}
+
+function readLocalVariables(value: unknown): VariableEntry[] | Error {
+  if (value === undefined || value === null || value === "") return [];
+  const raw = typeof value === "string" ? parseLocalVariables(value) : value;
+  if (raw instanceof Error) return raw;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return new Error("subflow localVariables must be a JSON object.");
+  }
+  const entries: VariableEntry[] = [];
+  for (const [name, item] of Object.entries(raw as Record<string, unknown>)) {
+    const trimmed = name.trim();
+    if (trimmed === "") {
+      return new Error("subflow localVariables cannot contain an empty name.");
+    }
+    const value = toVariableValue(item);
+    if (value === undefined) {
+      return new Error(`subflow localVariables.${trimmed} must be JSON-compatible.`);
+    }
+    entries.push({
+      name: trimmed,
+      value,
+      metadata: {
+        source: "runtime",
+        scope: { flowId: "subflow_local" },
+        description: "Subflow-local variable",
+      },
+    });
+  }
+  return entries;
+}
+
+function parseLocalVariables(value: string): unknown | Error {
+  const trimmed = value.trim();
+  if (trimmed === "") return {};
+  try {
+    return JSON.parse(trimmed);
+  } catch (cause) {
+    return new Error(
+      `subflow localVariables must be valid JSON: ${
+        cause instanceof Error ? cause.message : String(cause)
+      }`,
+    );
+  }
+}
+
+function toVariableValue(value: unknown): VariableValue | undefined {
+  if (value === null) return null;
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return Number.isNaN(value) ? undefined : value;
+  }
+  if (Array.isArray(value)) {
+    const items = value.map(toVariableValue);
+    return items.some((item) => item === undefined)
+      ? undefined
+      : (items as VariableValue[]);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, VariableValue> = {};
+    for (const [key, item] of Object.entries(value)) {
+      const converted = toVariableValue(item);
+      if (converted === undefined) return undefined;
+      out[key] = converted;
+    }
+    return out;
+  }
+  return undefined;
+}
+
+class LocalVariableOverlay implements MutableVariableStore {
+  private readonly local: InMemoryVariableStore;
+
+  constructor(
+    parent: VariableStore,
+    initial: readonly VariableEntry[],
+  ) {
+    this.parent = parent;
+    this.local = new InMemoryVariableStore(initial);
+  }
+
+  private readonly parent: VariableStore;
+
+  get(name: string): VariableValue | undefined {
+    return this.local.has(name) ? this.local.get(name) : this.parent.get(name);
+  }
+
+  getRequired(name: string): VariableValue {
+    const value = this.get(name);
+    if (value === undefined) throw new Error(`variable ${name} is not defined`);
+    return value;
+  }
+
+  getString(name: string): string | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value !== "string") throw new Error(`variable ${name} is not a string`);
+    return value;
+  }
+
+  getNumber(name: string): number | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value === "number") return value;
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    throw new Error(`variable ${name} is not a number`);
+  }
+
+  getBoolean(name: string): boolean | undefined {
+    const value = this.get(name);
+    if (value === undefined) return undefined;
+    if (typeof value === "boolean") return value;
+    if (typeof value === "string") {
+      const lower = value.toLowerCase();
+      if (lower === "true" || lower === "1") return true;
+      if (lower === "false" || lower === "0") return false;
+    }
+    throw new Error(`variable ${name} is not a boolean`);
+  }
+
+  has(name: string): boolean {
+    return this.local.has(name) || this.parent.has(name);
+  }
+
+  list(): readonly VariableEntry[] {
+    const seen = new Map<string, VariableEntry>();
+    for (const entry of this.local.list()) seen.set(entry.name, entry);
+    for (const entry of this.parent.list()) {
+      if (!seen.has(entry.name)) seen.set(entry.name, entry);
+    }
+    return [...seen.values()];
+  }
+
+  describe(name: string): VariableEntry | undefined {
+    return this.local.describe(name) ?? this.parent.describe(name);
+  }
+
+  set(name: string, value: VariableValue, metadata?: VariableMetadata): void {
+    this.local.set(name, value, metadata);
+  }
+
+  delete(name: string): boolean {
+    return this.local.delete(name);
+  }
 }
 
 function error(

@@ -3518,6 +3518,124 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(await rt.runStore.listByFlow("child_depth_limit")).toEqual([]);
   });
 
+  it("passes subflow local variables as child-scoped overrides", async () => {
+    const variables = new InMemoryVariableStore([
+      { name: "TENANT", value: "global" },
+    ]);
+    const rt = newRuntime({ variables });
+    const child = defineFlow({ id: "child_reads_local_var", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const getTenant = child.node("state_get", {
+      id: "get_tenant",
+      position: { x: 120, y: 0 },
+      config: { name: "TENANT" },
+    });
+    const childReport = child.node("transform", {
+      id: "child_report",
+      position: { x: 260, y: 0 },
+      config: { template: "tenant=${input}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 400, y: 0 } });
+    child.connect(childStart.out("out"), getTenant.in("in"));
+    child.connect(getTenant.out("out"), childReport.in("in"));
+    child.connect(getTenant.out("value"), childReport.in("input"));
+    child.connect(childReport.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_local_var_override", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: {
+        flowId: "child_reads_local_var",
+        localVariables: { TENANT: "local" },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_local_var_override",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:tenant=local");
+    expect(variables.get("TENANT")).toBe("global");
+  });
+
+  it("keeps subflow local state writes isolated from the parent variable store", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = newRuntime({ variables });
+    const child = defineFlow({ id: "child_writes_local_state", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const setState = child.node("state_set", {
+      id: "set_tmp",
+      position: { x: 120, y: 0 },
+      config: { name: "CHILD_TMP", value: "local-write" },
+    });
+    const getState = child.node("state_get", {
+      id: "get_tmp",
+      position: { x: 260, y: 0 },
+      config: { name: "CHILD_TMP" },
+    });
+    const childReport = child.node("transform", {
+      id: "child_report",
+      position: { x: 400, y: 0 },
+      config: { template: "child=${input}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 540, y: 0 } });
+    child.connect(childStart.out("out"), setState.in("in"));
+    child.connect(setState.out("out"), getState.in("in"));
+    child.connect(getState.out("out"), childReport.in("in"));
+    child.connect(getState.out("value"), childReport.in("input"));
+    child.connect(childReport.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_local_state_isolated", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: {
+        flowId: "child_writes_local_state",
+        localScope: true,
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_local_state_isolated",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:child=local-write");
+    expect(variables.has("CHILD_TMP")).toBe(false);
+  });
+
   it("routes failed subflow child runs when failOnError is false", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "child_fails", version: "1.0.0", registry: rt.nodeTypeRegistry });
