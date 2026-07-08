@@ -266,7 +266,7 @@ function applyMode(
   const retryable = readRetryable(options.error, options.retryableCodes);
   const attempt = (previous?.attempt ?? 0) + 1;
   const canRetry =
-    attempt < options.maxAttempts && (!options.retryableOnly || retryable !== false);
+    attempt < options.maxAttempts && (!options.retryableOnly || retryable === true);
   if (!canRetry) {
     return {
       kind: "success",

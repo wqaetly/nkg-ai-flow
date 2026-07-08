@@ -113,7 +113,7 @@ export const retryPolicyNode = defineNode({
     const maxAttempts = Math.max(1, Math.trunc(Number(config.maxAttempts ?? 3)));
     const retryable = readRetryable(input.error, config.retryableCodes);
     const canRetry =
-      attempt < maxAttempts && (!config.retryableOnly || retryable !== false);
+      attempt < maxAttempts && (config.retryableOnly === false || retryable === true);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
     const delayMs = canRetry ? calculateDelay(config, attempt) : 0;
     const branch = canRetry ? "retry" : "exhausted";
