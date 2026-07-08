@@ -85,6 +85,21 @@ export const circuitBreakerNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "failureThreshold",
+      direction: "input",
+      kind: "data",
+      label: "Failure Threshold",
+      schema: { type: "number" },
+    },
+    {
+      id: "resetTimeoutMs",
+      direction: "input",
+      kind: "data",
+      label: "Reset Timeout ms",
+      schema: { type: "number" },
+    },
     { id: "closed", direction: "output", kind: "control", label: "Closed" },
     { id: "open", direction: "output", kind: "control", label: "Open" },
     {
@@ -95,6 +110,7 @@ export const circuitBreakerNode = defineNode({
     },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     {
       id: "failureCount",
@@ -159,15 +175,15 @@ export const circuitBreakerNode = defineNode({
     }
 
     const now = Date.now();
-    const failureThreshold = Math.max(
-      1,
-      Math.trunc(Number(config.failureThreshold ?? 3)),
-    );
-    const resetTimeoutMs = Math.max(
-      0,
-      Math.trunc(Number(config.resetTimeoutMs ?? 30000)),
-    );
-    const mode = config.mode ?? "check";
+    const failureThreshold =
+      readIntegerAtLeast(input.failureThreshold, 1) ??
+      readIntegerAtLeast(config.failureThreshold, 1) ??
+      3;
+    const resetTimeoutMs =
+      readIntegerAtLeast(input.resetTimeoutMs, 0) ??
+      readIntegerAtLeast(config.resetTimeoutMs, 0) ??
+      30000;
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "check";
     const previous = readCircuitState(store.get(name));
     const next = applyMode(previous, {
       mode,
@@ -210,6 +226,7 @@ export const circuitBreakerNode = defineNode({
         [branch]: null,
         state: next,
         name,
+        mode,
         status: next.status,
         failureCount: next.failureCount,
         remainingMs,
@@ -307,6 +324,27 @@ function readStatus(value: unknown): CircuitStatus {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.trunc(number) : 0;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? Math.trunc(number) : undefined;
+}
+
+function readMode(value: unknown):
+  | "check"
+  | "record_failure"
+  | "record_success"
+  | "reset"
+  | undefined {
+  if (typeof value !== "string") return undefined;
+  const mode = value.trim();
+  return mode === "check" ||
+    mode === "record_failure" ||
+    mode === "record_success" ||
+    mode === "reset"
+    ? mode
+    : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {

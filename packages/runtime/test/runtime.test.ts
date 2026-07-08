@@ -4224,6 +4224,87 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("opens a circuit_breaker with dynamic mode and threshold inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 0 },
+      config: { value: "record_failure" },
+    });
+    const threshold = flow.node("transform", {
+      id: "threshold",
+      position: { x: 260, y: 0 },
+      config: { value: 1 },
+    });
+    const resetTimeout = flow.node("transform", {
+      id: "reset_timeout",
+      position: { x: 400, y: 0 },
+      config: { value: 60_000 },
+    });
+    const breaker = flow.node("circuit_breaker", {
+      id: "breaker",
+      position: { x: 540, y: 0 },
+      config: {
+        name: "PAYMENT_DYNAMIC_POLICY_CIRCUIT",
+        mode: "check",
+        failureThreshold: 99,
+        resetTimeoutMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 680, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(mode.out("out"), threshold.in("in"));
+    flow.connect(threshold.out("out"), resetTimeout.in("in"));
+    flow.connect(resetTimeout.out("out"), breaker.in("in"));
+    flow.connect(mode.out("output"), breaker.in("mode"));
+    flow.connect(threshold.out("output"), breaker.in("failureThreshold"));
+    flow.connect(resetTimeout.out("output"), breaker.in("resetTimeoutMs"));
+    flow.connect(breaker.out("open"), report.in("in"));
+    flow.connect(breaker.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:record_failure");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const breakerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "breaker") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(breakerOutput).toMatchObject({
+      mode: "record_failure",
+      status: "open",
+      failureCount: 1,
+      failureThreshold: 1,
+      resetTimeoutMs: 60_000,
+      isOpen: true,
+      canPass: false,
+    });
+    expect(variables.get("PAYMENT_DYNAMIC_POLICY_CIRCUIT")).toMatchObject({
+      status: "open",
+      failureCount: 1,
+    });
+  });
+
   it("routes expired open circuit_breaker state to half_open", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_CIRCUIT", {
@@ -4287,6 +4368,63 @@ describe("runtime / hello-flow end-to-end", () => {
       remainingMs: 0,
     });
     expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
+      status: "half_open",
+      failureCount: 2,
+    });
+  });
+
+  it("routes open circuit_breaker state to half_open with a dynamic reset timeout input", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_DYNAMIC_RESET_CIRCUIT", {
+      status: "open",
+      failureCount: 2,
+      openedAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_dynamic_reset_timeout_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const resetTimeout = flow.node("transform", {
+      id: "reset_timeout",
+      position: { x: 120, y: 0 },
+      config: { value: 1 },
+    });
+    const check = flow.node("circuit_breaker", {
+      id: "check",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_DYNAMIC_RESET_CIRCUIT",
+        resetTimeoutMs: 60_000,
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), resetTimeout.in("in"));
+    flow.connect(resetTimeout.out("out"), check.in("in"));
+    flow.connect(resetTimeout.out("output"), check.in("resetTimeoutMs"));
+    flow.connect(check.out("half_open"), report.in("in"));
+    flow.connect(check.out("resetTimeoutMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_dynamic_reset_timeout_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:1");
+    expect(variables.get("PAYMENT_DYNAMIC_RESET_CIRCUIT")).toMatchObject({
       status: "half_open",
       failureCount: 2,
     });

@@ -295,6 +295,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         open: "打开",
         half_open: "半开",
         state: "熔断状态",
+        mode: "模式",
         status: "状态",
         failureCount: "失败次数",
         remainingMs: "剩余毫秒",
