@@ -2208,6 +2208,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("retry:100");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const retryOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(retryOutput).toMatchObject({
+      status: "retry",
+      stateStatus: "waiting",
+      attempt: 1,
+      nextAttempt: 2,
+      maxAttempts: 3,
+      remainingAttempts: 2,
+      exhaustedValue: false,
+      delayMs: 100,
+    });
     expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
       status: "waiting",
       attempt: 1,
@@ -2484,6 +2500,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("exhausted:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const retryOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(retryOutput).toMatchObject({
+      status: "exhausted",
+      stateStatus: "exhausted",
+      attempt: 2,
+      nextAttempt: 2,
+      maxAttempts: 2,
+      remainingAttempts: 0,
+      exhaustedValue: true,
+      delayMs: 0,
+    });
     expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
       status: "exhausted",
       attempt: 2,

@@ -760,6 +760,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         retryAfterMs: "重试等待毫秒",
         nextRetryAt: "下次重试时间",
         retryable: "可重试",
+        stateStatus: "持久状态",
+        maxAttempts: "最大尝试次数",
+        remainingAttempts: "剩余尝试次数",
+        exhaustedValue: "是否耗尽",
         stateKey: "状态键",
       },
       resume_point: {

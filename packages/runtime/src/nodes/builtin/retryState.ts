@@ -154,6 +154,10 @@ export const retryStateNode = defineNode({
     { id: "retryAfterMs", direction: "output", kind: "data", label: "Retry after ms", schema: { type: "number" } },
     { id: "nextRetryAt", direction: "output", kind: "data", label: "Next Retry At", schema: { type: "string" } },
     { id: "retryable", direction: "output", kind: "data", label: "Retryable", schema: { type: "boolean" } },
+    { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
+    { id: "maxAttempts", direction: "output", kind: "data", label: "Max Attempts", schema: { type: "number" } },
+    { id: "remainingAttempts", direction: "output", kind: "data", label: "Remaining Attempts", schema: { type: "number" } },
+    { id: "exhaustedValue", direction: "output", kind: "data", label: "Exhausted", schema: { type: "boolean" } },
     { id: "stateKey", direction: "output", kind: "data", label: "State Key", schema: { type: "string" } },
   ],
   validateInput: false,
@@ -210,12 +214,19 @@ export const retryStateNode = defineNode({
       decision.state?.nextRetryAt === null || decision.state === null
         ? ""
         : new Date(decision.state.nextRetryAt).toISOString();
+    const attempt = decision.state?.attempt ?? 0;
+    const maxAttempts =
+      decision.state?.maxAttempts ?? readPositiveInteger(config.maxAttempts, 3);
+    const remainingAttempts = Math.max(0, maxAttempts - attempt);
+    const stateStatus = decision.state?.status ?? decision.branch;
+    const exhaustedValue =
+      decision.branch === "exhausted" || decision.state?.status === "exhausted";
 
     ctx.log.debug("retry_state selected branch", {
       stateKey,
       mode: config.mode ?? "record_failure",
       branch: decision.branch,
-      attempt: decision.state?.attempt ?? 0,
+      attempt,
       retryAfterMs,
     });
 
@@ -226,12 +237,16 @@ export const retryStateNode = defineNode({
         state: decision.state,
         error: decision.state?.lastError ?? null,
         status: decision.branch,
-        attempt: decision.state?.attempt ?? 0,
-        nextAttempt: decision.branch === "retry" ? (decision.state?.attempt ?? 0) + 1 : decision.state?.attempt ?? 0,
+        attempt,
+        nextAttempt: decision.branch === "retry" ? attempt + 1 : attempt,
         delayMs: decision.delayMs,
         retryAfterMs,
         nextRetryAt,
         retryable: decision.state?.retryable ?? null,
+        stateStatus,
+        maxAttempts,
+        remainingAttempts,
+        exhaustedValue,
         stateKey,
       },
     };
