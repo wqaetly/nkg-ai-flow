@@ -22,6 +22,7 @@ import type { NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import {
   agentNode,
   approvalNode,
+  auditLogNode,
   batchWindowNode,
   cacheNode,
   checkpointNode,
@@ -95,6 +96,7 @@ export function getBuiltinNodeDefinitions(
     endNode.definition,
     transformNode.definition,
     approvalNode.definition,
+    auditLogNode.definition,
     batchWindowNode.definition,
     cacheNode.definition,
     checkpointNode.definition,

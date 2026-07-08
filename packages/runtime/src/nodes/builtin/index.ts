@@ -16,6 +16,7 @@ export { startNode } from "./start.js";
 export { endNode } from "./end.js";
 export { transformNode } from "./transform.js";
 export { approvalNode } from "./approval.js";
+export { auditLogNode } from "./auditLog.js";
 export { batchWindowNode } from "./batchWindow.js";
 export { cacheNode } from "./cache.js";
 export { checkpointNode } from "./checkpoint.js";

@@ -134,6 +134,15 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         comment: "审批意见",
         timeoutMs: "超时时间（毫秒）",
       },
+      audit_log: {
+        name: "审计日志名",
+        mode: "模式",
+        type: "事件类型",
+        actor: "参与者",
+        message: "事件消息",
+        maxEntries: "最大保留条目",
+        limit: "读取数量",
+      },
       code_synthesizer: {
         base_url: "服务地址",
         api_key: "API 密钥",

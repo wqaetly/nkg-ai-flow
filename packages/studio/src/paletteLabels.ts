@@ -29,6 +29,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "人工审批",
         description: "创建、检查、批准、拒绝、取消或清理人工审批任务。",
       },
+      audit_log: {
+        title: "审计日志",
+        description: "记录、读取或清空业务级审计事件轨迹。",
+      },
       code_synthesizer: {
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",

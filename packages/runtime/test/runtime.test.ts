@@ -1486,6 +1486,263 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_APPROVAL")).toBe(false);
   });
 
+  it("appends business events into audit_log", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_append_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-1", decision: "approved" } },
+    });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_AUDIT_LOG",
+        type: "approval",
+        actor: "finance",
+        message: "Order approved",
+        maxEntries: 10,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), audit.in("in"));
+    flow.connect(payload.out("output"), audit.in("payload"));
+    flow.connect(audit.out("appended"), report.in("in"));
+    flow.connect(audit.out("sequence"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_append_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:1");
+    expect(variables.get("ORDER_AUDIT_LOG")).toMatchObject({
+      sequence: 1,
+      entries: [
+        {
+          sequence: 1,
+          type: "approval",
+          actor: "finance",
+          message: "Order approved",
+          payload: { orderId: "order-1", decision: "approved" },
+          nodeId: "audit",
+        },
+      ],
+    });
+  });
+
+  it("reads recent audit_log entries with a limit", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_AUDIT_LOG", {
+      sequence: 3,
+      updatedAt: Date.now(),
+      entries: [
+        {
+          id: "entry-1",
+          sequence: 1,
+          type: "created",
+          actor: "system",
+          message: "Order created",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now() - 3000,
+          runId: "run-1",
+          nodeId: "audit",
+        },
+        {
+          id: "entry-2",
+          sequence: 2,
+          type: "approval",
+          actor: "finance",
+          message: "Order approved",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now() - 2000,
+          runId: "run-2",
+          nodeId: "audit",
+        },
+        {
+          id: "entry-3",
+          sequence: 3,
+          type: "payment",
+          actor: "payment-service",
+          message: "Payment captured",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now() - 1000,
+          runId: "run-3",
+          nodeId: "audit",
+        },
+      ],
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_read_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_AUDIT_LOG",
+        mode: "read",
+        limit: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), audit.in("in"));
+    flow.connect(audit.out("read"), report.in("in"));
+    flow.connect(audit.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_read_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:2");
+    expect(variables.get("ORDER_AUDIT_LOG")).toMatchObject({
+      sequence: 3,
+      entries: [
+        { sequence: 1 },
+        { sequence: 2 },
+        { sequence: 3 },
+      ],
+    });
+  });
+
+  it("routes empty audit_log reads to empty", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_AUDIT_LOG",
+        mode: "read",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), audit.in("in"));
+    flow.connect(audit.out("empty"), report.in("in"));
+    flow.connect(audit.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:0");
+    expect(variables.has("ORDER_AUDIT_LOG")).toBe(false);
+  });
+
+  it("clears audit_log entries", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_AUDIT_LOG", {
+      sequence: 2,
+      updatedAt: Date.now(),
+      entries: [
+        {
+          id: "entry-1",
+          sequence: 1,
+          type: "created",
+          actor: "system",
+          message: "Order created",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now() - 1000,
+          runId: "run-1",
+          nodeId: "audit",
+        },
+        {
+          id: "entry-2",
+          sequence: 2,
+          type: "cancelled",
+          actor: "user",
+          message: "Order cancelled",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now(),
+          runId: "run-2",
+          nodeId: "audit",
+        },
+      ],
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_AUDIT_LOG",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), audit.in("in"));
+    flow.connect(audit.out("cleared"), report.in("in"));
+    flow.connect(audit.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:2");
+    expect(variables.has("ORDER_AUDIT_LOG")).toBe(false);
+  });
+
   it("invokes a registered child flow with subflow and returns its output", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });
