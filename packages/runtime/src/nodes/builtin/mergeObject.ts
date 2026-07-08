@@ -83,6 +83,10 @@ export const mergeObjectNode = defineNode({
       multiple: true,
       schema: { type: "object" },
     },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "nullMode", direction: "input", kind: "data", label: "Null mode", schema: { type: "string" } },
+    { id: "nonObjectMode", direction: "input", kind: "data", label: "Non-object mode", schema: { type: "string" } },
+    { id: "scalarKey", direction: "input", kind: "data", label: "Scalar key", schema: { type: "string" } },
     {
       id: "value",
       direction: "output",
@@ -125,15 +129,19 @@ export const mergeObjectNode = defineNode({
       label: "Skipped count",
       schema: { type: "number" },
     },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "nullMode", direction: "output", kind: "data", label: "Null mode", schema: { type: "string" } },
+    { id: "nonObjectMode", direction: "output", kind: "data", label: "Non-object mode", schema: { type: "string" } },
+    { id: "scalarKey", direction: "output", kind: "data", label: "Scalar key", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const rawSources = readSources(input);
     const options = {
-      mode: readMode(config.mode),
-      nullMode: readNullMode(config.nullMode),
-      nonObjectMode: readNonObjectMode(config.nonObjectMode),
-      scalarKey: String(config.scalarKey ?? "value") || "value",
+      mode: readMode(input.mode ?? config.mode),
+      nullMode: readNullMode(input.nullMode ?? config.nullMode),
+      nonObjectMode: readNonObjectMode(input.nonObjectMode ?? config.nonObjectMode),
+      scalarKey: String(input.scalarKey ?? config.scalarKey ?? "value") || "value",
     };
     const normalized = normalizeSources(rawSources, options);
     const value = mergeSources(normalized.sources, options);
@@ -156,6 +164,10 @@ export const mergeObjectNode = defineNode({
         keys,
         sourceCount: normalized.sources.length,
         skippedCount: normalized.skipped.length,
+        mode: options.mode,
+        nullMode: options.nullMode,
+        nonObjectMode: options.nonObjectMode,
+        scalarKey: options.scalarKey,
       },
     };
   },

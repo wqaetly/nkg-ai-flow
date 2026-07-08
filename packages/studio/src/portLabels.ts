@@ -733,6 +733,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       merge_object: {
         objects: "对象列表",
+        mode: "模式",
+        nullMode: "空值模式",
+        nonObjectMode: "非对象模式",
+        scalarKey: "标量键名",
         value: "合并对象",
         sources: "来源对象",
         skipped: "跳过来源",

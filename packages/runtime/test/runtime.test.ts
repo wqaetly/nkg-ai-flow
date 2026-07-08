@@ -17680,6 +17680,94 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("skipped=1");
   });
 
+  it("uses dynamic merge_object modes and scalar key ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "merge_object_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 120, y: 0 },
+      config: { value: { nested: { a: 1, b: 2 } } },
+    });
+    const second = flow.node("transform", {
+      id: "second",
+      position: { x: 120, y: 80 },
+      config: { value: { nested: { b: null, c: 3 } } },
+    });
+    const scalar = flow.node("transform", {
+      id: "scalar",
+      position: { x: 120, y: 160 },
+      config: { value: "raw" },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 240 },
+      config: { value: "deep" },
+    });
+    const nullMode = flow.node("transform", {
+      id: "nullMode",
+      position: { x: 120, y: 360 },
+      config: { value: "skip" },
+    });
+    const nonObjectMode = flow.node("transform", {
+      id: "nonObjectMode",
+      position: { x: 120, y: 480 },
+      config: { value: "wrap" },
+    });
+    const scalarKey = flow.node("transform", {
+      id: "scalarKey",
+      position: { x: 120, y: 600 },
+      config: { value: "scalar" },
+    });
+    const merge = flow.node("merge_object", {
+      id: "merge_object",
+      position: { x: 340, y: 0 },
+      config: { mode: "shallow", nullMode: "keep", nonObjectMode: "skip", scalarKey: "value" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 500, y: 0 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 660, y: 0 },
+      config: { template: "merged=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 0 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(first.out("out"), second.in("in"));
+    flow.connect(second.out("out"), scalar.in("in"));
+    flow.connect(scalar.out("out"), mode.in("in"));
+    flow.connect(mode.out("out"), nullMode.in("in"));
+    flow.connect(nullMode.out("out"), nonObjectMode.in("in"));
+    flow.connect(nonObjectMode.out("out"), scalarKey.in("in"));
+    flow.connect(scalarKey.out("out"), merge.in("in"));
+    flow.connect(first.out("output"), merge.in("objects"));
+    flow.connect(second.out("output"), merge.in("objects"));
+    flow.connect(scalar.out("output"), merge.in("objects"));
+    flow.connect(mode.out("output"), merge.in("mode"));
+    flow.connect(nullMode.out("output"), merge.in("nullMode"));
+    flow.connect(nonObjectMode.out("output"), merge.in("nonObjectMode"));
+    flow.connect(scalarKey.out("output"), merge.in("scalarKey"));
+    flow.connect(merge.out("out"), stringify.in("in"));
+    flow.connect(merge.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "merge_object_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('merged={"nested":{"a":1,"b":2,"c":3},"scalar":"raw"}');
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
