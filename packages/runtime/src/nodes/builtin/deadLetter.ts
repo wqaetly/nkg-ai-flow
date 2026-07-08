@@ -77,6 +77,7 @@ export const deadLetterNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
     { id: "recorded", direction: "output", kind: "control", label: "Recorded" },
@@ -85,6 +86,7 @@ export const deadLetterNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "entries", direction: "output", kind: "data", label: "Entries" },
     { id: "entry", direction: "output", kind: "data", label: "Entry" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -96,11 +98,11 @@ export const deadLetterNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.dead_letter.missing_name",
-        "dead_letter node requires config.name",
+        "dead_letter node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -146,6 +148,7 @@ export const deadLetterNode = defineNode({
         [decision.branch]: null,
         entries: decision.entries,
         entry: decision.entries[0] ?? null,
+        name,
         count: decision.entries.length,
         state: decision.state,
       },

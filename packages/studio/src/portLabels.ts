@@ -400,6 +400,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       dead_letter: {
         in: "输入",
+        name: "死信队列名",
         payload: "载荷",
         error: "错误",
         recorded: "已记录",

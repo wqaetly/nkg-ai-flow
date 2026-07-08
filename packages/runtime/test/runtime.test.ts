@@ -8053,6 +8053,67 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("records payloads into a dynamically named dead_letter", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const queueName = flow.node("transform", {
+      id: "queueName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_DEAD_LETTERS" },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-2", retryable: true } },
+    });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 260, y: 0 },
+      config: {
+        reason: "shipping worker failed",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "dead:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), queueName.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), deadLetter.in("in"));
+    flow.connect(queueName.out("output"), deadLetter.in("name"));
+    flow.connect(payload.out("output"), deadLetter.in("payload"));
+    flow.connect(deadLetter.out("recorded"), report.in("in"));
+    flow.connect(deadLetter.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dead:ORDER_DYNAMIC_DEAD_LETTERS");
+    expect(variables.get("ORDER_DYNAMIC_DEAD_LETTERS")).toMatchObject({
+      entries: [
+        {
+          payload: { orderId: "order-2", retryable: true },
+          reason: "shipping worker failed",
+        },
+      ],
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("drains existing dead_letter entries", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_DEAD_LETTERS", {
