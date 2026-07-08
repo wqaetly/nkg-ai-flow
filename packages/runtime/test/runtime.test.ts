@@ -120,6 +120,49 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("joins fan-out branches and collects their values", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const upper = flow.node("transform", {
+      id: "upper",
+      position: { x: 120, y: 40 },
+      config: { template: "upper:${input.name}" },
+    });
+    const lower = flow.node("transform", {
+      id: "lower",
+      position: { x: 120, y: 200 },
+      config: { template: "lower:${input.name}" },
+    });
+    const join = flow.node("join", { id: "join", position: { x: 280, y: 120 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 120 },
+      config: { template: "joined=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 560, y: 120 } });
+
+    flow.connect(start.out("out"), upper.in("in"));
+    flow.connect(start.out("out"), lower.in("in"));
+    flow.connect(upper.out("out"), join.in("in"));
+    flow.connect(lower.out("out"), join.in("in"));
+    flow.connect(upper.out("output"), join.in("values"));
+    flow.connect(lower.out("output"), join.in("values"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "join_e2e",
+      input: { name: "Flow" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("joined=upper:Flow,lower:Flow");
+  });
+
   it("executes every item in a foreach begin/end block", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

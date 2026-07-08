@@ -18,6 +18,7 @@ const BUILTIN_TYPES = [
   "condition",
   "delay",
   "http",
+  "join",
   "tool",
   "text_input",
   "llm",

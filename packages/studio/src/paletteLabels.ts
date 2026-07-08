@@ -69,6 +69,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "HTTP 请求",
         description: "调用外部 HTTP API。",
       },
+      join: {
+        title: "汇合",
+        description: "等待所有输入分支到达，并聚合多路数据。",
+      },
       llm: {
         title: "大模型调用",
         description: "使用提示词模板调用模型，并可选择流式输出。",

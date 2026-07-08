@@ -45,6 +45,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       item: "当前项",
       items: "数组",
       iteration: "轮次",
+      values: "多路数据",
       maxed: "达到上限",
       nextState: "下一状态",
       node_specs: "节点规格",
@@ -123,6 +124,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       http: {
         response: "响应",
+      },
+      join: {
+        in: "输入分支",
+        out: "继续",
+        values: "多路数据",
+        count: "数量",
       },
       llm: {
         result: "结果",

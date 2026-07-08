@@ -18,6 +18,7 @@ export { transformNode } from "./transform.js";
 export { conditionNode } from "./condition.js";
 export { delayNode } from "./delay.js";
 export { httpNode } from "./http.js";
+export { joinNode } from "./join.js";
 export { toolNode } from "./tool.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";
