@@ -10798,6 +10798,95 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic batch_window policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "batch_window_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -180 },
+      config: { value: "add" },
+    });
+    const maxItems = flow.node("transform", {
+      id: "maxItems",
+      position: { x: 120, y: -60 },
+      config: { value: 3 },
+    });
+    const maxAge = flow.node("transform", {
+      id: "maxAge",
+      position: { x: 120, y: 60 },
+      config: { value: 5_000 },
+    });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 180 },
+      config: { value: "email-policy" },
+    });
+    const batch = flow.node("batch_window", {
+      id: "batch",
+      position: { x: 340, y: 0 },
+      config: {
+        name: "EMAIL_DYNAMIC_POLICY_BATCH",
+        mode: "clear",
+        maxItems: 1,
+        maxAgeMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "batch:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), maxItems.in("in"));
+    flow.connect(start.out("out"), maxAge.in("in"));
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(start.out("out"), batch.in("in"));
+    flow.connect(mode.out("output"), batch.in("mode"));
+    flow.connect(maxItems.out("output"), batch.in("maxItems"));
+    flow.connect(maxAge.out("output"), batch.in("maxAgeMs"));
+    flow.connect(item.out("output"), batch.in("item"));
+    flow.connect(batch.out("waiting"), report.in("in"));
+    flow.connect(batch.out("remaining"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_window_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("batch:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput).toMatchObject({
+      name: "EMAIL_DYNAMIC_POLICY_BATCH",
+      mode: "add",
+      maxItems: 3,
+      maxAgeMs: 5_000,
+      count: 1,
+      remaining: 2,
+      items: ["email-policy"],
+      flushCount: 0,
+    });
+    expect(variables.get("EMAIL_DYNAMIC_POLICY_BATCH")).toMatchObject({
+      items: ["email-policy"],
+      flushCount: 0,
+    });
+  });
+
   it("routes batch_window to ready and clears state when maxItems is reached", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("EMAIL_BATCH", {

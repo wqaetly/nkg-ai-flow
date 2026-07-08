@@ -77,6 +77,9 @@ export const batchWindowNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "maxItems", direction: "input", kind: "data", label: "Max Items", schema: { type: "number" } },
+    { id: "maxAgeMs", direction: "input", kind: "data", label: "Max Age ms", schema: { type: "number" } },
     { id: "item", direction: "input", kind: "data", label: "Item" },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
@@ -85,6 +88,9 @@ export const batchWindowNode = defineNode({
     { id: "items", direction: "output", kind: "data", label: "Items" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "maxItems", direction: "output", kind: "data", label: "Max Items", schema: { type: "number" } },
+    { id: "maxAgeMs", direction: "output", kind: "data", label: "Max Age ms", schema: { type: "number" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     {
       id: "remaining",
@@ -129,10 +135,10 @@ export const batchWindowNode = defineNode({
     }
 
     const now = Date.now();
-    const maxItems = Math.max(1, Math.trunc(Number(config.maxItems ?? 10)));
-    const maxAgeMs = Math.max(0, Math.trunc(Number(config.maxAgeMs ?? 0)));
+    const maxItems = readPositiveInteger(input.maxItems) ?? readPositiveInteger(config.maxItems) ?? 10;
+    const maxAgeMs = readIntegerAtLeast(input.maxAgeMs, 0) ?? readIntegerAtLeast(config.maxAgeMs, 0) ?? 0;
     const previous = readBatchWindowState(store.get(name), now);
-    const mode = config.mode ?? "add";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "add";
     const decision =
       mode === "clear"
         ? clearWindow(previous, now)
@@ -165,6 +171,9 @@ export const batchWindowNode = defineNode({
         items: decision.items,
         state: decision.state,
         name,
+        mode,
+        maxItems,
+        maxAgeMs,
         count,
         remaining,
         ageMs,
@@ -263,6 +272,28 @@ function readTimestamp(value: unknown): number | undefined {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readMode(value: unknown): BatchWindowMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "add" || normalized === "flush" || normalized === "clear"
+    ? normalized
+    : undefined;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer > 0 ? integer : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
