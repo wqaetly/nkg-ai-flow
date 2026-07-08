@@ -1020,7 +1020,7 @@ export class ExecutionEngine {
         ? this.foreachIterations(beginNode, state)
         : this.forIterations(beginNode, state);
     const aggregated = new Map<string, unknown[]>();
-    const config = asRecord(this.assembleInputs(beginNode, state).__config__);
+    const config = loopConfigFromInputs(this.assembleInputs(beginNode, state));
     const errorPolicy = readLoopErrorPolicy(config.onError);
     const timeoutMs = Math.max(0, Math.trunc(numberOr(config.timeoutMs, 0)));
     const startedAt = Date.now();
@@ -1172,7 +1172,7 @@ export class ExecutionEngine {
     state: ExecutionState = this.defaultExecutionState(),
   ): NodeOutputs[] {
     const inputs = this.assembleInputs(beginNode, state);
-    const config = asRecord(inputs.__config__);
+    const config = loopConfigFromInputs(inputs);
     const start = numberOr(config.start, 0);
     const end = numberOr(config.end, start);
     const rawStep = numberOr(config.step, 1);
@@ -1361,7 +1361,7 @@ export class ExecutionEngine {
     executionState: ExecutionState = this.defaultExecutionState(),
   ): Promise<boolean> {
     const inputs = this.assembleInputs(beginNode, executionState);
-    const config = asRecord(inputs.__config__);
+    const config = loopConfigFromInputs(inputs);
     const maxIterations = Math.max(1, Math.trunc(numberOr(config.maxIterations, 10)));
     const checkMode = config.checkMode === "before" ? "before" : "after";
     const errorPolicy = readLoopErrorPolicy(config.onError);
@@ -1948,6 +1948,27 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : {};
+}
+
+function loopConfigFromInputs(inputs: Record<string, unknown>): Record<string, unknown> {
+  const config = { ...asRecord(inputs.__config__) };
+  for (const key of [
+    "mode",
+    "concurrency",
+    "batchSize",
+    "onError",
+    "timeoutMs",
+    "start",
+    "end",
+    "step",
+    "maxIterations",
+    "checkMode",
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(inputs, key)) {
+      config[key] = inputs[key];
+    }
+  }
+  return config;
 }
 
 function numberOr(value: unknown, fallback: number): number {

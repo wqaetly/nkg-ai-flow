@@ -640,6 +640,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       for_begin: {
         body: "循环体",
+        start: "起始值",
+        end: "结束值",
+        step: "步长",
+        onError: "错误策略",
+        timeoutMs: "超时毫秒",
         index: "索引",
         count: "总数",
       },

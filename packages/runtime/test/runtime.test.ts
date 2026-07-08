@@ -20399,6 +20399,97 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic for_begin range inputs when executing the loop block", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "for_block_dynamic_range_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const startValue = flow.node("transform", {
+      id: "startValue",
+      position: { x: 120, y: 0 },
+      config: { value: 2 },
+    });
+    const endValue = flow.node("transform", {
+      id: "endValue",
+      position: { x: 120, y: 120 },
+      config: { value: 8 },
+    });
+    const stepValue = flow.node("transform", {
+      id: "stepValue",
+      position: { x: 120, y: 240 },
+      config: { value: 3 },
+    });
+    const begin = flow.node("for_begin", {
+      id: "begin",
+      position: { x: 320, y: 0 },
+      config: { start: 0, end: 3, step: 1 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 480, y: 0 },
+      config: { template: "i=${input}" },
+    });
+    const loopEnd = flow.node("for_end", {
+      id: "loop_end",
+      position: { x: 640, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 800, y: 0 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 940, y: 0 } });
+
+    flow.connect(start.out("out"), startValue.in("in"));
+    flow.connect(startValue.out("out"), endValue.in("in"));
+    flow.connect(endValue.out("out"), stepValue.in("in"));
+    flow.connect(stepValue.out("out"), begin.in("in"));
+    flow.connect(startValue.out("output"), begin.in("start"));
+    flow.connect(endValue.out("output"), begin.in("end"));
+    flow.connect(stepValue.out("output"), begin.in("step"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(begin.out("index"), body.in("input"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("result"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "for_block_dynamic_range_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=i=2,i=5");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+    expect(progress.map((event) => (event.payload as { iteration: number }).iteration)).toEqual([
+      0,
+      0,
+      1,
+      1,
+    ]);
+    expect(progress[0]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "for_begin",
+      context: { index: 2, count: 2 },
+    });
+    expect(progress[2]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "for_begin",
+      context: { index: 5, count: 2 },
+    });
+  });
+
   it("executes descending for ranges with a negative step", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

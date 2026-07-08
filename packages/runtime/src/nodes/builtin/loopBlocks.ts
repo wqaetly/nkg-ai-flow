@@ -231,14 +231,26 @@ export const forBeginNode = defineNode({
   ports: [
     controlIn,
     bodyOut,
+    { id: "start", direction: "input", kind: "data", label: "起始值", schema: { type: "number" } },
+    { id: "end", direction: "input", kind: "data", label: "结束值", schema: { type: "number" } },
+    { id: "step", direction: "input", kind: "data", label: "步长", schema: { type: "number" } },
+    { id: "onError", direction: "input", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "input", kind: "data", label: "超时毫秒", schema: { type: "number" } },
     { id: "index", direction: "output", kind: "data", label: "索引" },
     { id: "count", direction: "output", kind: "data", label: "总数" },
+    { id: "start", direction: "output", kind: "data", label: "起始值", schema: { type: "number" } },
+    { id: "end", direction: "output", kind: "data", label: "结束值", schema: { type: "number" } },
+    { id: "step", direction: "output", kind: "data", label: "步长", schema: { type: "number" } },
+    { id: "onError", direction: "output", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "output", kind: "data", label: "超时毫秒", schema: { type: "number" } },
   ],
   validateInput: false,
-  run({ config }) {
-    const start = Number(config.start ?? 0);
-    const end = Number(config.end ?? start);
-    const step = Number(config.step ?? 1) || 1;
+  run({ input, config }) {
+    const start = readNumber(input.start, Number(config.start ?? 0));
+    const end = readNumber(input.end, Number(config.end ?? start));
+    const step = readNumber(input.step, Number(config.step ?? 1)) || 1;
+    const onError = readLoopErrorPolicyInput(input.onError ?? config.onError);
+    const timeoutMs = Math.max(0, Math.trunc(readNumber(input.timeoutMs, Number(config.timeoutMs ?? 0))));
     const values = forRange(start, end, step);
     return {
       kind: "success",
@@ -246,6 +258,11 @@ export const forBeginNode = defineNode({
         body: null,
         index: values[0] ?? start,
         count: values.length,
+        start,
+        end,
+        step,
+        onError,
+        timeoutMs,
       },
     };
   },
@@ -499,6 +516,15 @@ function readLoopIterationCount(value: unknown, fallback: number): number {
 function readLoopControlReason(inputReason: unknown, configReason: unknown): string {
   const value = inputReason ?? configReason ?? "";
   return typeof value === "string" ? value : String(value);
+}
+
+function readNumber(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function readLoopErrorPolicyInput(value: unknown): string {
+  return value === "continue" || value === "break" || value === "route" ? value : "terminate";
 }
 
 function forRange(start: number, end: number, step: number): number[] {
