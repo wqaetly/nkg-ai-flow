@@ -25,7 +25,6 @@ export const delayNode = defineNode({
   typeVersion: "1.0.0",
   title: "Delay",
   description: "Waits for a configured duration, then continues the flow.",
-  kind: "control",
   config: delayConfig,
   fieldMeta: {
     durationMs: {
