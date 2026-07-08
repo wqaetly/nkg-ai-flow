@@ -61,6 +61,7 @@ const BUILTIN_TYPES = [
   "rate_limit",
   "reduce_items",
   "retry_policy",
+  "rollback",
   "schedule_window",
   "schema_guard",
   "schema_transform",

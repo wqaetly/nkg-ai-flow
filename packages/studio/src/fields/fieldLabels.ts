@@ -425,6 +425,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxDelayMs: "最大等待毫秒",
         retryableOnly: "仅重试可重试错误",
       },
+      rollback: {
+        mode: "模式",
+        successPath: "成功字段路径",
+        successValues: "成功状态值",
+        errorPath: "错误字段路径",
+        missingResult: "缺失结果策略",
+      },
       schedule_window: {
         startTime: "开始时间",
         endTime: "结束时间",

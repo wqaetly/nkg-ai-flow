@@ -2294,6 +2294,165 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes drained compensation actions into a rollback branch", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "rollback_plan_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const first = flow.node("compensation", {
+      id: "first",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_ROLLBACKS",
+        mode: "register",
+        action: "release_inventory",
+        payload: { sku: "book", quantity: 1 },
+      },
+    });
+    const second = flow.node("compensation", {
+      id: "second",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_ROLLBACKS",
+        mode: "register",
+        action: "refund_payment",
+        payload: { paymentId: "pay_1" },
+      },
+    });
+    const drain = flow.node("compensation", {
+      id: "drain",
+      position: { x: 400, y: 0 },
+      config: {
+        name: "ORDER_ROLLBACKS",
+        mode: "drain",
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 540, y: 0 },
+      config: { mode: "plan" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 680, y: 0 },
+      config: { template: "rollback:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(first.out("out"), second.in("in"));
+    flow.connect(second.out("out"), drain.in("in"));
+    flow.connect(drain.out("out"), rollback.in("in"));
+    flow.connect(drain.out("actions"), rollback.in("actions"));
+    flow.connect(rollback.out("rollback"), report.in("in"));
+    flow.connect(rollback.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_plan_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("rollback:2");
+    expect(variables.get("ORDER_ROLLBACKS")).toMatchObject({
+      actions: [],
+    });
+  });
+
+  it("routes rollback to empty when there are no compensation actions", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "rollback_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 120, y: 0 },
+      config: { mode: "plan" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "rollback:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), rollback.in("in"));
+    flow.connect(rollback.out("empty"), report.in("in"));
+    flow.connect(rollback.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("rollback:empty");
+  });
+
+  it("summarizes rollback results as partial success", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "rollback_partial_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const actions = flow.node("transform", {
+      id: "actions",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a1", action: "release_inventory", payload: { sku: "book" }, registeredAt: 1 },
+          { id: "a2", action: "refund_payment", payload: { paymentId: "pay_1" }, registeredAt: 2 },
+        ],
+      },
+    });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 260, y: 0 },
+      config: {
+        value: [
+          { status: "succeeded" },
+          { status: "failed", error: "refund_failed" },
+        ],
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 400, y: 0 },
+      config: { mode: "summarize" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "partial:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), actions.in("in"));
+    flow.connect(actions.out("out"), results.in("in"));
+    flow.connect(results.out("out"), rollback.in("in"));
+    flow.connect(actions.out("output"), rollback.in("actions"));
+    flow.connect(results.out("output"), rollback.in("results"));
+    flow.connect(rollback.out("partial"), report.in("in"));
+    flow.connect(rollback.out("failureCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_partial_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("partial:1");
+  });
+
   it("routes wait_signal to received when an external signal is present", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {
