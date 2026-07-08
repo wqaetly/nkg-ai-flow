@@ -437,6 +437,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         baseDelayMs: "基础等待毫秒",
         multiplier: "退避倍率",
         maxDelayMs: "最大等待毫秒",
+        jitterPercent: "抖动比例",
         retryableOnly: "仅重试可重试错误",
         retryableCodes: "可重试错误码",
       },

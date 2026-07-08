@@ -35,6 +35,12 @@ const retryPolicyConfig = z
       .min(0)
       .default(30000)
       .describe("Maximum backoff delay in milliseconds."),
+    jitterPercent: z
+      .number()
+      .min(0)
+      .max(100)
+      .default(0)
+      .describe("Deterministic jitter percentage applied to retry delay."),
     retryableOnly: z
       .boolean()
       .default(true)
@@ -58,8 +64,9 @@ export const retryPolicyNode = defineNode({
     baseDelayMs: { label: "Base Delay (ms)", control: "number", order: 2 },
     multiplier: { label: "Multiplier", control: "number", order: 3 },
     maxDelayMs: { label: "Max Delay (ms)", control: "number", order: 4 },
-    retryableOnly: { label: "Retryable Only", control: "switch", order: 5 },
-    retryableCodes: { label: "Retryable Codes", control: "input", order: 6 },
+    jitterPercent: { label: "Jitter Percent", control: "number", order: 5 },
+    retryableOnly: { label: "Retryable Only", control: "switch", order: 6 },
+    retryableCodes: { label: "Retryable Codes", control: "input", order: 7 },
   },
   ports: [
     { id: "error", direction: "input", kind: "data", label: "Error" },
@@ -115,7 +122,7 @@ export const retryPolicyNode = defineNode({
     const canRetry =
       attempt < maxAttempts && (config.retryableOnly === false || retryable === true);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
-    const delayMs = canRetry ? calculateDelay(config, attempt) : 0;
+    const delayMs = canRetry ? calculateDelay(config, input.error, attempt) : 0;
     const branch = canRetry ? "retry" : "exhausted";
 
     ctx.log.debug("retry_policy selected branch", {
@@ -188,14 +195,30 @@ function matchesCodePattern(code: string, pattern: string): boolean {
 }
 
 function calculateDelay(
-  config: { baseDelayMs?: unknown; multiplier?: unknown; maxDelayMs?: unknown },
+  config: { baseDelayMs?: unknown; multiplier?: unknown; maxDelayMs?: unknown; jitterPercent?: unknown },
+  error: unknown,
   attempt: number,
 ): number {
   const baseDelayMs = Math.max(0, Math.trunc(Number(config.baseDelayMs ?? 1000)));
   const multiplier = Math.max(1, Number(config.multiplier ?? 2));
   const maxDelayMs = Math.max(0, Math.trunc(Number(config.maxDelayMs ?? 30000)));
+  const jitterPercent = Math.min(100, Math.max(0, Number(config.jitterPercent ?? 0)));
   const exponential = baseDelayMs * multiplier ** Math.max(0, attempt - 1);
-  return Math.min(maxDelayMs, Math.trunc(exponential));
+  const capped = Math.min(maxDelayMs, Math.trunc(exponential));
+  if (jitterPercent <= 0 || capped <= 0) return capped;
+  const spread = capped * (jitterPercent / 100);
+  const code = readPath(error, ["code"]);
+  const unit = stableUnit(`${typeof code === "string" ? code : ""}:${attempt}`);
+  return Math.max(0, Math.trunc(capped - spread + unit * spread * 2));
+}
+
+function stableUnit(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0xffffffff;
 }
 
 function readPath(value: unknown, path: readonly string[]): unknown {

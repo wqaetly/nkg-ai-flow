@@ -53,6 +53,32 @@ async function registerAndPromote(rt: Runtime, flow: ReturnType<typeof defineFlo
   return graph;
 }
 
+function deterministicJitterDelay(args: {
+  baseDelayMs: number;
+  multiplier: number;
+  maxDelayMs: number;
+  jitterPercent: number;
+  code: string;
+  attempt: number;
+}): number {
+  const exponential =
+    args.baseDelayMs * args.multiplier ** Math.max(0, args.attempt - 1);
+  const capped = Math.min(args.maxDelayMs, Math.trunc(exponential));
+  if (args.jitterPercent <= 0 || capped <= 0) return capped;
+  const spread = capped * (args.jitterPercent / 100);
+  const unit = stableUnit(`${args.code}:${args.attempt}`);
+  return Math.max(0, Math.trunc(capped - spread + unit * spread * 2));
+}
+
+function stableUnit(value: string): number {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) / 0xffffffff;
+}
+
 /* -------------------------------------------------------------------------- */
 /* hello-flow end-to-end                                                       */
 /* -------------------------------------------------------------------------- */
@@ -1754,6 +1780,58 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("retry:100");
+  });
+
+  it("applies deterministic jitter to retry_policy backoff", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_jitter_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 3,
+        baseDelayMs: 1000,
+        multiplier: 2,
+        maxDelayMs: 10_000,
+        jitterPercent: 50,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_jitter_e2e",
+      input: null,
+    });
+
+    const expectedDelay = deterministicJitterDelay({
+      baseDelayMs: 1000,
+      multiplier: 2,
+      maxDelayMs: 10_000,
+      jitterPercent: 50,
+      code: "payment.timeout",
+      attempt: 1,
+    });
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe(`retry:${expectedDelay}`);
   });
 
   it("routes exhausted retry_policy errors to the exhausted branch", async () => {
