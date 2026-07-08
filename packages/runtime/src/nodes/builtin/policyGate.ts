@@ -77,8 +77,14 @@ export const policyGateNode = defineNode({
   ports: [
     controlIn,
     { id: "input", direction: "input", kind: "data", label: "Input" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "rules", direction: "input", kind: "data", label: "Rules", schema: { type: "string" } },
+    { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
     { id: "allowed", direction: "output", kind: "control", label: "Allowed" },
     { id: "denied", direction: "output", kind: "control", label: "Denied" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "rules", direction: "output", kind: "data", label: "Rules", schema: { type: "string" } },
+    { id: "ruleCount", direction: "output", kind: "data", label: "Rule Count", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "passed", direction: "output", kind: "data", label: "Passed rules" },
     { id: "failed", direction: "output", kind: "data", label: "Failed rules" },
@@ -87,7 +93,9 @@ export const policyGateNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const rules = parseRules(String(config.rules ?? ""));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "all";
+    const ruleSource = String(input.rules ?? config.rules ?? "");
+    const rules = parseRules(ruleSource);
     const invalid = rules.find((rule) => rule instanceof Error);
     if (invalid instanceof Error) {
       return error(
@@ -99,13 +107,14 @@ export const policyGateNode = defineNode({
 
     const parsedRules = rules as PolicyRule[];
     const payload = input.input ?? input.in ?? input.__runInput__ ?? input;
-    const mode = config.mode === "any" ? "any" : "all";
 
     if (parsedRules.length === 0) {
       return decision({
         status: "denied",
         reason: "no_rules",
         results: [],
+        mode,
+        rules: ruleSource,
       });
     }
 
@@ -115,7 +124,7 @@ export const policyGateNode = defineNode({
     const status = allowed ? "allowed" : "denied";
     const reason = allowed
       ? ""
-      : String(config.reason ?? "").trim() || `failed_rules:${failed.join(",")}`;
+      : String(input.reason ?? config.reason ?? "").trim() || `failed_rules:${failed.join(",")}`;
 
     ctx.log.debug("policy_gate selected branch", {
       mode,
@@ -124,9 +133,15 @@ export const policyGateNode = defineNode({
       failed: failed.length,
     });
 
-    return decision({ status, reason, results });
+    return decision({ status, reason, results, mode, rules: ruleSource });
   },
 });
+
+function readMode(value: unknown): PolicyMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "all" || normalized === "any" ? normalized : undefined;
+}
 
 function parseRules(source: string): Array<PolicyRule | Error> {
   return source
@@ -235,6 +250,8 @@ function decision(args: {
   status: "allowed" | "denied";
   reason: string;
   results: PolicyRuleResult[];
+  mode: PolicyMode;
+  rules: string;
 }) {
   const passed = args.results
     .filter((result) => result.passed)
@@ -246,6 +263,9 @@ function decision(args: {
     kind: "success" as const,
     outputs: {
       [args.status]: null,
+      mode: args.mode,
+      rules: args.rules,
+      ruleCount: args.results.length,
       status: args.status,
       passed,
       failed,

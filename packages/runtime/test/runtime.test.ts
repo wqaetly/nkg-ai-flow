@@ -1487,6 +1487,85 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("policy:allowed");
   });
 
+  it("uses dynamic policy_gate policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "policy_gate_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { tier: "silver", beta: true, amount: 180 } },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -180 },
+      config: { value: "any" },
+    });
+    const rules = flow.node("transform", {
+      id: "rules",
+      position: { x: 120, y: -90 },
+      config: { value: 'tier == "gold"\nbeta\namount <= 100' },
+    });
+    const reason = flow.node("transform", {
+      id: "reason",
+      position: { x: 120, y: 90 },
+      config: { value: "dynamic_policy_denied" },
+    });
+    const gate = flow.node("policy_gate", {
+      id: "gate",
+      position: { x: 320, y: 0 },
+      config: {
+        mode: "all",
+        rules: 'tier == "gold"\namount <= 100',
+        reason: "static_denied",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "policy:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), rules.in("in"));
+    flow.connect(start.out("out"), reason.in("in"));
+    flow.connect(input.out("out"), gate.in("in"));
+    flow.connect(input.out("output"), gate.in("input"));
+    flow.connect(mode.out("output"), gate.in("mode"));
+    flow.connect(rules.out("output"), gate.in("rules"));
+    flow.connect(reason.out("output"), gate.in("reason"));
+    flow.connect(gate.out("allowed"), report.in("in"));
+    flow.connect(gate.out("ruleCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "policy_gate_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("policy:3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      mode: "any",
+      rules: 'tier == "gold"\nbeta\namount <= 100',
+      ruleCount: 3,
+      status: "allowed",
+      reason: "",
+      passed: ["beta"],
+      failed: ['tier == "gold"', "amount <= 100"],
+    });
+  });
+
   it("routes policy_gate with no rules to denied", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "policy_gate_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
