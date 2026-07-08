@@ -1890,6 +1890,256 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_WORK_QUEUE")).toBe(false);
   });
 
+  it("stores values in cache", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_set_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const value = flow.node("transform", {
+      id: "value",
+      position: { x: 120, y: 0 },
+      config: { value: { status: "ready", source: "http" } },
+    });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 260, y: 0 },
+      config: {
+        namespace: "http",
+        key: "GET:/orders/1",
+        mode: "set",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "stored:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), value.in("in"));
+    flow.connect(value.out("out"), cache.in("in"));
+    flow.connect(value.out("output"), cache.in("value"));
+    flow.connect(cache.out("stored"), report.in("in"));
+    flow.connect(cache.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_set_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("stored:1");
+    expect(variables.get("CACHE:http:GET:/orders/1")).toMatchObject({
+      value: { status: "ready", source: "http" },
+      hits: 0,
+    });
+  });
+
+  it("reads cache hits and updates hit count", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CACHE:http:GET:/orders/1", {
+      value: { status: "ready" },
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+      hits: 1,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_hit_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "http",
+        key: "GET:/orders/1",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "hit:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(cache.out("hit"), report.in("in"));
+    flow.connect(cache.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_hit_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("hit:ready");
+    expect(variables.get("CACHE:http:GET:/orders/1")).toMatchObject({
+      hits: 2,
+    });
+  });
+
+  it("routes missing cache entries to miss", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_miss_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "http",
+        key: "GET:/orders/2",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "miss:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(cache.out("miss"), report.in("in"));
+    flow.connect(cache.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_miss_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("miss:0");
+  });
+
+  it("routes expired cache entries to expired and deletes them", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CACHE:http:GET:/orders/1", {
+      value: { status: "stale" },
+      createdAt: Date.now() - 120_000,
+      updatedAt: Date.now() - 120_000,
+      expiresAt: Date.now() - 1,
+      hits: 3,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "http",
+        key: "GET:/orders/1",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "expired:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(cache.out("expired"), report.in("in"));
+    flow.connect(cache.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("expired:stale");
+    expect(variables.has("CACHE:http:GET:/orders/1")).toBe(false);
+  });
+
+  it("clears cache entries by namespace", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("CACHE:http:GET:/orders/1", {
+      value: "order-1",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: null,
+      hits: 0,
+    });
+    variables.set("CACHE:http:GET:/orders/2", {
+      value: "order-2",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: null,
+      hits: 0,
+    });
+    variables.set("CACHE:llm:summary", {
+      value: "kept",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      expiresAt: null,
+      hits: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "http",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "cleared:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(cache.out("cleared"), report.in("in"));
+    flow.connect(cache.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cleared:2");
+    expect(variables.has("CACHE:http:GET:/orders/1")).toBe(false);
+    expect(variables.has("CACHE:http:GET:/orders/2")).toBe(false);
+    expect(variables.has("CACHE:llm:summary")).toBe(true);
+  });
+
   it("saves a checkpoint snapshot for later recovery", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

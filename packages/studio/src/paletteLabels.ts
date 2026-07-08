@@ -33,6 +33,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "批窗口",
         description: "累积输入项，并在达到数量或时间窗口后输出批次。",
       },
+      cache: {
+        title: "缓存",
+        description: "读取、写入、删除或清空命名空间下的缓存值。",
+      },
       checkpoint: {
         title: "检查点",
         description: "保存、读取、续期或清除流程断点快照。",

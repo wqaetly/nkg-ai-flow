@@ -142,6 +142,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxAgeMs: "最大窗口时长（毫秒）",
         mode: "模式",
       },
+      cache: {
+        namespace: "命名空间",
+        key: "缓存键",
+        mode: "模式",
+        ttlMs: "TTL（毫秒）",
+        value: "静态缓存值",
+      },
       condition: {
         expression: "条件表达式",
       },

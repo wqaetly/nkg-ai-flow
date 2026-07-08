@@ -16,6 +16,7 @@ const BUILTIN_TYPES = [
   "end",
   "transform",
   "batch_window",
+  "cache",
   "checkpoint",
   "circuit_breaker",
   "compensation",
