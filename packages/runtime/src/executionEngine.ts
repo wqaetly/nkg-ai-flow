@@ -134,6 +134,8 @@ export class ExecutionEngine {
   private finalOutput: unknown = undefined;
   /** Whether `end` node has completed. */
   private endReached = false;
+  /** First failure already published through `run_failed`. */
+  private failureError: RuntimeError | undefined;
   /** Per-attempt counter for runners (Phase 1 always runs attempt=1). */
   private readonly attempt = 1;
 
@@ -341,6 +343,10 @@ export class ExecutionEngine {
         payload: { reason: "external cancellation" },
       });
       return { succeeded: false, cancelled: true };
+    }
+
+    if (this.failureError) {
+      return { succeeded: false, cancelled: false, error: this.failureError };
     }
 
     if (!this.endReached) {
@@ -1614,6 +1620,7 @@ export class ExecutionEngine {
   }
 
   private async publishRunFailed(error: RuntimeError): Promise<void> {
+    this.failureError ??= error;
     await this.options.eventBus.publish({
       runId: this.options.runId,
       flowId: this.options.flowId,

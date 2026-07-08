@@ -8964,6 +8964,79 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("error=node.http.missing_url");
   });
 
+  it("terminates a foreach block on body errors by default", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_error_terminate_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+    });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 300, y: 0 },
+      config: {},
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "should-not-run" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), failing.in("in"));
+    flow.connect(failing.out("out"), end.in("body_done"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_error_terminate_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(false);
+    expect(result.runRecord.status).toBe("failed");
+    expect(result.error?.code).toBe("node.http.missing_url");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.some((event) => event.kind === "node_started" && event.nodeId === "loop_end"),
+    ).toBe(false);
+    expect(
+      events.some((event) => event.kind === "node_started" && event.nodeId === "report"),
+    ).toBe(false);
+    expect(
+      events.find(
+        (event) =>
+          event.kind === "node_progress" &&
+          event.nodeId === "begin" &&
+          (event.payload as { phase?: string }).phase === "finished",
+      )?.payload,
+    ).toMatchObject({
+      type: "loop_iteration",
+      iteration: 0,
+      status: "failed",
+    });
+  });
+
   it("stops a foreach block when loop_break runs inside the body", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
