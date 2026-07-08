@@ -1911,6 +1911,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("retry:100");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(policyOutput).toMatchObject({
+      status: "retry",
+      attempt: 1,
+      nextAttempt: 2,
+      maxAttempts: 3,
+      remainingAttempts: 2,
+      exhaustedValue: false,
+      delayMs: 100,
+    });
   });
 
   it("applies deterministic jitter to retry_policy backoff", async () => {
@@ -2047,6 +2062,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("exhausted:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(policyOutput).toMatchObject({
+      status: "exhausted",
+      attempt: 1,
+      nextAttempt: 1,
+      maxAttempts: 1,
+      remainingAttempts: 0,
+      exhaustedValue: true,
+      delayMs: 0,
+    });
   });
 
   it("routes retry_policy to exhausted when error code is not retryable", async () => {

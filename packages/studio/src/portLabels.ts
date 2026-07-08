@@ -738,6 +738,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         nextAttempt: "下一次尝试",
         delayMs: "等待毫秒",
         retryable: "可重试",
+        status: "状态",
+        maxAttempts: "最大尝试次数",
+        remainingAttempts: "剩余尝试次数",
+        exhaustedValue: "是否耗尽",
       },
       retry_state: {
         in: "输入",

@@ -133,6 +133,34 @@ export const retryPolicyNode = defineNode({
       label: "Retryable",
       schema: { type: "boolean" },
     },
+    {
+      id: "status",
+      direction: "output",
+      kind: "data",
+      label: "Status",
+      schema: { type: "string" },
+    },
+    {
+      id: "maxAttempts",
+      direction: "output",
+      kind: "data",
+      label: "Max Attempts",
+      schema: { type: "number" },
+    },
+    {
+      id: "remainingAttempts",
+      direction: "output",
+      kind: "data",
+      label: "Remaining Attempts",
+      schema: { type: "number" },
+    },
+    {
+      id: "exhaustedValue",
+      direction: "output",
+      kind: "data",
+      label: "Exhausted",
+      schema: { type: "boolean" },
+    },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -144,6 +172,7 @@ export const retryPolicyNode = defineNode({
     const nextAttempt = canRetry ? attempt + 1 : attempt;
     const delayMs = canRetry ? calculateDelay(config, input.error, attempt) : 0;
     const branch = canRetry ? "retry" : "exhausted";
+    const remainingAttempts = Math.max(0, maxAttempts - attempt);
 
     ctx.log.debug("retry_policy selected branch", {
       attempt,
@@ -162,6 +191,10 @@ export const retryPolicyNode = defineNode({
         nextAttempt,
         delayMs,
         retryable,
+        status: branch,
+        maxAttempts,
+        remainingAttempts,
+        exhaustedValue: !canRetry,
       },
     };
   },
