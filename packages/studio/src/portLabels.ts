@@ -264,6 +264,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       cache: {
         in: "输入",
+        namespace: "命名空间",
         key: "缓存键",
         value: "缓存值",
         hit: "命中",
@@ -273,7 +274,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         cleared: "已清空",
         expired: "已过期",
         entry: "缓存条目",
-        namespace: "命名空间",
+        storeKey: "存储键",
         count: "数量",
         expiresAt: "过期时间",
         remainingMs: "剩余毫秒",

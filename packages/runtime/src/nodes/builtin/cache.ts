@@ -85,6 +85,7 @@ export const cacheNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "namespace", direction: "input", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "input", kind: "data", label: "Key" },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "hit", direction: "output", kind: "control", label: "Hit" },
@@ -101,6 +102,13 @@ export const cacheNode = defineNode({
       direction: "output",
       kind: "data",
       label: "Namespace",
+      schema: { type: "string" },
+    },
+    {
+      id: "storeKey",
+      direction: "output",
+      kind: "data",
+      label: "Store Key",
       schema: { type: "string" },
     },
     {
@@ -132,7 +140,7 @@ export const cacheNode = defineNode({
       return error("node.cache.readonly_store", "cache requires a mutable VariableStore", ctx.nodeId);
     }
 
-    const namespace = readNamespace(config.namespace);
+    const namespace = readNamespace(input.namespace ?? config.namespace);
     const mode = config.mode ?? "get";
     const now = Date.now();
     if (mode === "clear") {
@@ -145,6 +153,7 @@ export const cacheNode = defineNode({
       return success("cleared", {
         namespace,
         key: "",
+        storeKey: prefix,
         value: null,
         entry: null,
         count: keys.length,
@@ -164,6 +173,7 @@ export const cacheNode = defineNode({
       return success(existed ? "deleted" : "miss", {
         namespace,
         key,
+        storeKey,
         value: null,
         entry: null,
         count: existed ? 1 : 0,
@@ -191,6 +201,7 @@ export const cacheNode = defineNode({
       return success("stored", {
         namespace,
         key,
+        storeKey,
         value,
         entry,
         count: 1,
@@ -204,6 +215,7 @@ export const cacheNode = defineNode({
       return success("miss", {
         namespace,
         key,
+        storeKey,
         value: null,
         entry: null,
         count: 0,
@@ -216,6 +228,7 @@ export const cacheNode = defineNode({
       return success("expired", {
         namespace,
         key,
+        storeKey,
         value: entry.value,
         entry,
         count: 0,
@@ -228,6 +241,7 @@ export const cacheNode = defineNode({
     return success("hit", {
       namespace,
       key,
+      storeKey,
       value: hit.value,
       entry: hit,
       count: 1,
@@ -242,6 +256,7 @@ function success(
   values: {
     namespace: string;
     key: string;
+    storeKey: string;
     value: VariableValue | null;
     entry: CacheEntry | null;
     count: number;
@@ -257,6 +272,7 @@ function success(
       entry: values.entry,
       key: values.key,
       namespace: values.namespace,
+      storeKey: values.storeKey,
       count: values.count,
       expiresAt: values.expiresAt,
       remainingMs: values.remainingMs,

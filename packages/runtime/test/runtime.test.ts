@@ -8373,6 +8373,70 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("stores cache entries with a dynamic namespace input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_dynamic_namespace_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const namespace = flow.node("transform", {
+      id: "namespace",
+      position: { x: 120, y: -100 },
+      config: { value: "tenant-a-http" },
+    });
+    const key = flow.node("transform", {
+      id: "key",
+      position: { x: 120, y: 0 },
+      config: { value: "GET:/orders/dynamic" },
+    });
+    const value = flow.node("transform", {
+      id: "value",
+      position: { x: 120, y: 100 },
+      config: { value: { status: "ready", source: "dynamic" } },
+    });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 320, y: 0 },
+      config: {
+        mode: "set",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "stored:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), namespace.in("in"));
+    flow.connect(start.out("out"), key.in("in"));
+    flow.connect(start.out("out"), value.in("in"));
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(namespace.out("output"), cache.in("namespace"));
+    flow.connect(key.out("output"), cache.in("key"));
+    flow.connect(value.out("output"), cache.in("value"));
+    flow.connect(cache.out("stored"), report.in("in"));
+    flow.connect(cache.out("storeKey"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_dynamic_namespace_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("stored:CACHE:tenant-a-http:GET:/orders/dynamic");
+    expect(variables.get("CACHE:tenant-a-http:GET:/orders/dynamic")).toMatchObject({
+      value: { status: "ready", source: "dynamic" },
+      hits: 0,
+    });
+  });
+
   it("reads cache hits and updates hit count", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("CACHE:http:GET:/orders/1", {
