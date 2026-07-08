@@ -1140,6 +1140,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       sort_items: {
         items: "排序项",
+        path: "路径",
+        direction: "方向",
+        type: "类型",
+        nulls: "空值位置",
+        limit: "限制数量",
         keys: "排序键",
         first: "第一项",
         last: "最后一项",

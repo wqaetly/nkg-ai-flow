@@ -17045,6 +17045,116 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("sorted=high,middle");
   });
 
+  it("uses dynamic sort_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "sort_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "low", priority: 1 },
+          { id: "high", priority: 3 },
+          { id: "missing" },
+          { id: "middle", priority: 2 },
+        ],
+      },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 100 },
+      config: { value: "priority" },
+    });
+    const direction = flow.node("transform", {
+      id: "direction",
+      position: { x: 120, y: 180 },
+      config: { value: "asc" },
+    });
+    const type = flow.node("transform", {
+      id: "type",
+      position: { x: 120, y: 260 },
+      config: { value: "number" },
+    });
+    const nulls = flow.node("transform", {
+      id: "nulls",
+      position: { x: 120, y: 340 },
+      config: { value: "first" },
+    });
+    const limit = flow.node("transform", {
+      id: "limit",
+      position: { x: 120, y: 420 },
+      config: { value: 3 },
+    });
+    const sort = flow.node("sort_items", {
+      id: "sort",
+      position: { x: 340, y: 0 },
+      config: {
+        path: "priority",
+        direction: "desc",
+        type: "number",
+        nulls: "last",
+        limit: 1,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 500, y: 0 },
+      config: { template: "${item.id}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 660, y: 0 },
+      config: { template: "sorted=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), direction.in("in"));
+    flow.connect(start.out("out"), type.in("in"));
+    flow.connect(start.out("out"), nulls.in("in"));
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(input.out("out"), sort.in("in"));
+    flow.connect(input.out("output"), sort.in("items"));
+    flow.connect(path.out("output"), sort.in("path"));
+    flow.connect(direction.out("output"), sort.in("direction"));
+    flow.connect(type.out("output"), sort.in("type"));
+    flow.connect(nulls.out("output"), sort.in("nulls"));
+    flow.connect(limit.out("output"), sort.in("limit"));
+    flow.connect(sort.out("out"), map.in("in"));
+    flow.connect(sort.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "sort_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sorted=missing,low,middle");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sortOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "sort") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sortOutput).toMatchObject({
+      path: "priority",
+      direction: "asc",
+      type: "number",
+      nulls: "first",
+      limit: 3,
+      first: { id: "missing" },
+      last: { id: "middle", priority: 2 },
+      count: 3,
+    });
+  });
+
   it("slices array items with slice_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "slice_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

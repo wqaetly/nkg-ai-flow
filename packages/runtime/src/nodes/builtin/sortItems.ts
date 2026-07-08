@@ -96,6 +96,11 @@ export const sortItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "direction", direction: "input", kind: "data", label: "Direction", schema: { type: "string" } },
+    { id: "type", direction: "input", kind: "data", label: "Type", schema: { type: "string" } },
+    { id: "nulls", direction: "input", kind: "data", label: "Nulls", schema: { type: "string" } },
+    { id: "limit", direction: "input", kind: "data", label: "Limit", schema: { type: "number" } },
     {
       id: "items",
       direction: "output",
@@ -103,6 +108,11 @@ export const sortItemsNode = defineNode({
       label: "Sorted items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "direction", direction: "output", kind: "data", label: "Direction", schema: { type: "string" } },
+    { id: "type", direction: "output", kind: "data", label: "Type", schema: { type: "string" } },
+    { id: "nulls", direction: "output", kind: "data", label: "Nulls", schema: { type: "string" } },
+    { id: "limit", direction: "output", kind: "data", label: "Limit", schema: { type: "number" } },
     {
       id: "keys",
       direction: "output",
@@ -137,11 +147,11 @@ export const sortItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const path = String(config.path ?? "");
-    const direction = readDirection(config.direction);
-    const type = readType(config.type);
-    const nulls = readNulls(config.nulls);
-    const limit = Math.max(0, Math.trunc(Number(config.limit ?? 0)));
+    const path = String(input.path ?? config.path ?? "");
+    const direction = readDirection(input.direction ?? config.direction);
+    const type = readType(input.type ?? config.type);
+    const nulls = readNulls(input.nulls ?? config.nulls);
+    const limit = readNonNegativeInteger(input.limit) ?? readNonNegativeInteger(config.limit) ?? 0;
     const sortedEntries = source
       .map((item, index): SortEntry => ({ item, key: valueAtPath(item, path), index }))
       .sort((left, right) => {
@@ -166,6 +176,11 @@ export const sortItemsNode = defineNode({
       outputs: {
         out: null,
         items,
+        path,
+        direction,
+        type,
+        nulls,
+        limit,
         keys,
         first: items[0] ?? null,
         last: items.at(-1) ?? null,
@@ -185,6 +200,11 @@ function readType(value: unknown): SortValueType {
 
 function readNulls(value: unknown): NullPlacement {
   return value === "first" ? "first" : "last";
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  const parsed = Math.trunc(Number(value));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
 function valueAtPath(item: unknown, path: string): unknown {
