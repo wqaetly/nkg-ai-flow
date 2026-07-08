@@ -38,6 +38,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       base_url: "服务地址",
       body: "请求体",
       batchSize: "批大小",
+      branchCount: "分支数量",
       checkMode: "检查时机",
       concurrency: "并发数",
       condition: "继续条件",
@@ -155,6 +156,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         max_tokens: "最大输出 Token",
         max_concurrency: "最大并发数",
         max_retries: "JSON 重试次数",
+      },
+      parallel: {
+        branchCount: "分支数量",
       },
       skill_parser: {
         default_name: "默认 Skill 名称",

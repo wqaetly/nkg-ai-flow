@@ -97,6 +97,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "节点设计器（LLM 并发）",
         description: "针对执行计划的每个步骤并发设计 NodeSpec。",
       },
+      parallel: {
+        title: "并行分支",
+        description: "把流程扇出到多个命名分支。",
+      },
       skill_parser: {
         title: "Skill 解析器",
         description: "解析 SKILL.md 的 frontmatter 和正文，输出结构化定义。",

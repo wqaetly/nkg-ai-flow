@@ -38,6 +38,7 @@ import {
   eventTriggerNode,
   httpNode,
   joinNode,
+  parallelNode,
   foreachBeginNode,
   foreachEndNode,
   forBeginNode,
@@ -146,6 +147,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, delayNode);
   installNode(target, httpNode);
   installNode(target, joinNode);
+  installNode(target, parallelNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);
   installNode(target, llmNode, { llmProvider });

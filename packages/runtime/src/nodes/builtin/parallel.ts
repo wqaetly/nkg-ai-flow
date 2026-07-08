@@ -1,0 +1,68 @@
+/**
+ * `parallel` — explicit fan-out control node.
+ *
+ * It emits a configurable number of branch control ports and mirrors the
+ * inbound data as `value`, so downstream branch nodes can consume the
+ * same payload through the engine's control-edge data forwarding.
+ */
+
+import { z } from "zod";
+import { defineNode } from "@ai-native-flow/node-sdk";
+import { controlIn } from "./_helpers.js";
+
+const MAX_BRANCHES = 4;
+
+const parallelConfig = z
+  .object({
+    branchCount: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_BRANCHES)
+      .default(2)
+      .describe("Number of branch control outputs to fire."),
+  })
+  .passthrough();
+
+export const parallelNode = defineNode({
+  type: "parallel",
+  typeVersion: "1.0.0",
+  title: "Parallel",
+  description: "Fans out execution to multiple named branches.",
+  kind: "pseudo",
+  config: parallelConfig,
+  fieldMeta: {
+    branchCount: {
+      label: "Branch count",
+      control: "number",
+      order: 1,
+    },
+  },
+  ports: [
+    controlIn,
+    { id: "input", direction: "input", kind: "data", label: "Input" },
+    { id: "branch1", direction: "output", kind: "control", label: "Branch 1" },
+    { id: "branch2", direction: "output", kind: "control", label: "Branch 2" },
+    { id: "branch3", direction: "output", kind: "control", label: "Branch 3" },
+    { id: "branch4", direction: "output", kind: "control", label: "Branch 4" },
+    { id: "value", direction: "output", kind: "data", label: "Value" },
+  ],
+  validateInput: false,
+  run({ input, config }) {
+    const branchCount = clampBranchCount(config.branchCount);
+    const value = input.input ?? input.in ?? input.__runInput__ ?? null;
+    const outputs: Record<string, unknown> = { value };
+    for (let index = 1; index <= branchCount; index++) {
+      outputs[`branch${index}`] = null;
+    }
+    return {
+      kind: "success",
+      outputs,
+    };
+  },
+});
+
+function clampBranchCount(value: unknown): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return 2;
+  return Math.min(MAX_BRANCHES, Math.max(1, Math.trunc(value)));
+}
