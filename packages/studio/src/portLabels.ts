@@ -169,6 +169,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "首个成功",
         successes: "成功项",
         failures: "失败项",
+        successIndexes: "成功索引",
+        failureIndexes: "失败索引",
         firstSuccess: "首个成功",
         firstFailure: "首个失败",
         evaluations: "评估结果",
