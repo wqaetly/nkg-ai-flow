@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
-import { readPath } from "./_helpers.js";
+import { evaluateExpression, readPath } from "./_helpers.js";
 
 interface MappingRule {
   targetPath: string;
@@ -54,7 +54,7 @@ export const schemaTransformNode = defineNode({
       label: "Mappings",
       control: "textarea",
       order: 1,
-      placeholder: "user.id = id\nuser.name = profile.name",
+      placeholder: "user.id = id\nuser.name = template:${profile.first} ${profile.last}",
     },
     includeSource: {
       label: "Include Source",
@@ -166,6 +166,13 @@ function resolveSource(
       return { exists: false, value: undefined };
     }
   }
+  if (expression.startsWith("template:")) {
+    return renderMappingTemplate(expression.slice("template:".length), source);
+  }
+  if (expression.startsWith("expr:")) {
+    const value = evaluateExpression(expression.slice("expr:".length), expressionContext(source));
+    return { exists: value !== undefined, value };
+  }
   if (expression === "$input" || expression === ".") {
     return { exists: true, value: source };
   }
@@ -173,20 +180,47 @@ function resolveSource(
   return { exists: value !== undefined, value };
 }
 
+function renderMappingTemplate(
+  template: string,
+  source: unknown,
+): { exists: boolean; value: unknown } {
+  let missing = false;
+  const value = template.replace(/\$\{([^}]+)\}/g, (_match, rawPath: string) => {
+    const path = rawPath.trim();
+    const resolved = path === "$input" || path === "." ? source : readPath(source, path);
+    if (resolved === undefined) {
+      missing = true;
+      return "";
+    }
+    return resolved === null ? "" : String(resolved);
+  });
+  return { exists: !missing, value };
+}
+
+function expressionContext(source: unknown): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    input: source,
+    source,
+  };
+  return isPlainObject(source) ? { ...source, ...base } : base;
+}
+
 function setPath(target: Record<string, unknown>, path: string, value: unknown): void {
   const segments = parsePath(path);
   if (segments.length === 0) return;
-  let cursor: Record<string, unknown> = target;
+  let cursor: Record<string, unknown> | unknown[] = target;
   for (let index = 0; index < segments.length; index += 1) {
     const segment = segments[index]!;
     if (index === segments.length - 1) {
-      cursor[segment] = value;
+      assignSegment(cursor, segment, value);
       return;
     }
-    const next = cursor[segment];
-    if (!isPlainObject(next)) {
-      const created: Record<string, unknown> = {};
-      cursor[segment] = created;
+    const next = readSegment(cursor, segment);
+    if (!isContainer(next)) {
+      const created: Record<string, unknown> | unknown[] = isArrayIndex(segments[index + 1] ?? "")
+        ? []
+        : {};
+      assignSegment(cursor, segment, created);
       cursor = created;
     } else {
       cursor = next;
@@ -204,4 +238,29 @@ function parsePath(path: string): string[] {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isContainer(value: unknown): value is Record<string, unknown> | unknown[] {
+  return isPlainObject(value) || Array.isArray(value);
+}
+
+function isArrayIndex(segment: string): boolean {
+  return /^(0|[1-9]\d*)$/.test(segment);
+}
+
+function readSegment(source: Record<string, unknown> | unknown[], segment: string): unknown {
+  if (Array.isArray(source)) return isArrayIndex(segment) ? source[Number(segment)] : undefined;
+  return source[segment];
+}
+
+function assignSegment(
+  target: Record<string, unknown> | unknown[],
+  segment: string,
+  value: unknown,
+): void {
+  if (Array.isArray(target) && isArrayIndex(segment)) {
+    target[Number(segment)] = value;
+    return;
+  }
+  (target as Record<string, unknown>)[segment] = value;
 }

@@ -718,6 +718,17 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         issueCount: "问题数量",
         firstIssue: "首个问题",
       },
+      schema_transform: {
+        in: "输入",
+        input: "来源数据",
+        transformed: "已转换",
+        missing: "缺失映射",
+        value: "转换结果",
+        missingMappings: "缺失映射列表",
+        mappedCount: "映射数量",
+        missingCount: "缺失数量",
+        status: "状态",
+      },
       select_path: {
         value: "数据",
         found: "已找到",
