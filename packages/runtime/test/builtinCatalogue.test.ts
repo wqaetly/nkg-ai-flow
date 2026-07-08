@@ -61,6 +61,7 @@ const BUILTIN_TYPES = [
   "rate_limit",
   "reduce_items",
   "retry_policy",
+  "retry_state",
   "resume_point",
   "rollback",
   "schedule_window",

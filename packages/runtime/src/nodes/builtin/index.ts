@@ -61,6 +61,7 @@ export { raceNode } from "./race.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";
+export { retryStateNode } from "./retryState.js";
 export { resumePointNode } from "./resumePoint.js";
 export { rollbackNode } from "./rollback.js";
 export { scheduleWindowNode } from "./scheduleWindow.js";

@@ -1473,6 +1473,224 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("exhausted:1");
   });
 
+  it("records retry_state failures and schedules the next retry", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_retry_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-1",
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        multiplier: 2,
+        maxDelayMs: 1000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), retry.in("in"));
+    flow.connect(source.out("output"), retry.in("error"));
+    flow.connect(retry.out("retry"), report.in("in"));
+    flow.connect(retry.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_retry_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:100");
+    expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
+      status: "waiting",
+      attempt: 1,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+    });
+  });
+
+  it("routes retry_state check to waiting while backoff is active", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_RETRY:order-1", {
+      status: "waiting",
+      attempt: 1,
+      maxAttempts: 3,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+      nextRetryAt: Date.now() + 60_000,
+      exhaustedAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_waiting_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-1",
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "waiting:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), retry.in("in"));
+    flow.connect(retry.out("waiting"), report.in("in"));
+    flow.connect(retry.out("attempt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_waiting_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("waiting:1");
+  });
+
+  it("routes retry_state to exhausted when attempts reach the limit", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_RETRY:order-1", {
+      status: "waiting",
+      attempt: 1,
+      maxAttempts: 2,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+      nextRetryAt: Date.now() - 1,
+      exhaustedAt: null,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_exhausted_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-1",
+        maxAttempts: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "exhausted:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), retry.in("in"));
+    flow.connect(source.out("output"), retry.in("error"));
+    flow.connect(retry.out("exhausted"), report.in("in"));
+    flow.connect(retry.out("attempt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_exhausted_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("exhausted:2");
+    expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
+      status: "exhausted",
+      attempt: 2,
+    });
+  });
+
+  it("resets retry_state after a successful attempt", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_RETRY:order-1", {
+      status: "waiting",
+      attempt: 1,
+      maxAttempts: 3,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+      nextRetryAt: Date.now() + 60_000,
+      exhaustedAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_reset_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-1",
+        mode: "record_success",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "reset:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), retry.in("in"));
+    flow.connect(retry.out("reset"), report.in("in"));
+    flow.connect(retry.out("attempt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_reset_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("reset:0");
+    expect(variables.has("PAYMENT_RETRY:order-1")).toBe(false);
+  });
+
   it("routes error_classifier to matched by error code and category", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "error_classifier_matched_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

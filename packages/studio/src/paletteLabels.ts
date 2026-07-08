@@ -269,6 +269,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "重试策略",
         description: "根据错误、尝试次数和重试标记路由到重试或耗尽分支。",
       },
+      retry_state: {
+        title: "重试状态",
+        description: "持久化重试次数和下次重试时间，用于跨运行重试策略。",
+      },
       resume_point: {
         title: "恢复点",
         description: "记录或加载失败恢复目标节点、快照和恢复原因。",
