@@ -42,6 +42,7 @@ import {
   mapItemsNode,
   parallelNode,
   reduceItemsNode,
+  switchCaseNode,
   foreachBeginNode,
   foreachEndNode,
   forBeginNode,
@@ -154,6 +155,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, mapItemsNode);
   installNode(target, parallelNode);
   installNode(target, reduceItemsNode);
+  installNode(target, switchCaseNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);
   installNode(target, llmNode, { llmProvider });

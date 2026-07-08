@@ -23,6 +23,7 @@ const BUILTIN_TYPES = [
   "map_items",
   "parallel",
   "reduce_items",
+  "switch_case",
   "tool",
   "text_input",
   "llm",

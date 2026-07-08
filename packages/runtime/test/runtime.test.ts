@@ -212,6 +212,56 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
   });
 
+  it("routes to the matching switch_case branch and forwards the payload", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "switch_case_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 120 },
+      config: { value: { status: "approved", title: "release" } },
+    });
+    const branch = flow.node("switch_case", {
+      id: "branch",
+      position: { x: 260, y: 120 },
+      config: {
+        path: "value.status",
+        case1: "approved",
+        case2: "rejected",
+      },
+    });
+    const approved = flow.node("transform", {
+      id: "approved",
+      position: { x: 420, y: 40 },
+      config: { template: "approved:${input.title}" },
+    });
+    const fallback = flow.node("transform", {
+      id: "fallback",
+      position: { x: 420, y: 200 },
+      config: { template: "fallback:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 120 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), branch.in("in"));
+    flow.connect(input.out("output"), branch.in("value"));
+    flow.connect(branch.out("case1"), approved.in("in"));
+    flow.connect(branch.out("default"), fallback.in("in"));
+    flow.connect(branch.out("value"), approved.in("input"));
+    flow.connect(branch.out("value"), fallback.in("input"));
+    flow.connect(approved.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "switch_case_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approved:release");
+  });
+
   it("filters array items with filter_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "filter_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

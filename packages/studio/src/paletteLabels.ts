@@ -113,6 +113,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "汇总数组",
         description: "对数组执行计数、求和或拼接汇总。",
       },
+      switch_case: {
+        title: "多路分支",
+        description: "根据输入值路由到 case 或 default 分支。",
+      },
       skill_parser: {
         title: "Skill 解析器",
         description: "解析 SKILL.md 的 frontmatter 和正文，输出结构化定义。",
