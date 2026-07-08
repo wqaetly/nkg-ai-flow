@@ -5075,6 +5075,29 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("approval:pending");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const approvalOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "approval") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(approvalOutput).toMatchObject({
+      branch: "requested",
+      status: "pending",
+      title: "Approve high value order",
+      assignee: "finance",
+      requestedAt: expect.any(String),
+      resolvedAt: "",
+      expiresAt: expect.any(String),
+      timeoutMs: 60_000,
+      remainingMs: expect.any(Number),
+      stateExists: true,
+      requestedValue: true,
+      pendingValue: true,
+      approvedValue: false,
+      rejectedValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "pending",
       title: "Approve high value order",
@@ -5188,6 +5211,29 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("approval:rejected");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const approvalOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "approval") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(approvalOutput).toMatchObject({
+      branch: "rejected",
+      status: "rejected",
+      title: "Approve order",
+      assignee: "finance",
+      decision: "rejected",
+      comment: "budget exceeded",
+      requestedAt: expect.any(String),
+      resolvedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      stateExists: true,
+      requestedValue: false,
+      pendingValue: false,
+      approvedValue: false,
+      rejectedValue: true,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "rejected",
       decision: "rejected",
@@ -5245,6 +5291,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("approval:expired");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const approvalOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "approval") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(approvalOutput).toMatchObject({
+      branch: "expired",
+      status: "expired",
+      title: "Approve order",
+      assignee: "finance",
+      requestedAt: expect.any(String),
+      resolvedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      remainingMs: 0,
+      stateExists: true,
+      requestedValue: false,
+      pendingValue: false,
+      approvedValue: false,
+      rejectedValue: false,
+      expiredValue: true,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "expired",
     });

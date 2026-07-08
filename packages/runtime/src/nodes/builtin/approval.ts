@@ -124,10 +124,23 @@ export const approvalNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "title", direction: "output", kind: "data", label: "Title", schema: { type: "string" } },
+    { id: "assignee", direction: "output", kind: "data", label: "Assignee", schema: { type: "string" } },
     { id: "payload", direction: "output", kind: "data", label: "Payload" },
     { id: "decision", direction: "output", kind: "data", label: "Decision" },
     { id: "comment", direction: "output", kind: "data", label: "Comment", schema: { type: "string" } },
+    { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
+    { id: "resolvedAt", direction: "output", kind: "data", label: "Resolved At", schema: { type: "string" } },
+    { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
+    {
+      id: "timeoutMs",
+      direction: "output",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
     {
       id: "remainingMs",
       direction: "output",
@@ -135,6 +148,15 @@ export const approvalNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
+    { id: "requestedValue", direction: "output", kind: "data", label: "Requested", schema: { type: "boolean" } },
+    { id: "pendingValue", direction: "output", kind: "data", label: "Pending", schema: { type: "boolean" } },
+    { id: "approvedValue", direction: "output", kind: "data", label: "Approved", schema: { type: "boolean" } },
+    { id: "rejectedValue", direction: "output", kind: "data", label: "Rejected", schema: { type: "boolean" } },
+    { id: "cancelledValue", direction: "output", kind: "data", label: "Cancelled", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
+    { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
+    { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -172,11 +194,26 @@ export const approvalNode = defineNode({
     const state = decision.state;
     const remainingMs =
       state?.expiresAt === null || state === null ? 0 : Math.max(0, state.expiresAt - now);
+    const requestedAt =
+      state === null ? "" : new Date(state.requestedAt).toISOString();
+    const resolvedAt =
+      state?.resolvedAt === null || state === null
+        ? ""
+        : new Date(state.resolvedAt).toISOString();
+    const expiresAt =
+      state?.expiresAt === null || state === null
+        ? ""
+        : new Date(state.expiresAt).toISOString();
+    const timeoutMs =
+      state?.expiresAt === null || state === null
+        ? 0
+        : Math.max(0, state.expiresAt - state.requestedAt);
+    const status = state?.status ?? "missing";
     ctx.log.debug("approval selected branch", {
       name,
       mode,
       branch: decision.branch,
-      status: state?.status ?? "missing",
+      status,
     });
 
     return {
@@ -184,11 +221,27 @@ export const approvalNode = defineNode({
       outputs: {
         [decision.branch]: null,
         state,
-        status: state?.status ?? "missing",
+        branch: decision.branch,
+        status,
+        title: state?.title ?? "",
+        assignee: state?.assignee ?? "",
         payload: state?.payload ?? null,
         decision: state?.decision ?? null,
         comment: state?.comment ?? "",
+        requestedAt,
+        resolvedAt,
+        expiresAt,
+        timeoutMs,
         remainingMs,
+        stateExists: state !== null,
+        requestedValue: decision.branch === "requested",
+        pendingValue: status === "pending",
+        approvedValue: status === "approved",
+        rejectedValue: status === "rejected",
+        cancelledValue: status === "cancelled",
+        expiredValue: status === "expired",
+        clearedValue: decision.branch === "cleared",
+        missingValue: decision.branch === "missing",
       },
     };
   },
