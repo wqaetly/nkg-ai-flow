@@ -5167,6 +5167,39 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("TEMPLATE_CHILD_TMP")).toBe(false);
   });
 
+  it("blocks subflow_template direct recursive calls to the same flow version", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_template_recursive", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "self",
+        templates: {
+          self: {
+            flowId: "parent_template_recursive",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 280, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_recursive",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(false);
+    expect(result.error?.code).toBe("node.subflow_template.recursive_call");
+    expect(await rt.runStore.listByFlow("parent_template_recursive")).toHaveLength(1);
+  });
+
   it("blocks subflow invocation when maxDepth is reached", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_depth_limit", version: "1.0.0", registry: rt.nodeTypeRegistry });

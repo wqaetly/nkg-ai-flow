@@ -243,6 +243,17 @@ export const subflowTemplateNode = defineNode({
       };
     }
 
+    if (
+      template.flowId === ctx.flowId &&
+      (template.flowVersion === "" || template.flowVersion === ctx.flowVersion)
+    ) {
+      return error(
+        "node.subflow_template.recursive_call",
+        "subflow_template node cannot directly invoke its own flow version",
+        ctx.nodeId,
+      );
+    }
+
     const invokeFlow = (ctx as { invokeFlow?: SubflowInvokeFlow }).invokeFlow;
     if (!invokeFlow) {
       return error(
