@@ -9426,7 +9426,11 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
-    expect(fanoutOutput).toMatchObject({ branchCount: 2, concurrency: 2 });
+    expect(fanoutOutput).toMatchObject({
+      branchCount: 2,
+      concurrency: 2,
+      branchIds: ["branch1", "branch2"],
+    });
     expect(joinOutput).toMatchObject({
       status: "joined",
       empty: false,

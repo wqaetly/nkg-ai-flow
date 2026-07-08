@@ -72,13 +72,21 @@ export const parallelNode = defineNode({
       label: "Concurrency",
       schema: { type: "number" },
     },
+    {
+      id: "branchIds",
+      direction: "output",
+      kind: "data",
+      label: "Branch IDs",
+      schema: { type: "array", items: { type: "string" } },
+    },
   ],
   validateInput: false,
   run({ input, config }) {
     const branchCount = clampBranchCount(config.branchCount);
     const concurrency = clampConcurrency(config.concurrency, branchCount);
     const value = input.input ?? input.in ?? input.__runInput__ ?? null;
-    const outputs: Record<string, unknown> = { value, branchCount, concurrency };
+    const branchIds = Array.from({ length: branchCount }, (_, index) => `branch${index + 1}`);
+    const outputs: Record<string, unknown> = { value, branchCount, concurrency, branchIds };
     for (let index = 1; index <= branchCount; index++) {
       outputs[`branch${index}`] = null;
     }

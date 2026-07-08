@@ -703,6 +703,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "透传数据",
         branchCount: "分支数量",
         concurrency: "并发上限",
+        branchIds: "分支端口",
       },
       parse_json: {
         text: "文本",
