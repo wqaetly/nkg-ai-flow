@@ -50,6 +50,20 @@ export const batchItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "size",
+      direction: "input",
+      kind: "data",
+      label: "Size",
+      schema: { type: "number" },
+    },
+    {
+      id: "includePartial",
+      direction: "input",
+      kind: "data",
+      label: "Include partial",
+      schema: { type: "boolean" },
+    },
+    {
       id: "batches",
       direction: "output",
       kind: "data",
@@ -62,6 +76,20 @@ export const batchItemsNode = defineNode({
       kind: "data",
       label: "Batches",
       schema: { type: "array" },
+    },
+    {
+      id: "size",
+      direction: "output",
+      kind: "data",
+      label: "Size",
+      schema: { type: "number" },
+    },
+    {
+      id: "includePartial",
+      direction: "output",
+      kind: "data",
+      label: "Include partial",
+      schema: { type: "boolean" },
     },
     {
       id: "count",
@@ -92,8 +120,8 @@ export const batchItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const size = readPositiveInteger(config.size, 10);
-    const includePartial = config.includePartial !== false;
+    const size = readPositiveInteger(input.size, 0) ?? readPositiveInteger(config.size, 10) ?? 10;
+    const includePartial = readBoolean(input.includePartial) ?? readBoolean(config.includePartial) ?? true;
     const batches: unknown[][] = [];
 
     for (let index = 0; index < source.length; index += size) {
@@ -119,6 +147,8 @@ export const batchItemsNode = defineNode({
         out: null,
         batches,
         items: batches,
+        size,
+        includePartial,
         count: batches.length,
         itemCount: source.length,
         hasPartial,
@@ -127,7 +157,16 @@ export const batchItemsNode = defineNode({
   },
 });
 
-function readPositiveInteger(value: unknown, fallback: number): number {
+function readPositiveInteger(value: unknown, fallback: number): number | undefined {
   const parsed = Math.trunc(Number(value ?? fallback));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback > 0 ? fallback : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }

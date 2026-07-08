@@ -250,6 +250,15 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         clearedValue: "是否清除",
         state: "补偿状态",
       },
+      batch_items: {
+        items: "项目列表",
+        size: "批大小",
+        includePartial: "包含不完整批次",
+        batches: "批次列表",
+        count: "批次数量",
+        itemCount: "项目数量",
+        hasPartial: "存在不完整批次",
+      },
       batch_window: {
         in: "输入",
         name: "批窗口名",

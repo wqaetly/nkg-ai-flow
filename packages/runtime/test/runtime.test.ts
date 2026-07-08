@@ -17063,6 +17063,76 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("count=2");
   });
 
+  it("uses dynamic batch_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "batch_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: ["a", "b", "c", "d", "e"] },
+    });
+    const size = flow.node("transform", {
+      id: "size",
+      position: { x: 120, y: 100 },
+      config: { value: 2 },
+    });
+    const includePartial = flow.node("transform", {
+      id: "includePartial",
+      position: { x: 120, y: 180 },
+      config: { value: true },
+    });
+    const batch = flow.node("batch_items", {
+      id: "batch",
+      position: { x: 340, y: 0 },
+      config: {
+        size: 4,
+        includePartial: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "count=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), size.in("in"));
+    flow.connect(start.out("out"), includePartial.in("in"));
+    flow.connect(input.out("out"), batch.in("in"));
+    flow.connect(input.out("output"), batch.in("items"));
+    flow.connect(size.out("output"), batch.in("size"));
+    flow.connect(includePartial.out("output"), batch.in("includePartial"));
+    flow.connect(batch.out("out"), report.in("in"));
+    flow.connect(batch.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("count=3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput).toMatchObject({
+      size: 2,
+      includePartial: true,
+      count: 3,
+      itemCount: 5,
+      hasPartial: true,
+      batches: [["a", "b"], ["c", "d"], ["e"]],
+    });
+  });
+
   it("deduplicates array items with unique_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "unique_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
