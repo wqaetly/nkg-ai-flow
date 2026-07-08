@@ -92,6 +92,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         changed_files: "变更文件",
         tool_log: "工具日志",
       },
+      compensation: {
+        payload: "载荷",
+        actions: "补偿动作列表",
+        action: "补偿动作",
+        count: "动作数量",
+        state: "补偿状态",
+      },
       code_synthesizer: {
         skill_def: "Skill 定义",
         plan: "执行计划",

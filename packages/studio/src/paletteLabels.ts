@@ -33,6 +33,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "熔断器",
         description: "根据持久化熔断状态路由到 closed / open / half-open 分支。",
       },
+      compensation: {
+        title: "补偿动作",
+        description: "登记或取出 Saga 风格的回滚补偿动作。",
+      },
       condition: {
         title: "条件分支",
         description: "根据布尔表达式把流程路由到 true / false 分支。",

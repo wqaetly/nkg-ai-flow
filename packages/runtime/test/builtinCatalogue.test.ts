@@ -16,6 +16,7 @@ const BUILTIN_TYPES = [
   "end",
   "transform",
   "circuit_breaker",
+  "compensation",
   "condition",
   "delay",
   "filter_items",

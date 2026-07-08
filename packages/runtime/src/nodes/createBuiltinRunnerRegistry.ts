@@ -32,6 +32,7 @@ import { InMemoryNodeRunnerRegistry } from "../nodeRunnerRegistry.js";
 import type { NodeRunner } from "../nodeContext.js";
 import {
   circuitBreakerNode,
+  compensationNode,
   conditionNode,
   delayNode,
   filterItemsNode,
@@ -153,6 +154,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, endNode);
   installNode(target, transformNode);
   installNode(target, circuitBreakerNode);
+  installNode(target, compensationNode);
   installNode(target, conditionNode);
   installNode(target, delayNode);
   installNode(target, filterItemsNode);

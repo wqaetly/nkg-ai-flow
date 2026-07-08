@@ -75,6 +75,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       model: "模型",
       multiplier: "倍率",
       package_scope: "包作用域",
+      payload: "载荷",
       path: "字段路径",
       prompt: "提示词",
       resetTimeoutMs: "重置等待毫秒",
@@ -126,6 +127,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         failureThreshold: "失败阈值",
         resetTimeoutMs: "重置等待毫秒",
         mode: "模式",
+      },
+      compensation: {
+        name: "补偿栈名",
+        mode: "模式",
+        action: "补偿动作",
+        payload: "静态载荷",
       },
       delay: {
         durationMs: "等待时长（毫秒）",

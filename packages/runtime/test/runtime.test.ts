@@ -311,6 +311,70 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("drains compensation actions in reverse registration order", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "compensation_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const first = flow.node("compensation", {
+      id: "first",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_COMPENSATIONS",
+        mode: "register",
+        action: "release_inventory",
+        payload: { sku: "book", quantity: 1 },
+      },
+    });
+    const second = flow.node("compensation", {
+      id: "second",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_COMPENSATIONS",
+        mode: "register",
+        action: "refund_payment",
+        payload: { paymentId: "pay_1" },
+      },
+    });
+    const drain = flow.node("compensation", {
+      id: "drain",
+      position: { x: 400, y: 0 },
+      config: {
+        name: "ORDER_COMPENSATIONS",
+        mode: "drain",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "rollback:${input.0.action},${input.1.action}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(first.out("out"), second.in("in"));
+    flow.connect(second.out("out"), drain.in("in"));
+    flow.connect(drain.out("out"), report.in("in"));
+    flow.connect(drain.out("actions"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compensation_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("rollback:refund_payment,release_inventory");
+    expect(variables.get("ORDER_COMPENSATIONS")).toMatchObject({
+      actions: [],
+    });
+  });
+
   it("writes state for downstream variable resolution with state_set", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
