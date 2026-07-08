@@ -472,6 +472,105 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("reason:no_rules");
   });
 
+  it("routes schema_guard to valid when the payload matches the schema", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_guard_valid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { id: "order_1", quantity: 2, status: "ready" } },
+    });
+    const guard = flow.node("schema_guard", {
+      id: "guard",
+      position: { x: 260, y: 0 },
+      config: {
+        schema: {
+          type: "object",
+          required: ["id", "quantity"],
+          properties: {
+            id: { type: "string", minLength: 1 },
+            quantity: { type: "integer", minimum: 1 },
+            status: { enum: ["ready", "pending"] },
+          },
+          additionalProperties: false,
+        },
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "schema:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), guard.in("in"));
+    flow.connect(input.out("output"), guard.in("input"));
+    flow.connect(guard.out("valid"), report.in("in"));
+    flow.connect(guard.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_guard_valid_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("schema:valid");
+  });
+
+  it("routes schema_guard to invalid and reports schema issues", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_guard_invalid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { id: "order_1", quantity: "two", extra: true } },
+    });
+    const guard = flow.node("schema_guard", {
+      id: "guard",
+      position: { x: 260, y: 0 },
+      config: {
+        schema: JSON.stringify({
+          type: "object",
+          required: ["id", "quantity"],
+          properties: {
+            id: { type: "string" },
+            quantity: { type: "integer" },
+          },
+          additionalProperties: false,
+        }),
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "issues:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), guard.in("in"));
+    flow.connect(input.out("output"), guard.in("input"));
+    flow.connect(guard.out("invalid"), report.in("in"));
+    flow.connect(guard.out("issueCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_guard_invalid_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("issues:2");
+  });
+
   it("routes node errors through retry_policy with backoff metadata", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

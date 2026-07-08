@@ -41,6 +41,7 @@ const BUILTIN_TYPES = [
   "reduce_items",
   "retry_policy",
   "schedule_window",
+  "schema_guard",
   "semaphore",
   "subflow",
   "switch_case",

@@ -189,6 +189,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "时间窗口",
         description: "按工作日和时间段判断当前流程是否处于允许窗口。",
       },
+      schema_guard: {
+        title: "Schema 校验",
+        description: "按 JSON Schema 子集校验数据，并路由到有效或无效分支。",
+      },
       semaphore: {
         title: "信号量",
         description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",

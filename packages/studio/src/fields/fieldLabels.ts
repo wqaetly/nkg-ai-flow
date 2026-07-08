@@ -321,6 +321,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         days: "允许星期",
         timezoneOffsetMinutes: "时区偏移分钟",
       },
+      schema_guard: {
+        schema: "校验 Schema",
+      },
       semaphore: {
         name: "信号量状态名",
         owner: "持有者",

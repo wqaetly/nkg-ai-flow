@@ -463,6 +463,17 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         startMinute: "开始分钟",
         endMinute: "结束分钟",
       },
+      schema_guard: {
+        in: "输入",
+        input: "待校验数据",
+        valid: "有效",
+        invalid: "无效",
+        value: "原始数据",
+        status: "状态",
+        issues: "问题列表",
+        issueCount: "问题数量",
+        firstIssue: "首个问题",
+      },
       semaphore: {
         in: "输入",
         owner: "持有者",

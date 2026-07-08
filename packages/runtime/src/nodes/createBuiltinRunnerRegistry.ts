@@ -61,6 +61,7 @@ import {
   reduceItemsNode,
   retryPolicyNode,
   scheduleWindowNode,
+  schemaGuardNode,
   semaphoreNode,
   subflowNode,
   switchCaseNode,
@@ -197,6 +198,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, reduceItemsNode);
   installNode(target, retryPolicyNode);
   installNode(target, scheduleWindowNode);
+  installNode(target, schemaGuardNode);
   installNode(target, semaphoreNode);
   installNode(target, subflowNode);
   installNode(target, switchCaseNode);
