@@ -11221,6 +11221,97 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic queue policy inputs", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_DYNAMIC_POLICY_QUEUE", {
+      items: ["work-1", "work-2", "work-3"],
+      updatedAt: now,
+      pushedCount: 3,
+      poppedCount: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "queue_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -120 },
+      config: { value: "peek" },
+    });
+    const maxItems = flow.node("transform", {
+      id: "maxItems",
+      position: { x: 120, y: 0 },
+      config: { value: 5 },
+    });
+    const count = flow.node("transform", {
+      id: "count",
+      position: { x: 120, y: 120 },
+      config: { value: 2 },
+    });
+    const queue = flow.node("queue", {
+      id: "queue",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "ORDER_DYNAMIC_POLICY_QUEUE",
+        mode: "clear",
+        maxItems: 1,
+        count: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "queue:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), maxItems.in("in"));
+    flow.connect(start.out("out"), count.in("in"));
+    flow.connect(start.out("out"), queue.in("in"));
+    flow.connect(mode.out("output"), queue.in("mode"));
+    flow.connect(maxItems.out("output"), queue.in("maxItems"));
+    flow.connect(count.out("output"), queue.in("count"));
+    flow.connect(queue.out("peeked"), report.in("in"));
+    flow.connect(queue.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "queue_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("queue:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const queueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "queue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(queueOutput).toMatchObject({
+      name: "ORDER_DYNAMIC_POLICY_QUEUE",
+      mode: "peek",
+      maxItems: 5,
+      requestedCount: 2,
+      count: 2,
+      queueSize: 3,
+      remaining: 2,
+      items: ["work-1", "work-2"],
+      item: "work-1",
+    });
+    expect(variables.get("ORDER_DYNAMIC_POLICY_QUEUE")).toMatchObject({
+      items: ["work-1", "work-2", "work-3"],
+      pushedCount: 3,
+      poppedCount: 0,
+    });
+  });
+
   it("pops queue items in FIFO order", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_WORK_QUEUE", {

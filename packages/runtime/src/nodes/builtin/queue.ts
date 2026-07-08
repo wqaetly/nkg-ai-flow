@@ -79,6 +79,9 @@ export const queueNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "maxItems", direction: "input", kind: "data", label: "Max Items", schema: { type: "number" } },
+    { id: "count", direction: "input", kind: "data", label: "Count", schema: { type: "number" } },
     { id: "item", direction: "input", kind: "data", label: "Item" },
     { id: "pushed", direction: "output", kind: "control", label: "Pushed" },
     { id: "popped", direction: "output", kind: "control", label: "Popped" },
@@ -88,6 +91,21 @@ export const queueNode = defineNode({
     { id: "items", direction: "output", kind: "data", label: "Items" },
     { id: "item", direction: "output", kind: "data", label: "Item" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "maxItems",
+      direction: "output",
+      kind: "data",
+      label: "Max Items",
+      schema: { type: "number" },
+    },
+    {
+      id: "requestedCount",
+      direction: "output",
+      kind: "data",
+      label: "Requested Count",
+      schema: { type: "number" },
+    },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -125,9 +143,9 @@ export const queueNode = defineNode({
 
     const now = Date.now();
     const previous = readQueueState(store.get(name), now);
-    const mode = config.mode ?? "push";
-    const maxItems = Math.max(1, Math.trunc(Number(config.maxItems ?? 1000)));
-    const count = Math.max(1, Math.trunc(Number(config.count ?? 1)));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "push";
+    const maxItems = readPositiveInteger(input.maxItems) ?? readPositiveInteger(config.maxItems) ?? 1000;
+    const count = readPositiveInteger(input.count) ?? readPositiveInteger(config.count) ?? 1;
     const decision = applyMode(previous, {
       mode,
       item: input.item ?? input.input ?? input.in ?? null,
@@ -161,6 +179,9 @@ export const queueNode = defineNode({
         items: decision.items,
         item: decision.items[0] ?? null,
         name,
+        mode,
+        maxItems,
+        requestedCount: count,
         state: decision.state,
         count: decision.items.length,
         queueSize,
@@ -292,6 +313,24 @@ function readTimestamp(value: unknown): number | undefined {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readMode(value: unknown): QueueMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "push" ||
+    normalized === "pop" ||
+    normalized === "peek" ||
+    normalized === "clear"
+    ? normalized
+    : undefined;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer > 0 ? integer : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
