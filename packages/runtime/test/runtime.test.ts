@@ -16697,6 +16697,89 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("flat=0:a1,1:a2,2:b1");
   });
 
+  it("uses dynamic flatten_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "flatten_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { items: ["static-a"], groups: [["a", null], ["b"]] },
+          { items: ["static-b"], groups: [["c"]] },
+        ],
+      },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 100 },
+      config: { value: "groups" },
+    });
+    const depth = flow.node("transform", {
+      id: "depth",
+      position: { x: 120, y: 180 },
+      config: { value: 2 },
+    });
+    const includeNulls = flow.node("transform", {
+      id: "includeNulls",
+      position: { x: 120, y: 260 },
+      config: { value: false },
+    });
+    const flatten = flow.node("flatten_items", {
+      id: "flatten",
+      position: { x: 340, y: 0 },
+      config: {
+        path: "items",
+        depth: 1,
+        includeNulls: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "flat=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), depth.in("in"));
+    flow.connect(start.out("out"), includeNulls.in("in"));
+    flow.connect(input.out("out"), flatten.in("in"));
+    flow.connect(input.out("output"), flatten.in("items"));
+    flow.connect(path.out("output"), flatten.in("path"));
+    flow.connect(depth.out("output"), flatten.in("depth"));
+    flow.connect(includeNulls.out("output"), flatten.in("includeNulls"));
+    flow.connect(flatten.out("out"), report.in("in"));
+    flow.connect(flatten.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "flatten_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flat=a,b,c");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flattenOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flatten") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flattenOutput).toMatchObject({
+      path: "groups",
+      depth: 2,
+      includeNulls: false,
+      items: ["a", "b", "c"],
+      count: 3,
+      inputCount: 2,
+    });
+  });
+
   it("maps array items with map_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "map_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

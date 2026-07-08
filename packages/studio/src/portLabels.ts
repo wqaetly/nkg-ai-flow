@@ -586,6 +586,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       flatten_items: {
         items: "展平项",
+        path: "路径",
+        depth: "深度",
+        includeNulls: "包含空值",
         count: "数量",
         inputCount: "输入数量",
       },

@@ -60,6 +60,9 @@ export const flattenItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "depth", direction: "input", kind: "data", label: "Depth", schema: { type: "number" } },
+    { id: "includeNulls", direction: "input", kind: "data", label: "Include nulls", schema: { type: "boolean" } },
     {
       id: "items",
       direction: "output",
@@ -67,6 +70,9 @@ export const flattenItemsNode = defineNode({
       label: "Flattened items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "depth", direction: "output", kind: "data", label: "Depth", schema: { type: "number" } },
+    { id: "includeNulls", direction: "output", kind: "data", label: "Include nulls", schema: { type: "boolean" } },
     {
       id: "count",
       direction: "output",
@@ -89,9 +95,9 @@ export const flattenItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const path = String(config.path ?? "");
-    const depth = Math.max(1, Math.trunc(Number(config.depth ?? 1)));
-    const includeNulls = config.includeNulls !== false;
+    const path = String(input.path ?? config.path ?? "");
+    const depth = readPositiveInteger(input.depth) ?? readPositiveInteger(config.depth) ?? 1;
+    const includeNulls = readBoolean(input.includeNulls) ?? readBoolean(config.includeNulls) ?? true;
     const selected = path.trim() === "" ? source : source.map((item) => readPath(item, path));
     const items = flatten(selected, depth).filter(
       (item) => includeNulls || (item !== null && item !== undefined),
@@ -109,12 +115,29 @@ export const flattenItemsNode = defineNode({
       outputs: {
         out: null,
         items,
+        path,
+        depth,
+        includeNulls,
         count: items.length,
         inputCount: source.length,
       },
     };
   },
 });
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const parsed = Math.trunc(Number(value));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+}
 
 function flatten(values: unknown[], depth: number): unknown[] {
   const output: unknown[] = [];
