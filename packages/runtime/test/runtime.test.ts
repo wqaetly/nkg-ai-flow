@@ -11238,6 +11238,78 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(quorumOutput?.quorumRate).toBeCloseTo(2 / 3);
   });
 
+  it("uses dynamic quorum threshold input", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "quorum_dynamic_threshold_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 140, y: 40 },
+      config: { template: "first:${input.name}" },
+    });
+    const second = flow.node("transform", {
+      id: "second",
+      position: { x: 140, y: 140 },
+      config: { template: "second:${input.name}" },
+    });
+    const threshold = flow.node("transform", {
+      id: "threshold",
+      position: { x: 140, y: 240 },
+      config: { value: 2 },
+    });
+    const quorum = flow.node("quorum", {
+      id: "quorum",
+      position: { x: 340, y: 120 },
+      config: { threshold: 3 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 120 },
+      config: { template: "quorum:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 120 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(start.out("out"), second.in("in"));
+    flow.connect(start.out("out"), threshold.in("in"));
+    flow.connect(first.out("output"), quorum.in("values"));
+    flow.connect(second.out("output"), quorum.in("values"));
+    flow.connect(threshold.out("output"), quorum.in("threshold"));
+    flow.connect(quorum.out("met"), report.in("in"));
+    flow.connect(quorum.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "quorum_dynamic_threshold_e2e",
+      input: { name: "Flow" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("quorum:first:Flow,second:Flow");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const quorumOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "quorum") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(quorumOutput).toMatchObject({
+      status: "met",
+      metValue: true,
+      count: 2,
+      threshold: 2,
+      remaining: 0,
+      firstValue: "first:Flow",
+      lastValue: "second:Flow",
+      quorumRate: 1,
+    });
+  });
+
   it("continues through quorum before slow in-flight siblings finish", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "quorum_inflight_sibling_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

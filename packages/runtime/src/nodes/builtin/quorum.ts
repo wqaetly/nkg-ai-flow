@@ -41,6 +41,13 @@ export const quorumNode = defineNode({
       label: "Values",
       multiple: true,
     },
+    {
+      id: "threshold",
+      direction: "input",
+      kind: "data",
+      label: "Threshold",
+      schema: { type: "number" },
+    },
     { id: "met", direction: "output", kind: "control", label: "Met" },
     { id: "unmet", direction: "output", kind: "control", label: "Unmet" },
     { id: "values", direction: "output", kind: "data", label: "Values" },
@@ -80,7 +87,7 @@ export const quorumNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const values = normalizeValues(input.values);
-    const threshold = Math.max(1, Math.trunc(Number(config.threshold ?? 2)));
+    const threshold = readIntegerAtLeast(input.threshold, 1) ?? readIntegerAtLeast(config.threshold, 1) ?? 2;
     const met = values.length >= threshold;
     const status = met ? "met" : "unmet";
     const remaining = Math.max(0, threshold - values.length);
@@ -113,4 +120,11 @@ export const quorumNode = defineNode({
 function normalizeValues(value: unknown): unknown[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return undefined;
+  const integerValue = Math.trunc(numericValue);
+  return integerValue >= minimum ? integerValue : undefined;
 }
