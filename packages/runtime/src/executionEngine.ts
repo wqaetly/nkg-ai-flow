@@ -1041,9 +1041,12 @@ export class ExecutionEngine {
 
     let timedOut = false;
     const loopErrors: RuntimeError[] = [];
+    let iterationCount = 0;
+    let finalStatus = "done";
 
     for (let iteration = 0; iteration < iterations.length; iteration += 1) {
       const outputs = iterations[iteration]!;
+      iterationCount += 1;
       const iterationState: ExecutionState = {
         portValues: new Map(state.portValues),
         inputOverrides: new Map(state.inputOverrides),
@@ -1078,7 +1081,13 @@ export class ExecutionEngine {
         return true;
       }
       if (bodyResult.status === "error") {
-        const errorOutputs = loopErrorOutputs(block.endNode, aggregated, loopErrors);
+        const errorOutputs = loopErrorOutputs(
+          block.endNode,
+          aggregated,
+          loopErrors,
+          undefined,
+          iterationCount,
+        );
         this.recordOutputs(block.endNode, errorOutputs, state);
         this.enqueueReadyDownstream(block.endNode, errorOutputs, queue);
         await this.publishLoopIterationProgress(beginNode, block, {
@@ -1106,18 +1115,27 @@ export class ExecutionEngine {
             : bodyResult.status,
         context: loopIterationContext(outputs),
       });
-      if (bodyResult.status === "break") break;
+      if (bodyResult.status === "break") {
+        finalStatus = "break";
+        break;
+      }
       if (timedOut) break;
     }
 
     if (timedOut) {
-      const outputs = loopTimeoutOutputs(block.endNode, aggregated, loopErrors);
+      const outputs = loopTimeoutOutputs(
+        block.endNode,
+        aggregated,
+        loopErrors,
+        iterationCount,
+      );
       this.recordOutputs(block.endNode, outputs, state);
       this.enqueueReadyDownstream(block.endNode, outputs, queue);
       return true;
     }
 
     addLoopErrors(aggregated, loopErrors);
+    addLoopStatus(aggregated, finalStatus, iterationCount);
     this.applyLoopEndOverrides(block.endNode, aggregated, state);
     const endResult = await this.executeNode(block.endNode, state);
     this.clearLoopEndOverrides(block.endNode, aggregated, state);
@@ -1190,6 +1208,8 @@ export class ExecutionEngine {
       1,
       Math.trunc(numberOr(config.concurrency, batchSize)),
     );
+    let iterationCount = 0;
+    let finalStatus = "done";
 
     for (let batchStart = 0; batchStart < iterations.length; batchStart += batchSize) {
       const batch = iterations
@@ -1214,22 +1234,35 @@ export class ExecutionEngine {
       let shouldBreak = false;
 
       for (const result of [...results].sort((a, b) => a.iteration - b.iteration)) {
+        iterationCount += 1;
         mergeAggregated(aggregated, result.aggregated);
         loopErrors.push(...result.bodyResult.errors);
 
         if (result.bodyResult.status === "failed") return true;
         if (result.bodyResult.status === "error") {
-          const errorOutputs = loopErrorOutputs(block.endNode, aggregated, loopErrors);
+          const errorOutputs = loopErrorOutputs(
+            block.endNode,
+            aggregated,
+            loopErrors,
+            undefined,
+            iterationCount,
+          );
           this.recordOutputs(block.endNode, errorOutputs, state);
           this.enqueueReadyDownstream(block.endNode, errorOutputs, queue);
           return true;
         }
         if (result.bodyResult.status === "break") {
+          finalStatus = "break";
           shouldBreak = true;
           break;
         }
         if (result.timedOut) {
-          const outputs = loopTimeoutOutputs(block.endNode, aggregated, loopErrors);
+          const outputs = loopTimeoutOutputs(
+            block.endNode,
+            aggregated,
+            loopErrors,
+            iterationCount,
+          );
           this.recordOutputs(block.endNode, outputs, state);
           this.enqueueReadyDownstream(block.endNode, outputs, queue);
           return true;
@@ -1238,7 +1271,12 @@ export class ExecutionEngine {
 
       if (shouldBreak) break;
       if (timeoutMs > 0 && Date.now() - startedAt >= timeoutMs) {
-        const outputs = loopTimeoutOutputs(block.endNode, aggregated, loopErrors);
+        const outputs = loopTimeoutOutputs(
+          block.endNode,
+          aggregated,
+          loopErrors,
+          iterationCount,
+        );
         this.recordOutputs(block.endNode, outputs, state);
         this.enqueueReadyDownstream(block.endNode, outputs, queue);
         return true;
@@ -1246,6 +1284,7 @@ export class ExecutionEngine {
     }
 
     addLoopErrors(aggregated, loopErrors);
+    addLoopStatus(aggregated, finalStatus, iterationCount);
     this.applyLoopEndOverrides(block.endNode, aggregated, state);
     const endResult = await this.executeNode(block.endNode, state);
     this.clearLoopEndOverrides(block.endNode, aggregated, state);
@@ -1326,13 +1365,17 @@ export class ExecutionEngine {
     const condition = String(endConfig.condition ?? "nextState.continue == \"true\"");
     let state = inputs.initialState ?? inputs.input ?? null;
     const loopErrors: RuntimeError[] = [];
+    let iterationCount = 0;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
       if (
         checkMode === "before" &&
         !evaluateCondition(condition, { nextState: state, input: state })
       ) {
-        const outputs = withLoopErrors({ done: null, finalState: state }, loopErrors);
+        const outputs = withLoopErrors(
+          { done: null, finalState: state, status: "done", iterationCount },
+          loopErrors,
+        );
         this.recordOutputs(block.endNode, outputs, executionState);
         this.enqueueReadyDownstream(block.endNode, outputs, queue);
         return true;
@@ -1347,6 +1390,7 @@ export class ExecutionEngine {
         portValues: new Map(executionState.portValues),
         inputOverrides: new Map(executionState.inputOverrides),
       };
+      iterationCount += 1;
       await this.publishLoopIterationProgress(beginNode, block, {
         phase: "started",
         iteration,
@@ -1378,7 +1422,13 @@ export class ExecutionEngine {
         return true;
       }
       if (bodyResult.status === "error") {
-        const errorOutputs = loopErrorOutputs(block.endNode, aggregated, loopErrors, state);
+        const errorOutputs = loopErrorOutputs(
+          block.endNode,
+          aggregated,
+          loopErrors,
+          state,
+          iterationCount,
+        );
         this.recordOutputs(block.endNode, errorOutputs, executionState);
         this.enqueueReadyDownstream(block.endNode, errorOutputs, queue);
         await this.publishLoopIterationProgress(beginNode, block, {
@@ -1401,12 +1451,18 @@ export class ExecutionEngine {
         });
         this.recordOutputs(
           block.endNode,
-          withLoopErrors({ done: null, finalState: state }, loopErrors),
+          withLoopErrors(
+            { done: null, finalState: state, status: "break", iterationCount },
+            loopErrors,
+          ),
           executionState,
         );
         this.enqueueReadyDownstream(
           block.endNode,
-          withLoopErrors({ done: null, finalState: state }, loopErrors),
+          withLoopErrors(
+            { done: null, finalState: state, status: "break", iterationCount },
+            loopErrors,
+          ),
           queue,
         );
         return true;
@@ -1430,14 +1486,17 @@ export class ExecutionEngine {
           context: loopIterationContext(outputs),
         });
         if (hitTimeout) {
-          const timeoutOutputs = withLoopErrors({ timeout: null, finalState: state }, loopErrors);
+          const timeoutOutputs = withLoopErrors(
+            { timeout: null, finalState: state, status: "timeout", iterationCount },
+            loopErrors,
+          );
           this.recordOutputs(block.endNode, timeoutOutputs, executionState);
           this.enqueueReadyDownstream(block.endNode, timeoutOutputs, queue);
           return true;
         }
         if (hitLimit) {
           const maxedOutputs = withLoopErrors(
-            { maxed: null, finalState: state },
+            { maxed: null, finalState: state, status: "maxed", iterationCount },
             loopErrors,
           );
           this.recordOutputs(block.endNode, maxedOutputs, executionState);
@@ -1448,6 +1507,7 @@ export class ExecutionEngine {
       }
 
       addLoopErrors(aggregated, loopErrors);
+      aggregated.set("__iterationCount", [iterationCount]);
       this.applyLoopEndOverrides(block.endNode, aggregated, iterationState);
       const endResult = await this.executeNode(block.endNode, iterationState);
       this.clearLoopEndOverrides(block.endNode, aggregated, iterationState);
@@ -1477,15 +1537,21 @@ export class ExecutionEngine {
         context: loopIterationContext(outputs),
       });
       if (hitTimeout) {
-        const timeoutOutputs = withLoopErrors({ timeout: null, finalState: state }, loopErrors);
+        const timeoutOutputs = withLoopErrors(
+          { timeout: null, finalState: state, status: "timeout", iterationCount },
+          loopErrors,
+        );
         this.recordOutputs(block.endNode, timeoutOutputs, executionState);
         this.enqueueReadyDownstream(block.endNode, timeoutOutputs, queue);
         return true;
       }
       if (!wantsAnotherIteration || hitLimit) {
         const outputs = hitLimit
-          ? withLoopErrors({ ...endResult.outputs, maxed: null }, loopErrors)
-          : endResult.outputs;
+          ? withLoopErrors(
+              { ...endResult.outputs, maxed: null, status: "maxed", iterationCount },
+              loopErrors,
+            )
+          : { ...endResult.outputs, status: "done", iterationCount };
         this.recordOutputs(block.endNode, outputs, executionState);
         this.enqueueReadyDownstream(block.endNode, outputs, queue);
         return true;
@@ -1980,15 +2046,16 @@ function loopTimeoutOutputs(
   endNode: NodeInstance,
   aggregated: Map<string, unknown[]>,
   errors: RuntimeError[],
+  iterationCount = 0,
 ): NodeOutputs {
   const results = aggregated.get("result") ?? [];
   if (endNode.type === "foreach_end") {
-    return withLoopErrors({ timeout: null, results }, errors);
+    return withLoopErrors({ timeout: null, results, status: "timeout", iterationCount }, errors);
   }
   if (endNode.type === "for_end") {
-    return withLoopErrors({ timeout: null, results }, errors);
+    return withLoopErrors({ timeout: null, results, status: "timeout", iterationCount }, errors);
   }
-  return withLoopErrors({ timeout: null }, errors);
+  return withLoopErrors({ timeout: null, status: "timeout", iterationCount }, errors);
 }
 
 function loopErrorOutputs(
@@ -1996,12 +2063,16 @@ function loopErrorOutputs(
   aggregated: Map<string, unknown[]>,
   errors: RuntimeError[],
   finalState?: unknown,
+  iterationCount = 0,
 ): NodeOutputs {
   const results = aggregated.get("result") ?? [];
   if (endNode.type === "foreach_end" || endNode.type === "for_end") {
-    return withLoopErrors({ error: null, results }, errors);
+    return withLoopErrors({ error: null, results, status: "error", iterationCount }, errors);
   }
-  return withLoopErrors({ error: null, finalState: finalState ?? null }, errors);
+  return withLoopErrors(
+    { error: null, finalState: finalState ?? null, status: "error", iterationCount },
+    errors,
+  );
 }
 
 function addLoopErrors(
@@ -2010,6 +2081,15 @@ function addLoopErrors(
 ): void {
   if (errors.length === 0) return;
   aggregated.set("errors", errors);
+}
+
+function addLoopStatus(
+  aggregated: Map<string, unknown[]>,
+  status: string,
+  iterationCount: number,
+): void {
+  aggregated.set("__status", [status]);
+  aggregated.set("__iterationCount", [iterationCount]);
 }
 
 function mergeAggregated(

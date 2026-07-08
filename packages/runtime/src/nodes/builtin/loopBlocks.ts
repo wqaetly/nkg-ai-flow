@@ -156,19 +156,24 @@ export const foreachEndNode = defineNode({
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
+    { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
+    { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
   ],
   validateInput: false,
   run({ input }) {
     const raw = input.result;
     const errors = normalizeErrors(input.errors);
+    const results = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
     return {
       kind: "success",
       outputs: {
         done: null,
-        results: raw === undefined ? [] : Array.isArray(raw) ? raw : [raw],
+        results,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
+        status: readLoopStatus(input.__status, "done"),
+        iterationCount: readLoopIterationCount(input.__iterationCount, results.length),
       },
     };
   },
@@ -255,19 +260,24 @@ export const forEndNode = defineNode({
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
+    { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
+    { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
   ],
   validateInput: false,
   run({ input }) {
     const raw = input.result;
     const errors = normalizeErrors(input.errors);
+    const results = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
     return {
       kind: "success",
       outputs: {
         done: null,
-        results: raw === undefined ? [] : Array.isArray(raw) ? raw : [raw],
+        results,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
+        status: readLoopStatus(input.__status, "done"),
+        iterationCount: readLoopIterationCount(input.__iterationCount, results.length),
       },
     };
   },
@@ -371,6 +381,8 @@ export const loopEndNode = defineNode({
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
+    { id: "status", direction: "output", kind: "data", label: "状态", schema: { type: "string" } },
+    { id: "iterationCount", direction: "output", kind: "data", label: "迭代次数", schema: { type: "number" } },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -388,6 +400,8 @@ export const loopEndNode = defineNode({
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
+        status: readLoopStatus(input.__status, shouldContinue ? "maxed" : "done"),
+        iterationCount: readLoopIterationCount(input.__iterationCount, 0),
       },
     };
   },
@@ -429,6 +443,15 @@ function normalizeErrors(value: unknown): unknown[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) return [value];
   return value.flatMap((item) => (Array.isArray(item) ? item : [item]));
+}
+
+function readLoopStatus(value: unknown, fallback: string): string {
+  return typeof value === "string" && value.trim() !== "" ? value : fallback;
+}
+
+function readLoopIterationCount(value: unknown, fallback: number): number {
+  const parsed = Math.trunc(Number(value ?? fallback));
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function forRange(start: number, end: number, step: number): number[] {

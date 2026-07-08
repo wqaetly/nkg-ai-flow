@@ -444,6 +444,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         errors: "错误列表",
         errorCount: "错误数量",
         firstError: "首个错误",
+        status: "状态",
+        iterationCount: "迭代次数",
       },
       foreach_begin: {
         body: "循环体",
@@ -462,6 +464,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         errors: "错误列表",
         errorCount: "错误数量",
         firstError: "首个错误",
+        status: "状态",
+        iterationCount: "迭代次数",
       },
       flow_validator: {
         package: "生成包",
@@ -563,6 +567,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         errors: "错误列表",
         errorCount: "错误数量",
         firstError: "首个错误",
+        status: "状态",
+        iterationCount: "迭代次数",
       },
       node_designer: {
         skill_def: "Skill 定义",

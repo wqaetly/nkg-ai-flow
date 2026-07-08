@@ -11019,9 +11019,16 @@ describe("runtime / hello-flow end-to-end", () => {
       flowId: "foreach_break_e2e",
       input: null,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const loopOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "loop_end") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=beta");
+    expect(loopOutput).toMatchObject({ status: "break", iterationCount: 2 });
   });
 
   it("skips the current foreach item when loop_continue runs inside the body", async () => {
@@ -11086,9 +11093,16 @@ describe("runtime / hello-flow end-to-end", () => {
       flowId: "foreach_continue_e2e",
       input: null,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const loopOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "loop_end") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=gamma");
+    expect(loopOutput).toMatchObject({ status: "done", iterationCount: 3 });
   });
 
   it("executes nested foreach blocks independently", async () => {
@@ -11586,6 +11600,16 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(
       events.some((event) => event.kind === "node_started" && event.nodeId === "done_report"),
     ).toBe(false);
+    const loopFinished = events.filter(
+      (event) => event.kind === "node_finished" && event.nodeId === "loop_end",
+    );
+    expect(
+      (
+        loopFinished.at(-1) as
+          | { payload?: { output?: Record<string, unknown> } }
+          | undefined
+      )?.payload?.output,
+    ).toMatchObject({ status: "maxed", iterationCount: 2 });
   });
 
   it("aggregates inbound values for data input ports marked multiple", async () => {
