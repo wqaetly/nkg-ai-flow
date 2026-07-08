@@ -518,6 +518,171 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes semaphore to acquired and records a permit holder", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_acquired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "FILE_WORKER_POOL",
+        owner: "worker-1",
+        capacity: 2,
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "available:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("acquired"), report.in("in"));
+    flow.connect(gate.out("available"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_acquired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("available:1");
+    expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
+      capacity: 2,
+      holders: [{ owner: "worker-1" }],
+    });
+  });
+
+  it("routes semaphore to saturated when capacity is full", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("FILE_WORKER_POOL", {
+      capacity: 1,
+      holders: [
+        {
+          owner: "worker-1",
+          acquiredAt: now,
+          expiresAt: now + 60_000,
+          updatedAt: now,
+        },
+      ],
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_saturated_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "FILE_WORKER_POOL",
+        owner: "worker-2",
+        capacity: 1,
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "saturated:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("saturated"), report.in("in"));
+    flow.connect(gate.out("used"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_saturated_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("saturated:1");
+    expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
+      holders: [{ owner: "worker-1" }],
+    });
+  });
+
+  it("routes semaphore release to released and frees a permit", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("FILE_WORKER_POOL", {
+      capacity: 2,
+      holders: [
+        {
+          owner: "worker-1",
+          acquiredAt: now,
+          expiresAt: now + 60_000,
+          updatedAt: now,
+        },
+        {
+          owner: "worker-2",
+          acquiredAt: now,
+          expiresAt: now + 60_000,
+          updatedAt: now,
+        },
+      ],
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_release_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "FILE_WORKER_POOL",
+        owner: "worker-1",
+        capacity: 2,
+        mode: "release",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "available:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("released"), report.in("in"));
+    flow.connect(gate.out("available"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_release_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("available:1");
+    expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
+      holders: [{ owner: "worker-2" }],
+    });
+  });
+
   it("routes idempotency_key to started for a new business key", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

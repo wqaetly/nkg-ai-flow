@@ -51,6 +51,7 @@ import {
   rateLimitNode,
   reduceItemsNode,
   retryPolicyNode,
+  semaphoreNode,
   subflowNode,
   switchCaseNode,
   foreachBeginNode,
@@ -177,6 +178,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, rateLimitNode);
   installNode(target, reduceItemsNode);
   installNode(target, retryPolicyNode);
+  installNode(target, semaphoreNode);
   installNode(target, subflowNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);

@@ -149,6 +149,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "重试策略",
         description: "根据错误、尝试次数和重试标记路由到重试或耗尽分支。",
       },
+      semaphore: {
+        title: "信号量",
+        description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",
+      },
       subflow: {
         title: "子流程",
         description: "调用另一个已注册 Flow，并根据子运行状态继续流程。",

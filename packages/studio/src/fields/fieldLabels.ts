@@ -43,6 +43,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       case3: "匹配值 3",
       case4: "匹配值 4",
       branchCount: "分支数量",
+      capacity: "容量",
       checkMode: "检查时机",
       concurrency: "并发数",
       condition: "继续条件",
@@ -249,6 +250,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         multiplier: "退避倍率",
         maxDelayMs: "最大等待毫秒",
         retryableOnly: "仅重试可重试错误",
+      },
+      semaphore: {
+        name: "信号量状态名",
+        owner: "持有者",
+        capacity: "容量",
+        ttlMs: "TTL（毫秒）",
+        mode: "模式",
       },
       subflow: {
         flowId: "流程 ID",
