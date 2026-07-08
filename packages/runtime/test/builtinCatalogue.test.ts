@@ -30,6 +30,7 @@ const BUILTIN_TYPES = [
   "compensation",
   "condition",
   "cooldown_gate",
+  "cron_schedule",
   "deadline",
   "dead_letter",
   "delete_path",

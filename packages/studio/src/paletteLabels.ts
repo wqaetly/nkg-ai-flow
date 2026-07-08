@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "冷却门控",
         description: "放行一次后在指定时间内抑制重复触发。",
       },
+      cron_schedule: {
+        title: "Cron 调度",
+        description: "按五段 cron 表达式判断当前是否到期，并输出下一次触发时间。",
+      },
       deadline: {
         title: "截止时间",
         description: "检查 SLA 或截止时间，并路由到准时或已超时分支。",

@@ -44,6 +44,7 @@ import {
   compensationNode,
   conditionNode,
   cooldownGateNode,
+  cronScheduleNode,
   deadlineNode,
   deadLetterNode,
   deletePathNode,
@@ -214,6 +215,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, compensationNode);
   installNode(target, conditionNode);
   installNode(target, cooldownGateNode);
+  installNode(target, cronScheduleNode);
   installNode(target, deadlineNode);
   installNode(target, deadLetterNode);
   installNode(target, deletePathNode);

@@ -186,6 +186,10 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         durationMs: "冷却时长（毫秒）",
         mode: "模式",
       },
+      cron_schedule: {
+        cron: "Cron 表达式",
+        timezoneOffsetMinutes: "时区偏移分钟",
+      },
       deadline: {
         deadlineAt: "截止时间",
         durationMs: "相对时长（毫秒）",

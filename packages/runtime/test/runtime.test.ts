@@ -396,6 +396,70 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("window:open");
   });
 
+  it("routes cron_schedule to due when the current minute matches", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "cron_schedule_due_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cron = flow.node("cron_schedule", {
+      id: "cron",
+      position: { x: 120, y: 0 },
+      config: { cron: "30 9 * * 1" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "cron=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cron.in("in"));
+    flow.connect(cron.out("due"), report.in("in"));
+    flow.connect(cron.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cron_schedule_due_e2e",
+      input: Date.UTC(2026, 0, 5, 9, 30),
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cron=due");
+  });
+
+  it("routes cron_schedule to not_due and reports wait time", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "cron_schedule_not_due_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const cron = flow.node("cron_schedule", {
+      id: "cron",
+      position: { x: 120, y: 0 },
+      config: { cron: "30 9 * * 1" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "wait=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), cron.in("in"));
+    flow.connect(cron.out("not_due"), report.in("in"));
+    flow.connect(cron.out("waitMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cron_schedule_not_due_e2e",
+      input: Date.UTC(2026, 0, 5, 9, 29),
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("wait=60000");
+  });
+
   it("routes policy_gate to allowed when all rules pass", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "policy_gate_allowed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
