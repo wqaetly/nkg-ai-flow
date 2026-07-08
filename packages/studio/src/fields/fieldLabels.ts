@@ -42,6 +42,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       concurrency: "并发数",
       condition: "继续条件",
       default_name: "默认名称",
+      durationMs: "等待时长（毫秒）",
       end: "结束值",
       expression: "表达式",
       event: "事件",
@@ -103,6 +104,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       condition: {
         expression: "条件表达式",
+      },
+      delay: {
+        durationMs: "等待时长（毫秒）",
       },
       event_trigger: {
         event: "触发事件",

@@ -32,6 +32,7 @@ import { InMemoryNodeRunnerRegistry } from "../nodeRunnerRegistry.js";
 import type { NodeRunner } from "../nodeContext.js";
 import {
   conditionNode,
+  delayNode,
   agentNode,
   endNode,
   eventTriggerNode,
@@ -141,6 +142,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, endNode);
   installNode(target, transformNode);
   installNode(target, conditionNode);
+  installNode(target, delayNode);
   installNode(target, httpNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);

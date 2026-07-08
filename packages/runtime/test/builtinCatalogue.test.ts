@@ -16,6 +16,7 @@ const BUILTIN_TYPES = [
   "end",
   "transform",
   "condition",
+  "delay",
   "http",
   "tool",
   "text_input",

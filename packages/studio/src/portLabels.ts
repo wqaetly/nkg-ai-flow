@@ -24,6 +24,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       context: "上下文",
       error: "错误",
       event: "事件",
+      elapsedMs: "实际等待毫秒",
       false: "条件为假",
       body: "循环体",
       body_done: "循环体完成",
@@ -83,6 +84,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       condition: {
         true: "条件为真",
         false: "条件为假",
+      },
+      delay: {
+        elapsedMs: "实际等待毫秒",
       },
       event_trigger: {
         event: "事件",

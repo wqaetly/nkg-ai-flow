@@ -84,6 +84,42 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("Hello, Node");
   });
 
+  it("waits in a delay node before continuing the flow", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delay_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const delay = flow.node("delay", {
+      id: "wait",
+      position: { x: 100, y: 0 },
+      config: { durationMs: 1 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 200, y: 0 },
+      config: { template: "done" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 300, y: 0 } });
+    flow.connect(start.out("out"), delay.in("in"));
+    flow.connect(delay.out("out"), report.in("in"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delay_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("done");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const delayFinished = events.find(
+      (event) => event.kind === "node_finished" && (event as { nodeId?: string }).nodeId === "wait",
+    );
+    expect(delayFinished).toBeDefined();
+  });
+
   it("executes every item in a foreach begin/end block", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

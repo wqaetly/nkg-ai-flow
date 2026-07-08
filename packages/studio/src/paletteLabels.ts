@@ -33,6 +33,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "条件分支",
         description: "根据布尔表达式把流程路由到 true / false 分支。",
       },
+      delay: {
+        title: "延迟等待",
+        description: "等待指定毫秒数后继续流程。",
+      },
       end: {
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",
