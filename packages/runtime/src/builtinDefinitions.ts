@@ -99,6 +99,7 @@ import {
   toolNode,
   transformNode,
   uniqueItemsNode,
+  windowItemsNode,
   waitSignalNode,
 } from "./nodes/builtin/index.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
@@ -189,6 +190,7 @@ export function getBuiltinNodeDefinitions(
     stringifyJsonNode.definition,
     toolNode.definition,
     uniqueItemsNode.definition,
+    windowItemsNode.definition,
     textInputNode.definition,
     waitSignalNode.definition,
     llmDefined.definition,

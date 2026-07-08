@@ -353,6 +353,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "数组去重",
         description: "按字段或完整值去除重复项，并输出重复项列表。",
       },
+      window_items: {
+        title: "数组窗口",
+        description: "按窗口大小和步长生成滑动或滚动数组窗口。",
+      },
       transform: {
         title: "数据转换",
         description: "使用模板、表达式或静态值进行数据转换。",

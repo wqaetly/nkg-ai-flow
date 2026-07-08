@@ -528,6 +528,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         keep: "保留策略",
         caseSensitive: "区分大小写",
       },
+      window_items: {
+        size: "窗口大小",
+        step: "步长",
+        includePartial: "包含不足窗口",
+      },
       transform: {
         template: "模板",
         expression: "表达式",

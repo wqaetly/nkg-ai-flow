@@ -6230,6 +6230,98 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("slice=0:b,1:c,2:d");
   });
 
+  it("builds sliding windows with window_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "window_items_sliding_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: [1, 2, 3, 4, 5] },
+    });
+    const window = flow.node("window_items", {
+      id: "window",
+      position: { x: 260, y: 0 },
+      config: {
+        size: 3,
+        step: 2,
+        includePartial: true,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "[${item}]" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "windows=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), window.in("in"));
+    flow.connect(input.out("output"), window.in("items"));
+    flow.connect(window.out("out"), map.in("in"));
+    flow.connect(window.out("windows"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "window_items_sliding_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("windows=[1,2,3],[3,4,5],[5]");
+  });
+
+  it("drops incomplete windows with window_items by default", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "window_items_drop_partial_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: ["a", "b", "c", "d", "e"] },
+    });
+    const window = flow.node("window_items", {
+      id: "window",
+      position: { x: 260, y: 0 },
+      config: {
+        size: 2,
+        step: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "count=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), window.in("in"));
+    flow.connect(input.out("output"), window.in("items"));
+    flow.connect(window.out("out"), report.in("in"));
+    flow.connect(window.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "window_items_drop_partial_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("count=2");
+  });
+
   it("batches array items with batch_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "batch_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

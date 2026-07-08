@@ -75,6 +75,7 @@ const BUILTIN_TYPES = [
   "stringify_json",
   "tool",
   "unique_items",
+  "window_items",
   "text_input",
   "wait_signal",
   "llm",

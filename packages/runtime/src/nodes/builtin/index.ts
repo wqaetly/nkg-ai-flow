@@ -75,6 +75,7 @@ export { switchCaseNode } from "./switchCase.js";
 export { stringifyJsonNode } from "./stringifyJson.js";
 export { toolNode } from "./tool.js";
 export { uniqueItemsNode } from "./uniqueItems.js";
+export { windowItemsNode } from "./windowItems.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";
 export { waitSignalNode } from "./waitSignal.js";

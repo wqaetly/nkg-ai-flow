@@ -744,6 +744,14 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "唯一数量",
         duplicateCount: "重复数量",
       },
+      window_items: {
+        items: "窗口项",
+        windows: "窗口列表",
+        ranges: "窗口范围",
+        count: "窗口数量",
+        itemCount: "项目数量",
+        hasPartial: "存在不足窗口",
+      },
       transform: {
         input: "输入",
         output: "输出",
