@@ -685,6 +685,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         succeeded: "全部成功",
         partial: "部分成功",
         failed: "回滚失败",
+        incomplete: "未完成",
         failures: "失败项",
         pending: "待处理项",
         status: "状态",

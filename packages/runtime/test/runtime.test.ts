@@ -3418,6 +3418,50 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("partial:1");
   });
 
+  it("routes rollback summarize to incomplete when results are still pending", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "rollback_incomplete_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const actions = flow.node("transform", {
+      id: "actions",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a1", action: "release_inventory", payload: { sku: "book" }, registeredAt: 1 },
+          { id: "a2", action: "refund_payment", payload: { paymentId: "pay_1" }, registeredAt: 2 },
+        ],
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 260, y: 0 },
+      config: { mode: "summarize", missingResult: "pending" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "incomplete:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), actions.in("in"));
+    flow.connect(actions.out("out"), rollback.in("in"));
+    flow.connect(actions.out("output"), rollback.in("actions"));
+    flow.connect(rollback.out("incomplete"), report.in("in"));
+    flow.connect(rollback.out("pendingCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_incomplete_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("incomplete:2");
+  });
+
   it("marks and loads a resume_point recovery target", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

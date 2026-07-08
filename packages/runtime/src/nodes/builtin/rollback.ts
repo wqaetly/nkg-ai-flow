@@ -11,7 +11,7 @@ import { defineNode } from "@ai-native-flow/node-sdk";
 import type { VariableValue } from "@ai-native-flow/variable-store";
 import { readPath } from "./_helpers.js";
 
-type RollbackBranch = "rollback" | "empty" | "succeeded" | "partial" | "failed";
+type RollbackBranch = "rollback" | "empty" | "succeeded" | "partial" | "failed" | "incomplete";
 
 interface RollbackAction {
   id: string;
@@ -103,6 +103,7 @@ export const rollbackNode = defineNode({
     { id: "succeeded", direction: "output", kind: "control", label: "Succeeded" },
     { id: "partial", direction: "output", kind: "control", label: "Partial" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
+    { id: "incomplete", direction: "output", kind: "control", label: "Incomplete" },
     { id: "actions", direction: "output", kind: "data", label: "Actions" },
     { id: "results", direction: "output", kind: "data", label: "Results" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
@@ -250,6 +251,7 @@ function chooseSummaryBranch(counts: {
   pendingCount: number;
 }): RollbackBranch {
   if (counts.failureCount === 0 && counts.pendingCount === 0) return "succeeded";
+  if (counts.failureCount === 0 && counts.pendingCount > 0) return "incomplete";
   if (counts.successCount > 0) return "partial";
   return "failed";
 }
