@@ -4641,6 +4641,56 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("status=empty");
   });
 
+  it("routes fail_fast on the first reachable branch error", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fail_fast_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const firstError = flow.node("transform", {
+      id: "first_error",
+      position: { x: 140, y: 40 },
+      config: { value: { code: "branch.a_failed", message: "A failed" } },
+    });
+    const gate = flow.node("condition", {
+      id: "gate",
+      position: { x: 140, y: 200 },
+      config: { expression: "input.runSecond" },
+    });
+    const secondError = flow.node("transform", {
+      id: "second_error",
+      position: { x: 300, y: 200 },
+      config: { value: { code: "branch.b_failed", message: "B failed" } },
+    });
+    const failFast = flow.node("fail_fast", {
+      id: "fail_fast",
+      position: { x: 460, y: 120 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 120 },
+      config: { template: "failed=${input.code}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 780, y: 120 } });
+
+    flow.connect(start.out("out"), firstError.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("true"), secondError.in("in"));
+    flow.connect(firstError.out("output"), failFast.in("errors"));
+    flow.connect(secondError.out("output"), failFast.in("errors"));
+    flow.connect(failFast.out("failed"), report.in("in"));
+    flow.connect(failFast.out("error"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fail_fast_e2e",
+      input: { runSecond: false },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed=branch.a_failed");
+  });
+
   it("routes partial_success to partial when enough branches pass", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "partial_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

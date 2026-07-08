@@ -37,6 +37,7 @@ const BUILTIN_TYPES = [
   "distinct_until_changed",
   "empty_gate",
   "expression_eval",
+  "fail_fast",
   "filter_items",
   "flatten_items",
   "first_success",

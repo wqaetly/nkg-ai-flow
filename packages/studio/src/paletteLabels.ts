@@ -109,6 +109,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "表达式求值",
         description: "使用安全表达式从输入数据中计算结果和布尔值。",
       },
+      fail_fast: {
+        title: "快速失败",
+        description: "任一分支错误率先到达时立即进入失败分支。",
+      },
       end: {
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",

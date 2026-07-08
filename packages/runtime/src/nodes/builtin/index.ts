@@ -37,6 +37,7 @@ export { delayNode } from "./delay.js";
 export { distinctUntilChangedNode } from "./distinctUntilChanged.js";
 export { emptyGateNode } from "./emptyGate.js";
 export { expressionEvalNode } from "./expressionEval.js";
+export { failFastNode } from "./failFast.js";
 export { filterItemsNode } from "./filterItems.js";
 export { flattenItemsNode } from "./flattenItems.js";
 export { firstSuccessNode } from "./firstSuccess.js";

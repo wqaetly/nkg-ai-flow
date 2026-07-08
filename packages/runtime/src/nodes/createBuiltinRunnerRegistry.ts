@@ -52,6 +52,7 @@ import {
   emptyGateNode,
   expressionEvalNode,
   errorClassifierNode,
+  failFastNode,
   fallbackNode,
   filterItemsNode,
   flattenItemsNode,
@@ -220,6 +221,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, distinctUntilChangedNode);
   installNode(target, emptyGateNode);
   installNode(target, expressionEvalNode);
+  installNode(target, failFastNode);
   installNode(target, filterItemsNode);
   installNode(target, flattenItemsNode);
   installNode(target, firstSuccessNode);
