@@ -11865,6 +11865,116 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic partial_success policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "partial_success_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 180 } });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 140, y: 60 },
+      config: {
+        value: [
+          { state: "ready", label: "a" },
+          { state: "blocked", failure: "api timeout", label: "b" },
+          { state: "done", label: "c" },
+        ],
+      },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 140, y: 160 },
+      config: { value: "status" },
+    });
+    const minSuccess = flow.node("transform", {
+      id: "min_success",
+      position: { x: 140, y: 260 },
+      config: { value: 2 },
+    });
+    const statusPath = flow.node("transform", {
+      id: "status_path",
+      position: { x: 140, y: 360 },
+      config: { value: "state" },
+    });
+    const successValues = flow.node("transform", {
+      id: "success_values",
+      position: { x: 140, y: 460 },
+      config: { value: "ready,done" },
+    });
+    const errorPath = flow.node("transform", {
+      id: "error_path",
+      position: { x: 140, y: 560 },
+      config: { value: "failure" },
+    });
+    const partial = flow.node("partial_success", {
+      id: "partial",
+      position: { x: 380, y: 260 },
+      config: {
+        mode: "truthy",
+        minSuccess: 3,
+        statusPath: "status",
+        successValues: "ok",
+        errorPath: "error",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 600, y: 260 },
+      config: { template: "partial=${input.mode}:${input.successCount}/${input.total}:${input.statusPath}:${input.errorPath}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 840, y: 260 } });
+
+    flow.connect(start.out("out"), results.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), minSuccess.in("in"));
+    flow.connect(start.out("out"), statusPath.in("in"));
+    flow.connect(start.out("out"), successValues.in("in"));
+    flow.connect(start.out("out"), errorPath.in("in"));
+    flow.connect(results.out("output"), partial.in("results"));
+    flow.connect(mode.out("output"), partial.in("mode"));
+    flow.connect(minSuccess.out("output"), partial.in("minSuccess"));
+    flow.connect(statusPath.out("output"), partial.in("statusPath"));
+    flow.connect(successValues.out("output"), partial.in("successValues"));
+    flow.connect(errorPath.out("output"), partial.in("errorPath"));
+    flow.connect(partial.out("partial"), report.in("in"));
+    flow.connect(partial.out("summary"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "partial_success_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("partial=status:2/3:state:failure");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const partialOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "partial") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(partialOutput).toMatchObject({
+      status: "partial",
+      successCount: 2,
+      failureCount: 1,
+      total: 3,
+      mode: "status",
+      minSuccess: 2,
+      statusPath: "state",
+      successValues: ["ready", "done"],
+      errorPath: "failure",
+      remainingSuccess: 0,
+      firstSuccess: { state: "ready", label: "a" },
+      firstFailure: { state: "blocked", failure: "api timeout", label: "b" },
+    });
+    expect(partialOutput?.successRate).toBeCloseTo(2 / 3);
+  });
+
   it("routes all_success when every branch result succeeds", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "all_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

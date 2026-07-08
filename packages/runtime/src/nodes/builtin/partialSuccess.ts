@@ -96,6 +96,41 @@ export const partialSuccessNode = defineNode({
       label: "Results",
       multiple: true,
     },
+    {
+      id: "mode",
+      direction: "input",
+      kind: "data",
+      label: "Mode",
+      schema: { type: "string" },
+    },
+    {
+      id: "minSuccess",
+      direction: "input",
+      kind: "data",
+      label: "Minimum Success",
+      schema: { type: "number" },
+    },
+    {
+      id: "statusPath",
+      direction: "input",
+      kind: "data",
+      label: "Status Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "successValues",
+      direction: "input",
+      kind: "data",
+      label: "Success Values",
+      schema: { type: "string" },
+    },
+    {
+      id: "errorPath",
+      direction: "input",
+      kind: "data",
+      label: "Error Path",
+      schema: { type: "string" },
+    },
     { id: "all_success", direction: "output", kind: "control", label: "All success" },
     { id: "partial", direction: "output", kind: "control", label: "Partial" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
@@ -108,7 +143,11 @@ export const partialSuccessNode = defineNode({
     { id: "successCount", direction: "output", kind: "data", label: "Success count", schema: { type: "number" } },
     { id: "failureCount", direction: "output", kind: "data", label: "Failure count", schema: { type: "number" } },
     { id: "total", direction: "output", kind: "data", label: "Total", schema: { type: "number" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "minSuccess", direction: "output", kind: "data", label: "Minimum Success", schema: { type: "number" } },
+    { id: "statusPath", direction: "output", kind: "data", label: "Status Path", schema: { type: "string" } },
+    { id: "successValues", direction: "output", kind: "data", label: "Success Values" },
+    { id: "errorPath", direction: "output", kind: "data", label: "Error Path", schema: { type: "string" } },
     { id: "remainingSuccess", direction: "output", kind: "data", label: "Remaining Success", schema: { type: "number" } },
     { id: "successRate", direction: "output", kind: "data", label: "Success Rate", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -116,14 +155,17 @@ export const partialSuccessNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const results = normalizeResults(input.results);
-    const mode = readMode(config.mode);
-    const successValues = parseSuccessValues(config.successValues);
+    const mode = readMode(input.mode ?? config.mode);
+    const statusPath = String(input.statusPath ?? config.statusPath ?? "status");
+    const successValues = parseSuccessValues(input.successValues ?? config.successValues);
+    const successValueList = [...successValues];
+    const errorPath = String(input.errorPath ?? config.errorPath ?? "error");
     const evaluations = results.map((result, index) =>
       evaluateResult(result, index, {
         mode,
-        statusPath: String(config.statusPath ?? "status"),
+        statusPath,
         successValues,
-        errorPath: String(config.errorPath ?? "error"),
+        errorPath,
       }),
     );
     const successes = evaluations
@@ -132,7 +174,7 @@ export const partialSuccessNode = defineNode({
     const failures = evaluations
       .filter((evaluation) => !evaluation.passed)
       .map((evaluation) => evaluation.result);
-    const minSuccess = Math.max(1, Math.trunc(Number(config.minSuccess ?? 1)));
+    const minSuccess = readIntegerAtLeast(input.minSuccess, 1) ?? readIntegerAtLeast(config.minSuccess, 1) ?? 1;
     const successCount = successes.length;
     const failureCount = failures.length;
     const total = results.length;
@@ -149,7 +191,11 @@ export const partialSuccessNode = defineNode({
       successCount,
       failureCount,
       total,
+      mode,
       minSuccess,
+      statusPath,
+      successValues: successValueList,
+      errorPath,
       remainingSuccess,
       successRate,
     };
@@ -169,7 +215,11 @@ export const partialSuccessNode = defineNode({
         successCount,
         failureCount,
         total,
+        mode,
         minSuccess,
+        statusPath,
+        successValues: successValueList,
+        errorPath,
         remainingSuccess,
         successRate,
         status,
@@ -180,7 +230,17 @@ export const partialSuccessNode = defineNode({
 
 function normalizeResults(value: unknown): unknown[] {
   if (value === undefined) return [];
+  if (Array.isArray(value) && value.length === 1 && Array.isArray(value[0])) {
+    return value[0];
+  }
   return Array.isArray(value) ? value : [value];
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return undefined;
+  const integerValue = Math.trunc(numericValue);
+  return integerValue >= minimum ? integerValue : undefined;
 }
 
 function readMode(value: unknown): SuccessMode {
