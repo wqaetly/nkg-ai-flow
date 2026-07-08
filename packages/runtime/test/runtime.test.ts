@@ -9352,6 +9352,94 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic feature_flag policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -240 },
+      config: { value: "set" },
+    });
+    const enabled = flow.node("transform", {
+      id: "enabled",
+      position: { x: 120, y: -160 },
+      config: { value: false },
+    });
+    const rolloutPercent = flow.node("transform", {
+      id: "rolloutPercent",
+      position: { x: 120, y: -80 },
+      config: { value: 35 },
+    });
+    const description = flow.node("transform", {
+      id: "description",
+      position: { x: 120, y: 80 },
+      config: { value: "Dynamic checkout rollout" },
+    });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "CHECKOUT_DYNAMIC_POLICY",
+        mode: "clear",
+        enabled: true,
+        rolloutPercent: 5,
+        description: "Static checkout rollout",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), enabled.in("in"));
+    flow.connect(start.out("out"), rolloutPercent.in("in"));
+    flow.connect(start.out("out"), description.in("in"));
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(mode.out("output"), flag.in("mode"));
+    flow.connect(enabled.out("output"), flag.in("enabled"));
+    flow.connect(rolloutPercent.out("output"), flag.in("rolloutPercent"));
+    flow.connect(description.out("output"), flag.in("description"));
+    flow.connect(flag.out("updated"), report.in("in"));
+    flow.connect(flag.out("rolloutPercent"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:35");
+    expect(variables.get("CHECKOUT_DYNAMIC_POLICY")).toMatchObject({
+      name: "CHECKOUT_DYNAMIC_POLICY",
+      enabled: false,
+      rolloutPercent: 35,
+      description: "Dynamic checkout rollout",
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flagOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flag") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flagOutput).toMatchObject({
+      mode: "set",
+      enabledValue: false,
+      rolloutPercent: 35,
+      description: "Dynamic checkout rollout",
+    });
+  });
+
   it("routes enabled feature_flag evaluations to enabled", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("CHECKOUT_V2", {

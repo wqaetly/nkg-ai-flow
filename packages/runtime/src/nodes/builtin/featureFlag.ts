@@ -80,7 +80,17 @@ export const featureFlagNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "key", direction: "input", kind: "data", label: "Key" },
+    { id: "enabled", direction: "input", kind: "data", label: "Enabled", schema: { type: "boolean" } },
+    {
+      id: "rolloutPercent",
+      direction: "input",
+      kind: "data",
+      label: "Rollout percent",
+      schema: { type: "number" },
+    },
+    { id: "description", direction: "input", kind: "data", label: "Description", schema: { type: "string" } },
     { id: "enabled", direction: "output", kind: "control", label: "Enabled" },
     { id: "disabled", direction: "output", kind: "control", label: "Disabled" },
     { id: "updated", direction: "output", kind: "control", label: "Updated" },
@@ -88,6 +98,7 @@ export const featureFlagNode = defineNode({
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "key", direction: "output", kind: "data", label: "Key", schema: { type: "string" } },
     {
       id: "enabledValue",
@@ -110,6 +121,7 @@ export const featureFlagNode = defineNode({
       label: "Rollout percent",
       schema: { type: "number" },
     },
+    { id: "description", direction: "output", kind: "data", label: "Description", schema: { type: "string" } },
     {
       id: "evaluations",
       direction: "output",
@@ -139,22 +151,27 @@ export const featureFlagNode = defineNode({
     }
 
     const now = Date.now();
-    const mode = config.mode ?? "evaluate";
-    const previous = readFeatureFlagState(name, store.get(name), config, now);
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "evaluate";
+    const policy = {
+      enabled: readBoolean(input.enabled) ?? readBoolean(config.enabled) ?? true,
+      rolloutPercent: readRolloutPercent(input.rolloutPercent ?? config.rolloutPercent),
+      description: String(input.description ?? config.description ?? "").trim(),
+    };
+    const previous = readFeatureFlagState(name, store.get(name), policy, now);
     if (mode === "clear") {
       const existed = store.delete(name);
-      return success(existed ? "cleared" : "missing", emptyState(name, config, now), "", null);
+      return success(existed ? "cleared" : "missing", emptyState(name, policy, now), "", null, mode);
     }
     if (mode === "set") {
       const state = {
         ...previous,
-        enabled: Boolean(config.enabled ?? true),
-        rolloutPercent: readRolloutPercent(config.rolloutPercent),
-        description: String(config.description ?? "").trim(),
+        enabled: policy.enabled,
+        rolloutPercent: policy.rolloutPercent,
+        description: policy.description,
         updatedAt: now,
       };
       store.set(name, toVariableValue(state), metadata(ctx.flowId));
-      return success("updated", state, "", null);
+      return success("updated", state, "", null, mode);
     }
 
     const key = readKey(input.key ?? input.input ?? input.in ?? config.key ?? ctx.runId);
@@ -175,15 +192,22 @@ export const featureFlagNode = defineNode({
       bucket,
       rolloutPercent: state.rolloutPercent,
     });
-    return success(active ? "enabled" : "disabled", state, key, bucket);
+    return success(active ? "enabled" : "disabled", state, key, bucket, mode);
   },
 });
+
+function readMode(value: unknown): FeatureFlagMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "evaluate" || normalized === "set" || normalized === "clear" ? normalized : undefined;
+}
 
 function success(
   branch: FeatureFlagBranch,
   state: FeatureFlagState,
   key: string,
   bucket: number | null,
+  mode: FeatureFlagMode,
 ) {
   return {
     kind: "success" as const,
@@ -191,10 +215,12 @@ function success(
       [branch]: null,
       state,
       name: state.name,
+      mode,
       key,
       enabledValue: branch === "enabled" || (branch === "updated" && state.enabled),
       bucket,
       rolloutPercent: state.rolloutPercent,
+      description: state.description,
       evaluations: state.evaluations,
     },
   };
@@ -247,6 +273,15 @@ function readRolloutPercent(value: unknown): number {
   const number = Number(value);
   if (!Number.isFinite(number)) return 100;
   return Math.max(0, Math.min(100, number));
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function readBucket(value: unknown): number | null {

@@ -539,6 +539,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       feature_flag: {
         in: "输入",
         name: "开关名",
+        mode: "模式",
         key: "灰度键",
         enabled: "已启用",
         disabled: "已禁用",
@@ -549,6 +550,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         enabledValue: "是否启用",
         bucket: "灰度桶",
         rolloutPercent: "灰度比例",
+        description: "描述",
         evaluations: "评估次数",
       },
       filter_items: {
