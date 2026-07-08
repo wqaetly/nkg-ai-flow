@@ -234,6 +234,9 @@ function applyMode(
   }
   if (mode === "touch") {
     if (!previous) return { kind: "success", branch: "missing", state: null };
+    if (previous.status === "expired") {
+      return { kind: "success", branch: "expired", state: previous };
+    }
     return {
       kind: "success",
       branch: "marked",

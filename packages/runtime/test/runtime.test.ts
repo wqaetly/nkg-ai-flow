@@ -3261,6 +3261,127 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("touches a ready resume_point to extend its TTL and update reason", async () => {
+    const variables = new InMemoryVariableStore();
+    const originalExpiresAt = Date.now() + 100;
+    variables.set("ORDER_RESUME_TOUCH", {
+      name: "ORDER_RESUME_TOUCH",
+      status: "ready",
+      targetNodeId: "charge_payment",
+      snapshot: { orderId: "order-1" },
+      reason: "initial",
+      sourceRunId: "run_1",
+      version: 7,
+      markedAt: Date.now() - 1_000,
+      loadedAt: null,
+      expiresAt: originalExpiresAt,
+      updatedAt: Date.now() - 1_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_touch_ready_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const touch = flow.node("resume_point", {
+      id: "touch",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RESUME_TOUCH",
+        mode: "touch",
+        reason: "refreshed",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), touch.in("in"));
+    flow.connect(touch.out("marked"), report.in("in"));
+    flow.connect(touch.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_touch_ready_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:refreshed");
+    expect(variables.get("ORDER_RESUME_TOUCH")).toMatchObject({
+      status: "ready",
+      reason: "refreshed",
+      version: 7,
+    });
+    expect((variables.get("ORDER_RESUME_TOUCH") as { expiresAt: number }).expiresAt).toBeGreaterThan(originalExpiresAt);
+  });
+
+  it("routes resume_point touch to expired when the marker is already expired", async () => {
+    const variables = new InMemoryVariableStore();
+    const expiredAt = Date.now() - 1;
+    variables.set("ORDER_RESUME_TOUCH_EXPIRED", {
+      name: "ORDER_RESUME_TOUCH_EXPIRED",
+      status: "ready",
+      targetNodeId: "charge_payment",
+      snapshot: { orderId: "order-1" },
+      reason: "initial",
+      sourceRunId: "run_1",
+      version: 3,
+      markedAt: Date.now() - 10_000,
+      loadedAt: null,
+      expiresAt: expiredAt,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_touch_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const touch = flow.node("resume_point", {
+      id: "touch",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RESUME_TOUCH_EXPIRED",
+        mode: "touch",
+        reason: "should-not-revive",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), touch.in("in"));
+    flow.connect(touch.out("expired"), report.in("in"));
+    flow.connect(touch.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_touch_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:expired");
+    expect(variables.get("ORDER_RESUME_TOUCH_EXPIRED")).toMatchObject({
+      status: "expired",
+      reason: "initial",
+      expiresAt: expiredAt,
+    });
+  });
+
   it("routes wait_signal to received when an external signal is present", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {
