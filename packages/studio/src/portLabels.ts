@@ -182,6 +182,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       approval: {
         in: "输入",
         name: "审批名",
+        mode: "审批模式",
         payload: "审批载荷",
         decision: "审批决定",
         comment: "审批意见",

@@ -7159,6 +7159,118 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("requests approval with dynamic policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({
+      id: "approval_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 240 } });
+    const approvalName = flow.node("transform", {
+      id: "approval_name",
+      position: { x: 140, y: 40 },
+      config: { value: "ORDER_DYNAMIC_POLICY_APPROVAL" },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 140, y: 140 },
+      config: { value: "request" },
+    });
+    const title = flow.node("transform", {
+      id: "title",
+      position: { x: 140, y: 240 },
+      config: { value: "Approve dynamic policy order" },
+    });
+    const assignee = flow.node("transform", {
+      id: "assignee",
+      position: { x: 140, y: 340 },
+      config: { value: "risk" },
+    });
+    const timeoutMs = flow.node("transform", {
+      id: "timeout_ms",
+      position: { x: 140, y: 440 },
+      config: { value: 120_000 },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 140, y: 540 },
+      config: { value: { orderId: "order-3", amount: 9000 } },
+    });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 420, y: 280 },
+      config: {
+        mode: "check",
+        title: "Static title should be ignored",
+        assignee: "finance",
+        timeoutMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 280 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 280 } });
+
+    flow.connect(start.out("out"), approvalName.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), title.in("in"));
+    flow.connect(start.out("out"), assignee.in("in"));
+    flow.connect(start.out("out"), timeoutMs.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), approval.in("in"));
+    flow.connect(approvalName.out("output"), approval.in("name"));
+    flow.connect(mode.out("output"), approval.in("mode"));
+    flow.connect(title.out("output"), approval.in("title"));
+    flow.connect(assignee.out("output"), approval.in("assignee"));
+    flow.connect(timeoutMs.out("output"), approval.in("timeoutMs"));
+    flow.connect(payload.out("output"), approval.in("payload"));
+    flow.connect(approval.out("requested"), report.in("in"));
+    flow.connect(approval.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:request");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const approvalOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "approval") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(approvalOutput).toMatchObject({
+      mode: "request",
+      branch: "requested",
+      status: "pending",
+      title: "Approve dynamic policy order",
+      assignee: "risk",
+      timeoutMs: 120_000,
+      stateExists: true,
+      requestedValue: true,
+      pendingValue: true,
+    });
+    expect(variables.get("ORDER_DYNAMIC_POLICY_APPROVAL")).toMatchObject({
+      name: "ORDER_DYNAMIC_POLICY_APPROVAL",
+      status: "pending",
+      title: "Approve dynamic policy order",
+      assignee: "risk",
+      payload: { orderId: "order-3", amount: 9000 },
+      decision: null,
+    });
+  });
+
   it("checks approved approval state", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {

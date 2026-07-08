@@ -113,9 +113,19 @@ export const approvalNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "title", direction: "input", kind: "data", label: "Title", schema: { type: "string" } },
+    { id: "assignee", direction: "input", kind: "data", label: "Assignee", schema: { type: "string" } },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "decision", direction: "input", kind: "data", label: "Decision" },
     { id: "comment", direction: "input", kind: "data", label: "Comment" },
+    {
+      id: "timeoutMs",
+      direction: "input",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
     { id: "requested", direction: "output", kind: "control", label: "Requested" },
     { id: "pending", direction: "output", kind: "control", label: "Pending" },
     { id: "approved", direction: "output", kind: "control", label: "Approved" },
@@ -126,6 +136,7 @@ export const approvalNode = defineNode({
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "title", direction: "output", kind: "data", label: "Title", schema: { type: "string" } },
@@ -173,17 +184,17 @@ export const approvalNode = defineNode({
     }
 
     const now = Date.now();
-    const mode = config.mode ?? "request";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "request";
     const previous = normalizeExpired(readApprovalState(store.get(name)), now);
     const decision = applyMode(previous, {
       name,
       mode,
-      title: String(config.title ?? ""),
-      assignee: String(config.assignee ?? ""),
+      title: String(input.title ?? config.title ?? ""),
+      assignee: String(input.assignee ?? config.assignee ?? ""),
       payload: toJsonValue(input.payload ?? input.input ?? input.in ?? null),
       decision: readDecision(input.decision) ?? config.decision ?? "approved",
       comment: readComment(input.comment ?? config.comment),
-      timeoutMs: Math.max(0, Math.trunc(Number(config.timeoutMs ?? 0))),
+      timeoutMs: readIntegerAtLeast(input.timeoutMs, 0) ?? readIntegerAtLeast(config.timeoutMs, 0) ?? 0,
       now,
     });
 
@@ -224,6 +235,7 @@ export const approvalNode = defineNode({
         [decision.branch]: null,
         state,
         name: state?.name ?? name,
+        mode,
         branch: decision.branch,
         status,
         title: state?.title ?? "",
@@ -368,8 +380,30 @@ function readDecision(value: unknown): ApprovalDecision | undefined {
   return undefined;
 }
 
+function readMode(value: unknown): ApprovalMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "request" ||
+    normalized === "check" ||
+    normalized === "resolve" ||
+    normalized === "cancel" ||
+    normalized === "clear"
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
+
 function readComment(value: unknown): string {
   return value === undefined || value === null ? "" : String(value);
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | null {
