@@ -700,6 +700,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       map_items: {
         items: "映射项",
+        template: "模板",
+        expression: "表达式",
+        usedExpression: "使用表达式",
         count: "数量",
       },
       merge: {

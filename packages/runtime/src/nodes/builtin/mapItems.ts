@@ -51,6 +51,8 @@ export const mapItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "template", direction: "input", kind: "data", label: "Template", schema: { type: "string" } },
+    { id: "expression", direction: "input", kind: "data", label: "Expression", schema: { type: "string" } },
     {
       id: "items",
       direction: "output",
@@ -58,6 +60,9 @@ export const mapItemsNode = defineNode({
       label: "Mapped items",
       schema: { type: "array" },
     },
+    { id: "template", direction: "output", kind: "data", label: "Template", schema: { type: "string" } },
+    { id: "expression", direction: "output", kind: "data", label: "Expression", schema: { type: "string" } },
+    { id: "usedExpression", direction: "output", kind: "data", label: "Used expression", schema: { type: "boolean" } },
     {
       id: "count",
       direction: "output",
@@ -73,10 +78,11 @@ export const mapItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const template = String(config.template ?? "${item}");
-    const expression = typeof config.expression === "string"
-      ? config.expression.trim()
+    const template = String(input.template ?? config.template ?? "${item}");
+    const expression = typeof (input.expression ?? config.expression) === "string"
+      ? String(input.expression ?? config.expression).trim()
       : "";
+    const usedExpression = expression.length > 0;
     const items = source.map((item, index) => {
       const scope = {
         item,
@@ -85,7 +91,7 @@ export const mapItemsNode = defineNode({
         items: source,
         count: source.length,
       };
-      return expression.length > 0
+      return usedExpression
         ? evaluateExpression(expression, scope)
         : renderTemplate(template, scope);
     });
@@ -95,6 +101,9 @@ export const mapItemsNode = defineNode({
       outputs: {
         out: null,
         items,
+        template,
+        expression,
+        usedExpression,
         count: items.length,
       },
     };
