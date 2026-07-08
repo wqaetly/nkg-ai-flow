@@ -120,6 +120,8 @@ export class ExecutionEngine {
   private readonly remainingDeps = new Map<string, number>();
   /** Nodes already executed by the main DAG scheduler. */
   private readonly completedNodeIds = new Set<string>();
+  /** Nodes currently in-flight in the main DAG scheduler. */
+  private readonly runningNodeIds = new Set<string>();
   /** Per-node input overrides used by block runners when aggregating loop results. */
   private readonly inputOverrides = new Map<string, unknown>();
   /** Per-node progress event sequence, kept away from node lifecycle seq 1/2. */
@@ -286,41 +288,75 @@ export class ExecutionEngine {
       ),
     );
 
+    const inFlight: Array<{
+      node: NodeInstance;
+      promise: Promise<NodeResult>;
+    }> = [];
+    const startNode = (node: NodeInstance) => {
+      this.runningNodeIds.add(node.id);
+      inFlight.push({ node, promise: this.executeNode(node) });
+    };
+    const fillReady = () => {
+      while (queue.length > 0 && inFlight.length < schedulerConcurrency) {
+        const nodeId = queue.shift()!;
+        if (
+          this.completedNodeIds.has(nodeId) ||
+          this.runningNodeIds.has(nodeId)
+        ) {
+          continue;
+        }
+        const node = this.nodesById.get(nodeId);
+        if (!node) continue;
+        if (!this.fitsParallelBranchLimits(node, new Map())) {
+          queue.push(nodeId);
+          break;
+        }
+
+        const batch = this.dequeueReadyBatch(
+          node,
+          queue,
+          schedulerConcurrency - inFlight.length,
+        );
+        for (const batchNode of batch) startNode(batchNode);
+      }
+    };
+
     try {
-      while (queue.length > 0) {
+      fillReady();
+      while (queue.length > 0 || inFlight.length > 0) {
         if (signal?.aborted) {
           cancelled = true;
           break;
         }
-        const nodeId = queue.shift()!;
-        if (this.completedNodeIds.has(nodeId)) continue;
-        const node = this.nodesById.get(nodeId);
-        if (!node) continue;
-
-        const batch = this.dequeueReadyBatch(node, queue, schedulerConcurrency);
-        const results = await Promise.all(
-          batch.map(async (batchNode) => ({
-            node: batchNode,
-            result: await this.executeNode(batchNode),
-          })),
-        );
-
-        let reachedSink = false;
-        for (const { node: executedNode, result } of results) {
-          const handled = await this.finishScheduledNode(
-            executedNode,
-            result,
-            queue,
-          );
-          if (handled.kind === "failed") {
-            return { succeeded: false, cancelled: false, error: handled.error };
-          }
-          if (handled.kind === "sink_reached") {
-            reachedSink = true;
-            break;
-          }
+        if (inFlight.length === 0) {
+          fillReady();
+          continue;
         }
-        if (reachedSink) break;
+
+        const settled = await Promise.race(
+          inFlight.map((entry, index) =>
+            entry.promise.then((result) => ({ index, result })),
+          ),
+        );
+        const [entry] = inFlight.splice(settled.index, 1);
+        if (!entry) continue;
+        this.runningNodeIds.delete(entry.node.id);
+
+        const handled = await this.finishScheduledNode(
+          entry.node,
+          settled.result,
+          queue,
+        );
+        if (handled.kind === "failed") {
+          await Promise.allSettled(inFlight.map((item) => item.promise));
+          return { succeeded: false, cancelled: false, error: handled.error };
+        }
+        if (handled.kind === "sink_reached") {
+          await Promise.allSettled(inFlight.map((item) => item.promise));
+          break;
+        }
+
+        fillReady();
       }
     } catch (cause) {
       const error = normalizeError(cause, {
@@ -409,7 +445,7 @@ export class ExecutionEngine {
     this.addParallelBranchCounts(firstNode, parallelCounts);
     for (let index = 0; index < queue.length && batch.length < schedulerConcurrency;) {
       const nodeId = queue[index]!;
-      if (this.completedNodeIds.has(nodeId)) {
+      if (this.completedNodeIds.has(nodeId) || this.runningNodeIds.has(nodeId)) {
         queue.splice(index, 1);
         continue;
       }
@@ -442,7 +478,9 @@ export class ExecutionEngine {
     counts: ReadonlyMap<string, { count: number; limit: number }>,
   ): boolean {
     for (const parent of this.parallelBranchParents(node)) {
-      const current = counts.get(parent.nodeId)?.count ?? 0;
+      const current =
+        (counts.get(parent.nodeId)?.count ?? 0) +
+        this.runningParallelBranchCount(parent.nodeId);
       if (current >= parent.limit) return false;
     }
     return true;
@@ -473,6 +511,22 @@ export class ExecutionEngine {
       if (limit > 0) parents.push({ nodeId: parent.id, limit });
     }
     return parents;
+  }
+
+  private runningParallelBranchCount(parentNodeId: string): number {
+    let count = 0;
+    for (const nodeId of this.runningNodeIds) {
+      const node = this.nodesById.get(nodeId);
+      if (!node) continue;
+      if (
+        this.parallelBranchParents(node).some(
+          (parent) => parent.nodeId === parentNodeId,
+        )
+      ) {
+        count += 1;
+      }
+    }
+    return count;
   }
 
   private async finishScheduledNode(

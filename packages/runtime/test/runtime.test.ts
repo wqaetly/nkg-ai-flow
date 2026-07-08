@@ -6361,6 +6361,81 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("remaining:1");
   });
 
+  it("continues through quorum before slow in-flight siblings finish", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "quorum_inflight_sibling_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const fanout = flow.node("parallel", {
+      id: "fanout",
+      position: { x: 120, y: 120 },
+      config: { branchCount: 3 },
+    });
+    const fastA = flow.node("transform", {
+      id: "fast_a",
+      position: { x: 280, y: 20 },
+      config: { value: "a" },
+    });
+    const fastB = flow.node("transform", {
+      id: "fast_b",
+      position: { x: 280, y: 120 },
+      config: { value: "b" },
+    });
+    const waitSlow = flow.node("delay", {
+      id: "wait_slow",
+      position: { x: 280, y: 220 },
+      config: { durationMs: 60 },
+    });
+    const slow = flow.node("transform", {
+      id: "slow",
+      position: { x: 440, y: 220 },
+      config: { value: "slow" },
+    });
+    const quorum = flow.node("quorum", {
+      id: "quorum",
+      position: { x: 600, y: 120 },
+      config: { threshold: 2 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 760, y: 120 },
+      config: { template: "quorum=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 920, y: 120 } });
+
+    flow.connect(start.out("out"), fanout.in("in"));
+    flow.connect(fanout.out("branch1"), fastA.in("in"));
+    flow.connect(fanout.out("branch2"), fastB.in("in"));
+    flow.connect(fanout.out("branch3"), waitSlow.in("in"));
+    flow.connect(waitSlow.out("out"), slow.in("in"));
+    flow.connect(fastA.out("output"), quorum.in("values"));
+    flow.connect(fastB.out("output"), quorum.in("values"));
+    flow.connect(slow.out("output"), quorum.in("values"));
+    flow.connect(quorum.out("met"), report.in("in"));
+    flow.connect(quorum.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "quorum_inflight_sibling_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("quorum=a,b");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const reportStarted = events.findIndex(
+      (event) => event.kind === "node_started" && event.nodeId === "report",
+    );
+    const slowFinished = events.findIndex(
+      (event) => event.kind === "node_finished" && event.nodeId === "wait_slow",
+    );
+    expect(reportStarted).toBeGreaterThanOrEqual(0);
+    expect(slowFinished).toBeGreaterThanOrEqual(0);
+    expect(reportStarted).toBeLessThan(slowFinished);
+  });
+
   it("races the first reachable branch without waiting for unreachable siblings", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "race_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
@@ -6408,6 +6483,72 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("winner=fast");
+  });
+
+  it("races fast branches before slow in-flight siblings finish", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "race_inflight_sibling_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const fanout = flow.node("parallel", {
+      id: "fanout",
+      position: { x: 120, y: 120 },
+      config: { branchCount: 2 },
+    });
+    const fast = flow.node("transform", {
+      id: "fast",
+      position: { x: 280, y: 40 },
+      config: { value: "fast" },
+    });
+    const waitSlow = flow.node("delay", {
+      id: "wait_slow",
+      position: { x: 280, y: 200 },
+      config: { durationMs: 60 },
+    });
+    const slow = flow.node("transform", {
+      id: "slow",
+      position: { x: 440, y: 200 },
+      config: { value: "slow" },
+    });
+    const race = flow.node("race", { id: "race", position: { x: 600, y: 120 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 760, y: 120 },
+      config: { template: "winner=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 920, y: 120 } });
+
+    flow.connect(start.out("out"), fanout.in("in"));
+    flow.connect(fanout.out("branch1"), fast.in("in"));
+    flow.connect(fanout.out("branch2"), waitSlow.in("in"));
+    flow.connect(waitSlow.out("out"), slow.in("in"));
+    flow.connect(fast.out("out"), race.in("in"));
+    flow.connect(slow.out("out"), race.in("in"));
+    flow.connect(fast.out("output"), race.in("values"));
+    flow.connect(slow.out("output"), race.in("values"));
+    flow.connect(race.out("winner"), report.in("in"));
+    flow.connect(race.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "race_inflight_sibling_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("winner=fast");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const reportStarted = events.findIndex(
+      (event) => event.kind === "node_started" && event.nodeId === "report",
+    );
+    const slowFinished = events.findIndex(
+      (event) => event.kind === "node_finished" && event.nodeId === "wait_slow",
+    );
+    expect(reportStarted).toBeGreaterThanOrEqual(0);
+    expect(slowFinished).toBeGreaterThanOrEqual(0);
+    expect(reportStarted).toBeLessThan(slowFinished);
   });
 
   it("routes race to empty when no value has arrived", async () => {
@@ -6486,6 +6627,73 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("failed=branch.a_failed");
+  });
+
+  it("routes fail_fast before slow in-flight siblings finish", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fail_fast_inflight_sibling_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const fanout = flow.node("parallel", {
+      id: "fanout",
+      position: { x: 120, y: 120 },
+      config: { branchCount: 2 },
+    });
+    const firstError = flow.node("transform", {
+      id: "first_error",
+      position: { x: 280, y: 40 },
+      config: { value: { code: "branch.a_failed", message: "A failed" } },
+    });
+    const waitSlow = flow.node("delay", {
+      id: "wait_slow",
+      position: { x: 280, y: 200 },
+      config: { durationMs: 60 },
+    });
+    const slow = flow.node("transform", {
+      id: "slow",
+      position: { x: 440, y: 200 },
+      config: { value: { ok: true } },
+    });
+    const failFast = flow.node("fail_fast", {
+      id: "fail_fast",
+      position: { x: 600, y: 120 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 760, y: 120 },
+      config: { template: "failed=${input.code}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 920, y: 120 } });
+
+    flow.connect(start.out("out"), fanout.in("in"));
+    flow.connect(fanout.out("branch1"), firstError.in("in"));
+    flow.connect(fanout.out("branch2"), waitSlow.in("in"));
+    flow.connect(waitSlow.out("out"), slow.in("in"));
+    flow.connect(firstError.out("output"), failFast.in("errors"));
+    flow.connect(slow.out("output"), failFast.in("errors"));
+    flow.connect(failFast.out("failed"), report.in("in"));
+    flow.connect(failFast.out("error"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fail_fast_inflight_sibling_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed=branch.a_failed");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const reportStarted = events.findIndex(
+      (event) => event.kind === "node_started" && event.nodeId === "report",
+    );
+    const slowFinished = events.findIndex(
+      (event) => event.kind === "node_finished" && event.nodeId === "wait_slow",
+    );
+    expect(reportStarted).toBeGreaterThanOrEqual(0);
+    expect(slowFinished).toBeGreaterThanOrEqual(0);
+    expect(reportStarted).toBeLessThan(slowFinished);
   });
 
   it("routes partial_success to partial when enough branches pass", async () => {
