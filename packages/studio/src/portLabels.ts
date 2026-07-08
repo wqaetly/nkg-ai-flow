@@ -1268,11 +1268,15 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       switch_case: {
         in: "输入",
         value: "匹配数据",
+        path: "路径",
         case1: "分支 1",
         case2: "分支 2",
         case3: "分支 3",
         case4: "分支 4",
         default: "默认分支",
+        selected: "选中值",
+        selectedText: "选中文本",
+        branch: "命中分支",
       },
       stringify_json: {
         value: "数据",

@@ -48,23 +48,34 @@ export const switchCaseNode = defineNode({
   ports: [
     controlIn,
     { id: "value", direction: "input", kind: "data", label: "Value" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "case1", direction: "input", kind: "data", label: "Case 1", schema: { type: "string" } },
+    { id: "case2", direction: "input", kind: "data", label: "Case 2", schema: { type: "string" } },
+    { id: "case3", direction: "input", kind: "data", label: "Case 3", schema: { type: "string" } },
+    { id: "case4", direction: "input", kind: "data", label: "Case 4", schema: { type: "string" } },
     { id: "case1", direction: "output", kind: "control", label: "Case 1" },
     { id: "case2", direction: "output", kind: "control", label: "Case 2" },
     { id: "case3", direction: "output", kind: "control", label: "Case 3" },
     { id: "case4", direction: "output", kind: "control", label: "Case 4" },
     { id: "default", direction: "output", kind: "control", label: "Default" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "selected", direction: "output", kind: "data", label: "Selected" },
+    { id: "selectedText", direction: "output", kind: "data", label: "Selected text", schema: { type: "string" } },
+    { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const raw = input as Record<string, unknown>;
     const payload = readPayload(raw);
-    const selected = selectValue(raw, String(config.path ?? "value"), payload);
+    const path = String(raw.path ?? config.path ?? "value");
+    const selected = selectValue(raw, path, payload);
     const selectedText = selected == null ? "" : String(selected);
-    const branch = findMatchingCase(config, selectedText) ?? "default";
+    const cases = readCases(raw, config);
+    const branch = findMatchingCase(cases, selectedText) ?? "default";
 
     ctx.log.debug("switch_case selected branch", {
-      path: config.path,
+      path,
       value: selectedText,
       branch,
     });
@@ -74,6 +85,10 @@ export const switchCaseNode = defineNode({
       outputs: {
         [branch]: null,
         value: payload,
+        path,
+        selected,
+        selectedText,
+        branch,
       },
     };
   },
@@ -93,13 +108,25 @@ function selectValue(
   return payload;
 }
 
-function findMatchingCase(
+function readCases(
+  input: Record<string, unknown>,
   config: Record<string, unknown>,
+): Record<string, unknown> {
+  const cases: Record<string, unknown> = {};
+  for (let index = 1; index <= CASE_COUNT; index++) {
+    const key = `case${index}`;
+    cases[key] = Object.prototype.hasOwnProperty.call(input, key) ? input[key] : config[key];
+  }
+  return cases;
+}
+
+function findMatchingCase(
+  cases: Record<string, unknown>,
   selectedText: string,
 ): string | undefined {
   for (let index = 1; index <= CASE_COUNT; index++) {
     const key = `case${index}`;
-    const expected = config[key];
+    const expected = cases[key];
     if (typeof expected === "string" && expected !== "" && expected === selectedText) {
       return key;
     }

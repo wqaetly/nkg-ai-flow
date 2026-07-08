@@ -15914,6 +15914,75 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("approved:release");
   });
 
+  it("uses dynamic switch_case path and case values ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "switch_case_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 120 },
+      config: { value: { kind: "order", type: "invoice", id: "doc_1" } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 260 },
+      config: { value: "value.type" },
+    });
+    const case2 = flow.node("transform", {
+      id: "case2",
+      position: { x: 120, y: 400 },
+      config: { value: "invoice" },
+    });
+    const branch = flow.node("switch_case", {
+      id: "branch",
+      position: { x: 320, y: 120 },
+      config: {
+        path: "value.kind",
+        case1: "order",
+        case2: "receipt",
+      },
+    });
+    const staticOrder = flow.node("transform", {
+      id: "staticOrder",
+      position: { x: 500, y: 40 },
+      config: { template: "static:${input.id}" },
+    });
+    const dynamicInvoice = flow.node("transform", {
+      id: "dynamicInvoice",
+      position: { x: 500, y: 200 },
+      config: { template: "dynamic:${input.id}" },
+    });
+    const merge = flow.node("merge", { id: "merge", position: { x: 660, y: 120 } });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 120 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), path.in("in"));
+    flow.connect(path.out("out"), case2.in("in"));
+    flow.connect(case2.out("out"), branch.in("in"));
+    flow.connect(input.out("output"), branch.in("value"));
+    flow.connect(path.out("output"), branch.in("path"));
+    flow.connect(case2.out("output"), branch.in("case2"));
+    flow.connect(branch.out("case1"), staticOrder.in("in"));
+    flow.connect(branch.out("case2"), dynamicInvoice.in("in"));
+    flow.connect(branch.out("value"), staticOrder.in("input"));
+    flow.connect(branch.out("value"), dynamicInvoice.in("input"));
+    flow.connect(staticOrder.out("out"), merge.in("in"));
+    flow.connect(dynamicInvoice.out("out"), merge.in("in"));
+    flow.connect(staticOrder.out("output"), merge.in("value"));
+    flow.connect(dynamicInvoice.out("output"), merge.in("value"));
+    flow.connect(merge.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "switch_case_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dynamic:doc_1");
+  });
+
   it("merges an exclusive switch_case branch before a shared end node", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "merge_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
