@@ -913,6 +913,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("cron=due");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cronOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cron") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cronOutput).toMatchObject({
+      status: "due",
+      cron: "30 9 * * 1",
+      timezoneOffsetMinutes: 0,
+      now: Date.UTC(2026, 0, 5, 9, 30),
+      nextAt: Date.UTC(2026, 0, 5, 9, 30),
+      nextAtIso: new Date(Date.UTC(2026, 0, 5, 9, 30)).toISOString(),
+      waitMs: 0,
+      dueValue: true,
+      notDueValue: false,
+    });
   });
 
   it("routes cron_schedule to not_due and reports wait time", async () => {
@@ -945,6 +962,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("wait=60000");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cronOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cron") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cronOutput).toMatchObject({
+      status: "not_due",
+      cron: "30 9 * * 1",
+      timezoneOffsetMinutes: 0,
+      now: Date.UTC(2026, 0, 5, 9, 29),
+      nextAt: Date.UTC(2026, 0, 5, 9, 30),
+      nextAtIso: new Date(Date.UTC(2026, 0, 5, 9, 30)).toISOString(),
+      waitMs: 60_000,
+      dueValue: false,
+      notDueValue: true,
+    });
   });
 
   it("routes policy_gate to allowed when all rules pass", async () => {
