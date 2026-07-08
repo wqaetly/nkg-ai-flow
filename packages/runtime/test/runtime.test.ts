@@ -7,6 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { defineFlow } from "@ai-native-flow/flow-builder";
 import { defineNode } from "@ai-native-flow/node-sdk";
+import { createRuntimeError } from "@ai-native-flow/flow-ir";
 import {
   InMemorySecretStore,
   InMemoryVariableStore,
@@ -181,6 +182,123 @@ describe("runtime / hello-flow end-to-end", () => {
         context: { timeoutMs: 1 },
       },
     });
+  });
+
+  it("retries a failed node according to runtimeRetry policy", async () => {
+    let calls = 0;
+    const flakyNode = defineNode({
+      type: "flaky_retry",
+      typeVersion: "1.0.0",
+      title: "Flaky Retry",
+      ports: [
+        { id: "value", direction: "output", kind: "data", label: "Value" },
+      ],
+      validateInput: false,
+      run({ ctx }) {
+        calls += 1;
+        if (calls === 1) {
+          return {
+            kind: "error",
+            error: createRuntimeError({
+              code: "node.flaky_retry.transient",
+              kind: "internal",
+              category: "system",
+              message: "transient failure",
+              retryable: true,
+              source: { module: "node_logic", nodeId: ctx.nodeId },
+            }) as unknown as { code: string; message: string; [key: string]: unknown },
+          };
+        }
+        return { kind: "success", outputs: { out: null, value: `ok:${ctx.attempt}` } };
+      },
+    });
+    const rt = newRuntime({ nodes: [flakyNode] });
+    const flow = defineFlow({ id: "runtime_retry_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flaky = flow.node("flaky_retry", {
+      id: "flaky",
+      position: { x: 120, y: 0 },
+      config: {
+        runtimeRetry: {
+          maxAttempts: 2,
+          baseDelayMs: 0,
+          retryableOnly: true,
+        },
+      },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+    flow.connect(start.out("out"), flaky.in("in"));
+    flow.connect(flaky.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "runtime_retry_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("ok:2");
+    expect(calls).toBe(2);
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.filter((event) => event.kind === "node_started" && event.nodeId === "flaky"),
+    ).toHaveLength(2);
+    expect(
+      events.find((event) => event.kind === "node_progress" && event.nodeId === "flaky")
+        ?.payload,
+    ).toMatchObject({
+      type: "node_retry",
+      attempt: 1,
+      nextAttempt: 2,
+    });
+  });
+
+  it("does not retry non-retryable errors when runtimeRetry requires retryable errors", async () => {
+    let calls = 0;
+    const fatalNode = defineNode({
+      type: "fatal_retry",
+      typeVersion: "1.0.0",
+      title: "Fatal Retry",
+      validateInput: false,
+      run({ ctx }) {
+        calls += 1;
+        return {
+          kind: "error",
+          error: createRuntimeError({
+            code: "node.fatal_retry.failed",
+            kind: "validation",
+            category: "user_input",
+            message: "fatal failure",
+            retryable: false,
+            source: { module: "node_logic", nodeId: ctx.nodeId },
+          }) as unknown as { code: string; message: string; [key: string]: unknown },
+        };
+      },
+    });
+    const rt = newRuntime({ nodes: [fatalNode] });
+    const flow = defineFlow({ id: "runtime_retry_non_retryable_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const fatal = flow.node("fatal_retry", {
+      id: "fatal",
+      position: { x: 120, y: 0 },
+      config: { runtimeRetry: { maxAttempts: 3, baseDelayMs: 0 } },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+    flow.connect(start.out("out"), fatal.in("in"));
+    flow.connect(fatal.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "runtime_retry_non_retryable_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(false);
+    expect(result.error?.code).toBe("node.fatal_retry.failed");
+    expect(calls).toBe(1);
   });
 
   it("routes deadline to on_time before the deadline", async () => {

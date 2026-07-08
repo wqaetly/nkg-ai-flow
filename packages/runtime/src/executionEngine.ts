@@ -475,8 +475,36 @@ export class ExecutionEngine {
     node: NodeInstance,
     state: ExecutionState = this.defaultExecutionState(),
   ): Promise<NodeResult> {
-    const { eventBus, runId, flowId, flowVersion, signal } = this.options;
     const inputs = this.assembleInputs(node, state);
+    const retryPolicy = readRuntimeRetryPolicy(inputs.__config__);
+    let attempt = 1;
+    while (true) {
+      const result = await this.executeNodeAttempt(node, inputs, attempt);
+      if (result.kind !== "error") return result;
+      if (attempt >= retryPolicy.maxAttempts) return result;
+      if (!shouldRetryError(result.error, retryPolicy)) return result;
+
+      const delayMs = retryDelayMs(retryPolicy, attempt);
+      await this.publishNodeRetryProgress(node, {
+        attempt,
+        nextAttempt: attempt + 1,
+        delayMs,
+        error: result.error,
+      });
+      if (delayMs > 0) {
+        const completed = await waitForRetryDelay(delayMs, this.options.signal);
+        if (!completed) return result;
+      }
+      attempt += 1;
+    }
+  }
+
+  private async executeNodeAttempt(
+    node: NodeInstance,
+    inputs: NodeInputs,
+    attempt: number,
+  ): Promise<NodeResult> {
+    const { eventBus, runId, flowId, flowVersion, signal } = this.options;
     const startedAt = Date.now();
 
     await eventBus.publish({
@@ -485,7 +513,7 @@ export class ExecutionEngine {
       flowVersion,
       nodeId: node.id,
       nodeVersion: node.typeVersion,
-      attempt: this.attempt,
+      attempt,
       seq: 1,
       kind: "node_started",
       payload: { input: redactInputs(inputs) },
@@ -523,7 +551,7 @@ export class ExecutionEngine {
       flowVersion,
       nodeId: node.id,
       nodeVersion: node.typeVersion,
-      attempt: this.attempt,
+      attempt,
       initialSeq: 3,
     });
 
@@ -534,7 +562,7 @@ export class ExecutionEngine {
       nodeId: node.id,
       nodeType: node.type,
       nodeVersion: node.typeVersion,
-      attempt: this.attempt,
+      attempt,
       subflowDepth: this.options.subflowDepth ?? 0,
       variables: this.options.variables,
       secrets: this.options.variables,
@@ -622,7 +650,7 @@ export class ExecutionEngine {
         flowVersion,
         nodeId: node.id,
         nodeVersion: node.typeVersion,
-        attempt: this.attempt,
+        attempt,
         seq: 2,
         kind: "node_finished",
         payload: { output: redactInputs(result.outputs), durationMs },
@@ -634,7 +662,7 @@ export class ExecutionEngine {
         flowVersion,
         nodeId: node.id,
         nodeVersion: node.typeVersion,
-        attempt: this.attempt,
+        attempt,
         seq: 2,
         kind: "node_error",
         payload: { error: result.error, durationMs },
@@ -642,6 +670,35 @@ export class ExecutionEngine {
     }
 
     return result;
+  }
+
+  private async publishNodeRetryProgress(
+    node: NodeInstance,
+    payload: {
+      attempt: number;
+      nextAttempt: number;
+      delayMs: number;
+      error: RuntimeError;
+    },
+  ): Promise<void> {
+    const seq = this.nextProgressSeq(node.id);
+    await this.options.eventBus.publish({
+      runId: this.options.runId,
+      flowId: this.options.flowId,
+      flowVersion: this.options.flowVersion,
+      nodeId: node.id,
+      nodeVersion: node.typeVersion,
+      attempt: payload.attempt,
+      seq,
+      kind: "node_progress",
+      payload: {
+        type: "node_retry",
+        attempt: payload.attempt,
+        nextAttempt: payload.nextAttempt,
+        delayMs: payload.delayMs,
+        error: payload.error,
+      },
+    });
   }
 
   private assembleInputs(
@@ -1622,6 +1679,15 @@ type ScheduledFinish =
   | { kind: "sink_reached" }
   | { kind: "failed"; error: RuntimeError };
 
+interface RuntimeRetryPolicy {
+  maxAttempts: number;
+  baseDelayMs: number;
+  multiplier: number;
+  maxDelayMs: number;
+  retryableOnly: boolean;
+  retryableCodes: readonly string[];
+}
+
 function loopSpecFor(type: string): { endType: string } | undefined {
   switch (type) {
     case "foreach_begin":
@@ -1655,6 +1721,90 @@ function readRuntimeTimeoutMs(config: unknown, fallback: number): number {
         : fallback;
   if (!Number.isFinite(parsed)) return Math.max(0, Math.trunc(fallback));
   return Math.max(0, Math.trunc(parsed));
+}
+
+function readRuntimeRetryPolicy(config: unknown): RuntimeRetryPolicy {
+  const record = asRecord(config);
+  const raw = asRecord(record.runtimeRetry ?? record.retry);
+  const maxAttempts = Math.max(
+    1,
+    Math.trunc(numberFrom(raw.maxAttempts, numberFrom(raw.attempts, 1))),
+  );
+  const baseDelayMs = Math.max(
+    0,
+    Math.trunc(numberFrom(raw.baseDelayMs, numberFrom(raw.delayMs, 0))),
+  );
+  const multiplier = Math.max(1, numberFrom(raw.multiplier, 2));
+  const maxDelayMs = Math.max(
+    baseDelayMs,
+    Math.trunc(numberFrom(raw.maxDelayMs, Number.MAX_SAFE_INTEGER)),
+  );
+  return {
+    maxAttempts,
+    baseDelayMs,
+    multiplier,
+    maxDelayMs,
+    retryableOnly: raw.retryableOnly !== false,
+    retryableCodes: readStringList(raw.retryableCodes ?? raw.codes),
+  };
+}
+
+function numberFrom(value: unknown, fallback: number): number {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : fallback;
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function readStringList(value: unknown): readonly string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item): item is string => typeof item === "string")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+}
+
+function shouldRetryError(
+  error: RuntimeError,
+  policy: RuntimeRetryPolicy,
+): boolean {
+  if (
+    policy.retryableCodes.length > 0 &&
+    !policy.retryableCodes.includes(error.code)
+  ) {
+    return false;
+  }
+  if (policy.retryableOnly && error.retryable !== true) return false;
+  return true;
+}
+
+function retryDelayMs(policy: RuntimeRetryPolicy, attempt: number): number {
+  if (policy.baseDelayMs <= 0) return 0;
+  const exponential =
+    policy.baseDelayMs * policy.multiplier ** Math.max(0, attempt - 1);
+  return Math.max(0, Math.min(policy.maxDelayMs, Math.trunc(exponential)));
+}
+
+function waitForRetryDelay(
+  delayMs: number,
+  signal: AbortSignal | undefined,
+): Promise<boolean> {
+  if (delayMs <= 0) return Promise.resolve(true);
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve(true);
+    }, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
 }
 
 function readLoopErrorPolicy(value: unknown): LoopErrorPolicy {
