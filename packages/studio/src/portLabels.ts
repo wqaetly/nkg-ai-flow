@@ -946,6 +946,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         mode: "模式",
         successPath: "成功路径",
+        successValues: "成功值",
         errorPath: "错误路径",
         missingResult: "缺失结果策略",
         count: "动作数量",

@@ -98,6 +98,11 @@ export const rollbackNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "actions", direction: "input", kind: "data", label: "Actions" },
     { id: "results", direction: "input", kind: "data", label: "Results" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "successPath", direction: "input", kind: "data", label: "Success Path", schema: { type: "string" } },
+    { id: "successValues", direction: "input", kind: "data", label: "Success Values" },
+    { id: "errorPath", direction: "input", kind: "data", label: "Error Path", schema: { type: "string" } },
+    { id: "missingResult", direction: "input", kind: "data", label: "Missing Result", schema: { type: "string" } },
     { id: "rollback", direction: "output", kind: "control", label: "Rollback" },
     { id: "empty", direction: "output", kind: "control", label: "Empty" },
     { id: "succeeded", direction: "output", kind: "control", label: "Succeeded" },
@@ -111,6 +116,7 @@ export const rollbackNode = defineNode({
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "successPath", direction: "output", kind: "data", label: "Success Path", schema: { type: "string" } },
+    { id: "successValues", direction: "output", kind: "data", label: "Success Values" },
     { id: "errorPath", direction: "output", kind: "data", label: "Error Path", schema: { type: "string" } },
     { id: "missingResult", direction: "output", kind: "data", label: "Missing Result", schema: { type: "string" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
@@ -149,12 +155,14 @@ export const rollbackNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const mode = config.mode ?? "plan";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "plan";
+    const successValues = normalizeSuccessValues(input.successValues ?? config.successValues);
     const diagnostics = {
       mode,
-      successPath: String(config.successPath ?? "status"),
-      errorPath: String(config.errorPath ?? "error"),
-      missingResult: config.missingResult ?? "pending",
+      successPath: String(input.successPath ?? config.successPath ?? "status"),
+      successValues,
+      errorPath: String(input.errorPath ?? config.errorPath ?? "error"),
+      missingResult: readMissingResult(input.missingResult) ?? readMissingResult(config.missingResult) ?? "pending",
     };
     const actions = readActions(input.actions ?? input.input);
     if (actions.length === 0) {
@@ -195,7 +203,7 @@ export const rollbackNode = defineNode({
 
     const evaluations = summarize(actions, input.results, {
       successPath: diagnostics.successPath,
-      successValues: normalizeSuccessValues(config.successValues),
+      successValues,
       errorPath: diagnostics.errorPath,
       missingResult: diagnostics.missingResult,
     });
@@ -281,6 +289,18 @@ function chooseSummaryBranch(counts: {
   return "failed";
 }
 
+function readMode(value: unknown): "plan" | "summarize" | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "plan" || normalized === "summarize" ? normalized : undefined;
+}
+
+function readMissingResult(value: unknown): "pending" | "failed" | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "pending" || normalized === "failed" ? normalized : undefined;
+}
+
 function readActions(value: unknown): RollbackAction[] {
   if (!Array.isArray(value)) return [];
   return value.map(readAction).filter((action) => action !== undefined);
@@ -305,8 +325,11 @@ function readAction(value: unknown): RollbackAction | undefined {
 }
 
 function normalizeSuccessValues(value: unknown): string[] {
-  if (!Array.isArray(value)) return ["succeeded", "success", "ok", "rolled_back", "done"];
-  return value.map((item) => String(item).toLowerCase());
+  const rawValues = Array.isArray(value) ? value : String(value ?? "").split(",");
+  const values = rawValues
+    .map((item) => String(item).trim().toLowerCase())
+    .filter(Boolean);
+  return values.length > 0 ? values : ["succeeded", "success", "ok", "rolled_back", "done"];
 }
 
 function toJsonValue(value: unknown): VariableValue | undefined {

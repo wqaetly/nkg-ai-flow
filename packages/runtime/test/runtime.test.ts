@@ -5342,6 +5342,126 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic rollback summarize policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "rollback_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 260 } });
+    const actions = flow.node("transform", {
+      id: "actions",
+      position: { x: 140, y: 40 },
+      config: {
+        value: [
+          { id: "a1", action: "release_inventory", payload: { sku: "book" }, registeredAt: 1 },
+          { id: "a2", action: "refund_payment", payload: { paymentId: "pay_1" }, registeredAt: 2 },
+        ],
+      },
+    });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 140, y: 160 },
+      config: {
+        value: [{ result: { state: "done" } }],
+      },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 140, y: 280 },
+      config: { value: "summarize" },
+    });
+    const successPath = flow.node("transform", {
+      id: "success_path",
+      position: { x: 140, y: 400 },
+      config: { value: "result.state" },
+    });
+    const successValues = flow.node("transform", {
+      id: "success_values",
+      position: { x: 140, y: 520 },
+      config: { value: "done,ok" },
+    });
+    const errorPath = flow.node("transform", {
+      id: "error_path",
+      position: { x: 140, y: 640 },
+      config: { value: "problem" },
+    });
+    const missingResult = flow.node("transform", {
+      id: "missing_result",
+      position: { x: 140, y: 760 },
+      config: { value: "failed" },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 420, y: 320 },
+      config: {
+        mode: "plan",
+        successPath: "status",
+        successValues: ["succeeded"],
+        errorPath: "error",
+        missingResult: "pending",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 320 },
+      config: { template: "partial:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 320 } });
+
+    flow.connect(start.out("out"), actions.in("in"));
+    flow.connect(start.out("out"), results.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), successPath.in("in"));
+    flow.connect(start.out("out"), successValues.in("in"));
+    flow.connect(start.out("out"), errorPath.in("in"));
+    flow.connect(start.out("out"), missingResult.in("in"));
+    flow.connect(results.out("out"), rollback.in("in"));
+    flow.connect(actions.out("output"), rollback.in("actions"));
+    flow.connect(results.out("output"), rollback.in("results"));
+    flow.connect(mode.out("output"), rollback.in("mode"));
+    flow.connect(successPath.out("output"), rollback.in("successPath"));
+    flow.connect(successValues.out("output"), rollback.in("successValues"));
+    flow.connect(errorPath.out("output"), rollback.in("errorPath"));
+    flow.connect(missingResult.out("output"), rollback.in("missingResult"));
+    flow.connect(rollback.out("partial"), report.in("in"));
+    flow.connect(rollback.out("failureCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("partial:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const rollbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "rollback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(rollbackOutput).toMatchObject({
+      status: "partial",
+      mode: "summarize",
+      successPath: "result.state",
+      successValues: ["done", "ok"],
+      errorPath: "problem",
+      missingResult: "failed",
+      count: 2,
+      successCount: 1,
+      failureCount: 1,
+      pendingCount: 0,
+      hasFailures: true,
+      hasPending: false,
+      partialValue: true,
+      incompleteValue: false,
+    });
+  });
+
   it("routes rollback summarize to incomplete when results are still pending", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "rollback_incomplete_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
