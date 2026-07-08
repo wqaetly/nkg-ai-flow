@@ -3011,6 +3011,61 @@ describe("runtime / hello-flow end-to-end", () => {
     ).toHaveLength(1);
   });
 
+  it("routes a dynamically named rate_limit to allowed", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "rate_limit_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const limitName = flow.node("transform", {
+      id: "limitName",
+      position: { x: 120, y: -80 },
+      config: { value: "PAYMENT_DYNAMIC_API_LIMIT" },
+    });
+    const limit = flow.node("rate_limit", {
+      id: "limit",
+      position: { x: 260, y: 0 },
+      config: {
+        limit: 2,
+        windowMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "allowed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), limitName.in("in"));
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(limitName.out("output"), limit.in("name"));
+    flow.connect(limit.out("allowed"), report.in("in"));
+    flow.connect(limit.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rate_limit_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("allowed:PAYMENT_DYNAMIC_API_LIMIT");
+    expect(variables.get("PAYMENT_DYNAMIC_API_LIMIT")).toMatchObject({
+      limit: 2,
+      windowMs: 60_000,
+    });
+    expect(
+      (variables.get("PAYMENT_DYNAMIC_API_LIMIT") as { timestamps?: unknown[] })
+        .timestamps,
+    ).toHaveLength(1);
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes rate_limit to limited when the window is full", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_API_LIMIT", {

@@ -798,6 +798,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       rate_limit: {
         in: "输入",
+        name: "限流桶名",
         allowed: "允许",
         limited: "已限流",
         state: "限流状态",

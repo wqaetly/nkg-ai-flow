@@ -67,9 +67,11 @@ export const rateLimitNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "allowed", direction: "output", kind: "control", label: "Allowed" },
     { id: "limited", direction: "output", kind: "control", label: "Limited" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     {
       id: "remaining",
       direction: "output",
@@ -93,12 +95,12 @@ export const rateLimitNode = defineNode({
     },
   ],
   validateInput: false,
-  run({ config, ctx }) {
-    const name = String(config.name ?? "").trim();
+  run({ input, config, ctx }) {
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.rate_limit.missing_name",
-        "rate_limit node requires config.name",
+        "rate_limit node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -150,6 +152,7 @@ export const rateLimitNode = defineNode({
       outputs: {
         [branch]: null,
         state,
+        name,
         remaining,
         used,
         retryAfterMs,
