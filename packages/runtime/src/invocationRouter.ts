@@ -34,6 +34,7 @@ export interface InvokeArgs {
   flowVersion?: string;
   input: unknown;
   traceId?: string;
+  subflowDepth?: number;
   /** Optional run-scoped variable overrides. */
   variables?: VariableStore;
   /** Optional run-scoped secret overrides. */
@@ -54,6 +55,7 @@ export interface InvokeNodeArgs extends InvokeArgs {
 export interface TriggerEventArgs {
   event: string;
   traceId?: string;
+  subflowDepth?: number;
   /** Optional run-scoped variable overrides. */
   variables?: VariableStore;
   /** Optional run-scoped secret overrides. */
@@ -95,6 +97,7 @@ export class InvocationRouter {
       graph: ref.graph,
       input: args.input,
       ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
       ...(args.variables !== undefined ? { variables: args.variables } : {}),
       ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
     });
@@ -125,6 +128,7 @@ export class InvocationRouter {
       input: args.input,
       sinkNodeId: args.nodeId,
       ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
       ...(args.variables !== undefined ? { variables: args.variables } : {}),
       ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
     });
@@ -147,6 +151,7 @@ export class InvocationRouter {
           input: args.event,
           entryNodeId: trigger.nodeId,
           ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+          ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
           ...(args.variables !== undefined ? { variables: args.variables } : {}),
           ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
         }),
@@ -191,6 +196,7 @@ export class InvocationRouter {
       graph: ref.graph,
       input: args.input,
       ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
       ...(args.variables !== undefined ? { variables: args.variables } : {}),
       ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
     });
@@ -232,6 +238,7 @@ export class InvocationRouter {
       graph: ref.graph,
       input: args.input,
       ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
       ...(args.variables !== undefined ? { variables: args.variables } : {}),
       ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
     });

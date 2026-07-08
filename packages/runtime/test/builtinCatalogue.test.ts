@@ -106,6 +106,7 @@ function testContext(): NodeContext {
     nodeType: "agent",
     nodeVersion: "1.0.0",
     attempt: 1,
+    subflowDepth: 0,
     variables,
     secrets: new InMemorySecretStore(),
     signal: new AbortController().signal,

@@ -30,6 +30,7 @@ type SubflowInvokeFlow = (args: {
   flowVersion?: string;
   input: unknown;
   traceId?: string;
+  subflowDepth?: number;
   variables?: unknown;
   secrets?: unknown;
 }) => Promise<SubflowInvokeResult>;
@@ -61,6 +62,12 @@ const subflowConfig = z
       .enum(["fail", "route"])
       .default("fail")
       .describe("Whether contract violations fail this node or route to contract_failed."),
+    maxDepth: z
+      .number()
+      .int()
+      .min(0)
+      .default(10)
+      .describe("Maximum allowed nested subflow depth. Root runs start at depth 0."),
     failOnError: z
       .boolean()
       .default(true)
@@ -116,7 +123,8 @@ export const subflowNode = defineNode({
         { label: "Route Branch", value: "route" },
       ],
     },
-    failOnError: { label: "Fail On Error", control: "switch", order: 8 },
+    maxDepth: { label: "Max Depth", control: "number", order: 8 },
+    failOnError: { label: "Fail On Error", control: "switch", order: 9 },
   },
   ports: [
     controlIn,
@@ -149,6 +157,8 @@ export const subflowNode = defineNode({
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
+    { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
+    { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     errorOut,
   ],
   validateInput: false,
@@ -183,6 +193,21 @@ export const subflowNode = defineNode({
       );
     }
 
+    const subflowDepth = Math.max(
+      0,
+      Math.trunc(Number((ctx as { subflowDepth?: number }).subflowDepth ?? 0)),
+    );
+    const maxDepth = Math.max(0, Math.trunc(Number(config.maxDepth ?? 10)));
+    if (subflowDepth >= maxDepth) {
+      return error(
+        "node.subflow.max_depth_exceeded",
+        `subflow depth ${subflowDepth} reached maxDepth ${maxDepth}`,
+        ctx.nodeId,
+        { subflowDepth, maxDepth, flowId, flowVersion: flowVersion || undefined },
+      );
+    }
+    const childDepth = subflowDepth + 1;
+
     const payload = childInput(input, config);
     const inputContract = validateContract(config.inputSchema, payload, "input");
     if (inputContract instanceof Error) {
@@ -200,6 +225,8 @@ export const subflowNode = defineNode({
         issues: inputContract.issues,
         output: null,
         runRecord: null,
+        subflowDepth,
+        childDepth,
       });
     }
 
@@ -210,6 +237,7 @@ export const subflowNode = defineNode({
         ...(flowVersion === "" ? {} : { flowVersion }),
         input: payload,
         traceId: `${ctx.runId}:${ctx.nodeId}`,
+        subflowDepth: childDepth,
         variables: ctx.variables,
         secrets: ctx.secrets,
       });
@@ -232,6 +260,8 @@ export const subflowNode = defineNode({
       runId: result.runRecord.runId,
       status,
       runRecord: result.runRecord,
+      subflowDepth,
+      childDepth,
     };
 
     if (status === "succeeded") {
@@ -258,6 +288,8 @@ export const subflowNode = defineNode({
           issues: outputContract.issues,
           output: result.output ?? null,
           runRecord: result.runRecord,
+          subflowDepth,
+          childDepth,
         });
       }
 
@@ -338,6 +370,8 @@ function contractFailure(args: {
   issues: SchemaIssue[];
   output: unknown;
   runRecord: SubflowInvokeResult["runRecord"] | null;
+  subflowDepth: number;
+  childDepth: number;
 }): {
   kind: "success";
   outputs: Record<string, unknown>;
@@ -359,6 +393,8 @@ function contractFailure(args: {
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,
         firstContractIssue: firstIssue,
+        subflowDepth: args.subflowDepth,
+        childDepth: args.childDepth,
       },
     };
   }

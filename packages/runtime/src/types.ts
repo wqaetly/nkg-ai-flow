@@ -44,6 +44,8 @@ export interface RunRecord {
   finishedAt?: string;
   /** Optional human-supplied trace id for correlating across services. */
   traceId?: string;
+  /** Depth of nested subflow invocation; root manual invocations are 0. */
+  subflowDepth?: number;
 }
 
 /** A single FlowVersion entry in the Runtime Registry. */

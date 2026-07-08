@@ -44,6 +44,7 @@ export interface NodeInvokeFlowArgs {
   flowVersion?: string;
   input: unknown;
   traceId?: string;
+  subflowDepth?: number;
   variables?: VariableStore;
   secrets?: SecretStore;
 }
@@ -83,6 +84,7 @@ export interface NodeContext {
   readonly nodeType: string;
   readonly nodeVersion: string;
   readonly attempt: number;
+  readonly subflowDepth: number;
   readonly variables: VariableStore;
   /** @deprecated Use `variables`; this is the same store. */
   readonly secrets: SecretStore;

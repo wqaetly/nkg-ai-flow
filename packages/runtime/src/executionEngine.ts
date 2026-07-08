@@ -75,6 +75,8 @@ export interface ExecutionEngineOptions {
   triggerEvent?: (event: string) => Promise<unknown>;
   /** Registered-flow invocation dispatcher exposed to `subflow` nodes. */
   invokeFlow?: NodeInvokeFlow;
+  /** Depth of nested subflow invocation; root runs are 0. */
+  subflowDepth?: number;
   /**
    * Sub-graph execution mode. When set, the engine restricts itself to
    * `sinkNodeId` plus its transitive upstream closure (computed from the
@@ -454,6 +456,7 @@ export class ExecutionEngine {
       nodeType: node.type,
       nodeVersion: node.typeVersion,
       attempt: this.attempt,
+      subflowDepth: this.options.subflowDepth ?? 0,
       variables: this.options.variables,
       secrets: this.options.variables,
       log: makeNodeLogger(channel),

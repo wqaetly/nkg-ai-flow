@@ -56,6 +56,7 @@ export interface CreateRunInput {
   graph: FlowGraph;
   input: unknown;
   traceId?: string;
+  subflowDepth?: number;
   /** Optional run-scoped variable overrides. */
   variables?: VariableStore;
   /** @deprecated Use `variables`; treated as the same store. */
@@ -161,6 +162,7 @@ export class RunManager {
       input: input.input,
       createdAt: new Date().toISOString(),
       ...(input.traceId !== undefined ? { traceId: input.traceId } : {}),
+      ...(input.subflowDepth !== undefined ? { subflowDepth: input.subflowDepth } : {}),
     };
     await this.options.runStore.create(record);
     return record;
@@ -192,6 +194,7 @@ export class RunManager {
         flowId: record.flowId,
         flowVersion: record.flowVersion,
         runInput: record.input,
+        subflowDepth: record.subflowDepth ?? 0,
         runners: this.options.runners,
         variables,
         secrets: variables,

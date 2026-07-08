@@ -3490,6 +3490,32 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.status).toBe("succeeded");
     expect(childRuns[0]?.output).toBe("child:Ada");
+    expect(childRuns[0]?.subflowDepth).toBe(1);
+  });
+
+  it("blocks subflow invocation when maxDepth is reached", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_depth_limit", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: { flowId: "child_depth_limit", maxDepth: 0 },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 280, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_depth_limit",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(false);
+    expect(result.error?.code).toBe("node.subflow.max_depth_exceeded");
+    expect(await rt.runStore.listByFlow("child_depth_limit")).toEqual([]);
   });
 
   it("routes failed subflow child runs when failOnError is false", async () => {
