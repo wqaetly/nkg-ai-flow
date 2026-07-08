@@ -1735,6 +1735,83 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("schema:valid");
   });
 
+  it("uses dynamic schema_guard schema input", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_guard_dynamic_schema_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { id: "order_1", quantity: 2 } },
+    });
+    const schema = flow.node("transform", {
+      id: "schema",
+      position: { x: 120, y: 100 },
+      config: {
+        value: {
+          type: "object",
+          required: ["id"],
+          properties: {
+            id: { type: "string" },
+            quantity: { type: "integer", minimum: 1 },
+          },
+        },
+      },
+    });
+    const guard = flow.node("schema_guard", {
+      id: "guard",
+      position: { x: 340, y: 0 },
+      config: {
+        schema: {
+          type: "object",
+          required: ["id", "email"],
+          properties: {
+            id: { type: "string" },
+            email: { type: "string" },
+          },
+        },
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "schema:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), schema.in("in"));
+    flow.connect(input.out("out"), guard.in("in"));
+    flow.connect(input.out("output"), guard.in("input"));
+    flow.connect(schema.out("output"), guard.in("schema"));
+    flow.connect(guard.out("valid"), report.in("in"));
+    flow.connect(guard.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_guard_dynamic_schema_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("schema:valid");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const guardOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "guard") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(guardOutput).toMatchObject({
+      status: "valid",
+      issueCount: 0,
+      schema: {
+        required: ["id"],
+      },
+    });
+  });
+
   it("routes schema_guard to invalid and reports schema issues", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schema_guard_invalid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

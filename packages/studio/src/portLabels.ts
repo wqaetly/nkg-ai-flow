@@ -1073,6 +1073,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       schema_guard: {
         in: "输入",
         input: "待校验数据",
+        schema: "校验模式",
         valid: "有效",
         invalid: "无效",
         value: "原始数据",

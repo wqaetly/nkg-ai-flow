@@ -56,9 +56,11 @@ export const schemaGuardNode = defineNode({
   ports: [
     controlIn,
     { id: "input", direction: "input", kind: "data", label: "Input" },
+    { id: "schema", direction: "input", kind: "data", label: "Schema" },
     { id: "valid", direction: "output", kind: "control", label: "Valid" },
     { id: "invalid", direction: "output", kind: "control", label: "Invalid" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
+    { id: "schema", direction: "output", kind: "data", label: "Schema" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "issues", direction: "output", kind: "data", label: "Issues", schema: { type: "array" } },
     {
@@ -78,7 +80,7 @@ export const schemaGuardNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const schema = readSchema(config.schema);
+    const schema = readSchema(input.schema ?? config.schema);
     if (schema instanceof Error) {
       return error(
         "node.schema_guard.invalid_schema",
@@ -102,6 +104,7 @@ export const schemaGuardNode = defineNode({
       outputs: {
         [status]: null,
         value,
+        schema,
         status,
         issues,
         issueCount: issues.length,
