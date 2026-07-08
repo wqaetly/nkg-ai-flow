@@ -6905,6 +6905,75 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("resumes a flow from a resume_point target node with its snapshot", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const markFlow = defineFlow({ id: "resume_point_runtime_mark_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const markStart = markFlow.node("start", { id: "mark_start", position: { x: 0, y: 0 } });
+    const mark = markFlow.node("resume_point", {
+      id: "mark",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RUNTIME_RESUME",
+        mode: "mark",
+        targetNodeId: "charge_payment",
+        snapshot: { orderId: "order-2", step: "charge_payment" },
+        reason: "resume charge",
+      },
+    });
+    const markEnd = markFlow.node("end", { id: "mark_end", position: { x: 260, y: 0 } });
+    markFlow.connect(markStart.out("out"), mark.in("in"));
+    markFlow.connect(mark.out("marked"), markEnd.in("in"));
+
+    const recoveryFlow = defineFlow({ id: "resume_point_runtime_recovery_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = recoveryFlow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const charge = recoveryFlow.node("transform", {
+      id: "charge_payment",
+      position: { x: 140, y: 0 },
+      config: { template: "charge:${input.orderId}:${input.step}" },
+    });
+    const exit = recoveryFlow.node("end", { id: "e", position: { x: 280, y: 0 } });
+    recoveryFlow.connect(start.out("out"), charge.in("in"));
+    recoveryFlow.connect(charge.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, markFlow);
+    await registerAndPromote(rt, recoveryFlow);
+
+    const marked = await rt.invocationRouter.invoke({
+      flowId: "resume_point_runtime_mark_e2e",
+      input: null,
+    });
+    expect(marked.succeeded).toBe(true);
+    expect(variables.get("ORDER_RUNTIME_RESUME")).toMatchObject({
+      status: "ready",
+      targetNodeId: "charge_payment",
+      snapshot: { orderId: "order-2", step: "charge_payment" },
+    });
+
+    const resumed = await rt.invocationRouter.resumeFromPoint({
+      flowId: "resume_point_runtime_recovery_e2e",
+      resumePointName: "ORDER_RUNTIME_RESUME",
+    });
+
+    expect(resumed.succeeded).toBe(true);
+    expect(resumed.output).toBe("charge:order-2:charge_payment");
+    expect(resumed.runRecord.input).toEqual({
+      orderId: "order-2",
+      step: "charge_payment",
+    });
+    const events = await rt.eventBus.store.read(resumed.runRecord.runId);
+    expect(events.some((event) => event.kind === "node_started" && event.nodeId === "s")).toBe(false);
+    expect(events.some((event) => event.kind === "node_started" && event.nodeId === "charge_payment")).toBe(true);
+    expect(variables.get("ORDER_RUNTIME_RESUME")).toMatchObject({
+      status: "ready",
+      targetNodeId: "charge_payment",
+      loadedAt: expect.any(Number),
+    });
+  });
+
   it("marks a resume_point with dynamic name and reason inputs", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
