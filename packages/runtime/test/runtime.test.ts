@@ -1155,6 +1155,337 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("requests a human approval and stores pending state", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_request_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-1", amount: 4200 } },
+    });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        title: "Approve high value order",
+        assignee: "finance",
+        timeoutMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), approval.in("in"));
+    flow.connect(payload.out("output"), approval.in("payload"));
+    flow.connect(approval.out("requested"), report.in("in"));
+    flow.connect(approval.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_request_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:pending");
+    expect(variables.get("ORDER_APPROVAL")).toMatchObject({
+      status: "pending",
+      title: "Approve high value order",
+      assignee: "finance",
+      payload: { orderId: "order-1", amount: 4200 },
+      decision: null,
+    });
+  });
+
+  it("checks approved approval state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "approved",
+      title: "Approve release",
+      assignee: "lead",
+      payload: { release: "2026.07" },
+      decision: "approved",
+      comment: "looks good",
+      requestedAt: Date.now() - 10_000,
+      resolvedAt: Date.now() - 1000,
+      expiresAt: null,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_check_approved_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), approval.in("in"));
+    flow.connect(approval.out("approved"), report.in("in"));
+    flow.connect(approval.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_check_approved_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:approved");
+  });
+
+  it("resolves pending approval as rejected", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "pending",
+      title: "Approve order",
+      assignee: "finance",
+      payload: { orderId: "order-2" },
+      decision: null,
+      comment: "",
+      requestedAt: Date.now() - 10_000,
+      resolvedAt: null,
+      expiresAt: Date.now() + 60_000,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_resolve_rejected_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "resolve",
+        decision: "rejected",
+        comment: "budget exceeded",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), approval.in("in"));
+    flow.connect(approval.out("rejected"), report.in("in"));
+    flow.connect(approval.out("decision"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_resolve_rejected_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:rejected");
+    expect(variables.get("ORDER_APPROVAL")).toMatchObject({
+      status: "rejected",
+      decision: "rejected",
+      comment: "budget exceeded",
+    });
+  });
+
+  it("routes expired pending approvals to expired", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "pending",
+      title: "Approve order",
+      assignee: "finance",
+      payload: { orderId: "order-3" },
+      decision: null,
+      comment: "",
+      requestedAt: Date.now() - 120_000,
+      resolvedAt: null,
+      expiresAt: Date.now() - 1,
+      updatedAt: Date.now() - 120_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), approval.in("in"));
+    flow.connect(approval.out("expired"), report.in("in"));
+    flow.connect(approval.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:expired");
+    expect(variables.get("ORDER_APPROVAL")).toMatchObject({
+      status: "expired",
+    });
+  });
+
+  it("cancels pending approval state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "pending",
+      title: "Approve order",
+      assignee: "finance",
+      payload: { orderId: "order-5" },
+      decision: null,
+      comment: "",
+      requestedAt: Date.now(),
+      resolvedAt: null,
+      expiresAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_cancel_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "cancel",
+        comment: "request withdrawn",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), approval.in("in"));
+    flow.connect(approval.out("cancelled"), report.in("in"));
+    flow.connect(approval.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_cancel_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:cancelled");
+    expect(variables.get("ORDER_APPROVAL")).toMatchObject({
+      status: "cancelled",
+      comment: "request withdrawn",
+    });
+  });
+
+  it("clears approval state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "pending",
+      title: "Approve order",
+      assignee: "finance",
+      payload: { orderId: "order-4" },
+      decision: null,
+      comment: "",
+      requestedAt: Date.now(),
+      resolvedAt: null,
+      expiresAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), approval.in("in"));
+    flow.connect(approval.out("cleared"), report.in("in"));
+    flow.connect(approval.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:missing");
+    expect(variables.has("ORDER_APPROVAL")).toBe(false);
+  });
+
   it("invokes a registered child flow with subflow and returns its output", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });

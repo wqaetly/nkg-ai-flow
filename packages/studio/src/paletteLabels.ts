@@ -25,6 +25,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "智能体",
         description: "通过大模型循环调用文件、搜索、编辑和命令工具。",
       },
+      approval: {
+        title: "人工审批",
+        description: "创建、检查、批准、拒绝、取消或清理人工审批任务。",
+      },
       code_synthesizer: {
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",

@@ -125,6 +125,15 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxOutputChars: "最大输出字符数",
         systemPrompt: "系统提示词",
       },
+      approval: {
+        name: "审批状态名",
+        mode: "模式",
+        title: "审批标题",
+        assignee: "审批人",
+        decision: "审批决定",
+        comment: "审批意见",
+        timeoutMs: "超时时间（毫秒）",
+      },
       code_synthesizer: {
         base_url: "服务地址",
         api_key: "API 密钥",
