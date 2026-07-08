@@ -53,6 +53,20 @@ export const parallelNode = defineNode({
   ports: [
     controlIn,
     { id: "input", direction: "input", kind: "data", label: "Input" },
+    {
+      id: "branchCount",
+      direction: "input",
+      kind: "data",
+      label: "Branch count",
+      schema: { type: "number" },
+    },
+    {
+      id: "concurrency",
+      direction: "input",
+      kind: "data",
+      label: "Concurrency",
+      schema: { type: "number" },
+    },
     { id: "branch1", direction: "output", kind: "control", label: "Branch 1" },
     { id: "branch2", direction: "output", kind: "control", label: "Branch 2" },
     { id: "branch3", direction: "output", kind: "control", label: "Branch 3" },
@@ -82,8 +96,8 @@ export const parallelNode = defineNode({
   ],
   validateInput: false,
   run({ input, config }) {
-    const branchCount = clampBranchCount(config.branchCount);
-    const concurrency = clampConcurrency(config.concurrency, branchCount);
+    const branchCount = clampBranchCount(input.branchCount ?? config.branchCount);
+    const concurrency = clampConcurrency(input.concurrency ?? config.concurrency, branchCount);
     const value = input.input ?? input.in ?? input.__runInput__ ?? null;
     const branchIds = Array.from({ length: branchCount }, (_, index) => `branch${index + 1}`);
     const outputs: Record<string, unknown> = { value, branchCount, concurrency, branchIds };
@@ -98,11 +112,13 @@ export const parallelNode = defineNode({
 });
 
 function clampBranchCount(value: unknown): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return 2;
-  return Math.min(MAX_BRANCHES, Math.max(1, Math.trunc(value)));
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 2;
+  return Math.min(MAX_BRANCHES, Math.max(1, Math.trunc(number)));
 }
 
 function clampConcurrency(value: unknown, branchCount: number): number {
-  if (typeof value !== "number" || !Number.isFinite(value)) return branchCount;
-  return Math.min(branchCount, Math.max(1, Math.trunc(value)));
+  const number = Number(value);
+  if (!Number.isFinite(number)) return branchCount;
+  return Math.min(branchCount, Math.max(1, Math.trunc(number)));
 }

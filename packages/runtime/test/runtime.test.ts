@@ -12344,6 +12344,113 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(startsBeforeFirstFinish).toHaveLength(1);
   });
 
+  it("limits direct parallel branch concurrency from dynamic inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parallel_dynamic_concurrency_limit_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 120 },
+      config: { value: { name: "Flow" } },
+    });
+    const branchCount = flow.node("transform", {
+      id: "branch_count",
+      position: { x: 260, y: 40 },
+      config: { value: 2 },
+    });
+    const concurrency = flow.node("transform", {
+      id: "concurrency",
+      position: { x: 260, y: 200 },
+      config: { value: 1 },
+    });
+    const fanout = flow.node("parallel", {
+      id: "fanout",
+      position: { x: 420, y: 120 },
+      config: { branchCount: 4, concurrency: 4 },
+    });
+    const waitA = flow.node("delay", {
+      id: "wait_a",
+      position: { x: 580, y: 40 },
+      config: { durationMs: 25 },
+    });
+    const waitB = flow.node("delay", {
+      id: "wait_b",
+      position: { x: 580, y: 200 },
+      config: { durationMs: 25 },
+    });
+    const upper = flow.node("transform", {
+      id: "upper",
+      position: { x: 740, y: 40 },
+      config: { template: "upper:${input.name}" },
+    });
+    const lower = flow.node("transform", {
+      id: "lower",
+      position: { x: 740, y: 200 },
+      config: { template: "lower:${input.name}" },
+    });
+    const join = flow.node("join", { id: "join", position: { x: 900, y: 120 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 1040, y: 120 },
+      config: { template: "parallel=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 1180, y: 120 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), branchCount.in("in"));
+    flow.connect(branchCount.out("out"), concurrency.in("in"));
+    flow.connect(concurrency.out("out"), fanout.in("in"));
+    flow.connect(source.out("output"), fanout.in("input"));
+    flow.connect(branchCount.out("output"), fanout.in("branchCount"));
+    flow.connect(concurrency.out("output"), fanout.in("concurrency"));
+    flow.connect(fanout.out("branch1"), waitA.in("in"));
+    flow.connect(fanout.out("branch2"), waitB.in("in"));
+    flow.connect(waitA.out("out"), upper.in("in"));
+    flow.connect(waitB.out("out"), lower.in("in"));
+    flow.connect(fanout.out("value"), upper.in("input"));
+    flow.connect(fanout.out("value"), lower.in("input"));
+    flow.connect(upper.out("out"), join.in("in"));
+    flow.connect(lower.out("out"), join.in("in"));
+    flow.connect(upper.out("output"), join.in("values"));
+    flow.connect(lower.out("output"), join.in("values"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parallel_dynamic_concurrency_limit_e2e",
+      input: { name: "Flow" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fanoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fanout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(fanoutOutput).toMatchObject({
+      branchCount: 2,
+      concurrency: 1,
+      branchIds: ["branch1", "branch2"],
+    });
+    const waitEvents = events.filter(
+      (event) =>
+        (event.nodeId === "wait_a" || event.nodeId === "wait_b") &&
+        (event.kind === "node_started" || event.kind === "node_finished"),
+    );
+    const firstFinished = waitEvents.findIndex((event) => event.kind === "node_finished");
+    const startsBeforeFirstFinish = waitEvents
+      .slice(0, firstFinished)
+      .filter((event) => event.kind === "node_started");
+
+    expect(startsBeforeFirstFinish).toHaveLength(1);
+  });
+
   it("routes to the matching switch_case branch and forwards the payload", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "switch_case_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

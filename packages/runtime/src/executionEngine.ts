@@ -507,7 +507,7 @@ export class ExecutionEngine {
       if (!/^branch[1-4]$/.test(edge.from.portId)) continue;
       const parent = this.nodesById.get(edge.from.nodeId);
       if (parent?.type !== "parallel") continue;
-      const limit = readParallelConcurrency(parent);
+      const limit = readParallelConcurrency(parent, this.portValues);
       if (limit > 0) parents.push({ nodeId: parent.id, limit });
     }
     return parents;
@@ -1948,15 +1948,20 @@ function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function readParallelConcurrency(node: NodeInstance): number {
+function readParallelConcurrency(
+  node: NodeInstance,
+  portValues?: ReadonlyMap<string, unknown>,
+): number {
   const config = asRecord(node.config ?? {});
+  const outputBranchCount = portValues?.get(`${node.id}.branchCount`);
+  const outputConcurrency = portValues?.get(`${node.id}.concurrency`);
   const branchCount = Math.min(
     4,
-    Math.max(1, Math.trunc(numberOr(config.branchCount, 2))),
+    Math.max(1, Math.trunc(numberOr(outputBranchCount ?? config.branchCount, 2))),
   );
   return Math.min(
     branchCount,
-    Math.max(1, Math.trunc(numberOr(config.concurrency, branchCount))),
+    Math.max(1, Math.trunc(numberOr(outputConcurrency ?? config.concurrency, branchCount))),
   );
 }
 
