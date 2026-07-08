@@ -203,6 +203,57 @@ function evaluateFunction(name: string, args: unknown[]): unknown {
       return false;
     }
   }
+  if (name === "length" || name === "len") {
+    if (Array.isArray(value) || typeof value === "string") return value.length;
+    if (value && typeof value === "object") return Object.keys(value).length;
+    return 0;
+  }
+  if (name === "sum") {
+    return numericArgs(args).reduce<number>((total, item) => total + item, 0);
+  }
+  if (name === "average" || name === "avg") {
+    const numbers = numericArgs(args);
+    return numbers.length > 0
+      ? numbers.reduce<number>((total, item) => total + item, 0) / numbers.length
+      : null;
+  }
+  if (name === "min") {
+    const numbers = numericArgs(args);
+    return numbers.length > 0 ? Math.min(...numbers) : null;
+  }
+  if (name === "max") {
+    const numbers = numericArgs(args);
+    return numbers.length > 0 ? Math.max(...numbers) : null;
+  }
+  if (name === "coalesce") {
+    return args.find((item) => item !== undefined && item !== null);
+  }
+  if (name === "trim") {
+    return typeof value === "string" ? value.trim() : value;
+  }
+  if (name === "lower") {
+    return typeof value === "string" ? value.toLowerCase() : value;
+  }
+  if (name === "upper") {
+    return typeof value === "string" ? value.toUpperCase() : value;
+  }
+  return undefined;
+}
+
+function numericArgs(args: unknown[]): number[] {
+  const values = args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
+  return values.flatMap((value) => {
+    const number = numberOrUndefined(value);
+    return number === undefined ? [] : [number];
+  });
+}
+
+function numberOrUndefined(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
   return undefined;
 }
 

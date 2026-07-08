@@ -8618,6 +8618,63 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("truthy=true");
   });
 
+  it("evaluates expression_eval aggregate and string helper functions", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "expression_eval_helpers_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          amounts: [2, "3", "skip", 5],
+          tags: ["api", "batch"],
+          name: " Ada ",
+          fallback: "ready",
+          missing: null,
+        },
+      },
+    });
+    const expression = flow.node("expression_eval", {
+      id: "expression",
+      position: { x: 260, y: 0 },
+      config: {
+        expression: [
+          "length(input.tags) == 2",
+          "sum(input.amounts) == 10",
+          "avg(input.amounts) > 3",
+          "min(input.amounts) == 2",
+          "max(input.amounts) == 5",
+          "lower(trim(input.name)) == 'ada'",
+          "upper(coalesce(input.missing, input.fallback)) == 'READY'",
+        ].join(" && "),
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "helpers=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), expression.in("in"));
+    flow.connect(input.out("output"), expression.in("input"));
+    flow.connect(expression.out("out"), report.in("in"));
+    flow.connect(expression.out("truthy"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "expression_eval_helpers_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("helpers=true");
+  });
+
   it("routes condition branches with numeric and boolean expressions", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "condition_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
