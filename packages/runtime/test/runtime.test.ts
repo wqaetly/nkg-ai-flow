@@ -9246,6 +9246,101 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic metric policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_LATENCY_MS", {
+      name: "ORDER_LATENCY_MS",
+      value: 30,
+      count: 3,
+      sum: 60,
+      min: 10,
+      max: 30,
+      last: 30,
+      samples: [10, 20, 30],
+      createdAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -120 },
+      config: { value: "observe" },
+    });
+    const value = flow.node("transform", {
+      id: "value",
+      position: { x: 120, y: 0 },
+      config: { value: 80 },
+    });
+    const maxSamples = flow.node("transform", {
+      id: "maxSamples",
+      position: { x: 120, y: 120 },
+      config: { value: 2 },
+    });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "ORDER_LATENCY_MS",
+        mode: "reset",
+        value: 999,
+        maxSamples: 100,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "metric:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), value.in("in"));
+    flow.connect(start.out("out"), maxSamples.in("in"));
+    flow.connect(value.out("out"), metric.in("in"));
+    flow.connect(mode.out("output"), metric.in("mode"));
+    flow.connect(value.out("output"), metric.in("value"));
+    flow.connect(maxSamples.out("output"), metric.in("maxSamples"));
+    flow.connect(metric.out("updated"), report.in("in"));
+    flow.connect(metric.out("maxSamples"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("metric:2");
+    expect(variables.get("ORDER_LATENCY_MS")).toMatchObject({
+      value: 80,
+      count: 4,
+      sum: 140,
+      min: 10,
+      max: 80,
+      last: 80,
+      samples: [30, 80],
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const metricOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "metric") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(metricOutput).toMatchObject({
+      mode: "observe",
+      maxSamples: 2,
+      average: 35,
+      samples: [30, 80],
+    });
+  });
+
   it("observes metric samples and computes aggregates", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_LATENCY_MS", {

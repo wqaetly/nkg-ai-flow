@@ -81,13 +81,17 @@ export const metricNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "value", direction: "input", kind: "data", label: "Value" },
+    { id: "maxSamples", direction: "input", kind: "data", label: "Max samples", schema: { type: "number" } },
     { id: "updated", direction: "output", kind: "control", label: "Updated" },
     { id: "read", direction: "output", kind: "control", label: "Read" },
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "maxSamples", direction: "output", kind: "data", label: "Max samples", schema: { type: "number" } },
     { id: "value", direction: "output", kind: "data", label: "Value", schema: { type: "number" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     { id: "sum", direction: "output", kind: "data", label: "Sum", schema: { type: "number" } },
@@ -110,16 +114,16 @@ export const metricNode = defineNode({
     }
 
     const now = Date.now();
-    const mode = config.mode ?? "increment";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "increment";
     const previous = readMetricState(name, store.get(name), now);
-    const maxSamples = Math.max(0, Math.trunc(Number(config.maxSamples ?? 100)));
+    const maxSamples = readIntegerAtLeast(input.maxSamples, 0) ?? readIntegerAtLeast(config.maxSamples, 0) ?? 100;
     if (mode === "reset") {
       store.delete(name);
-      return success("reset", emptyState(name, now));
+      return success("reset", emptyState(name, now), mode, maxSamples);
     }
     if (mode === "read") {
-      if (!store.has(name)) return success("missing", emptyState(name, now));
-      return success("read", previous);
+      if (!store.has(name)) return success("missing", emptyState(name, now), mode, maxSamples);
+      return success("read", previous, mode, maxSamples);
     }
 
     const value = readNumber(input.value ?? input.input ?? input.in ?? config.value);
@@ -134,9 +138,24 @@ export const metricNode = defineNode({
       value: state.value,
       count: state.count,
     });
-    return success("updated", state);
+    return success("updated", state, mode, maxSamples);
   },
 });
+
+function readMode(value: unknown): MetricMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (
+    normalized === "increment" ||
+    normalized === "set" ||
+    normalized === "observe" ||
+    normalized === "read" ||
+    normalized === "reset"
+  ) {
+    return normalized;
+  }
+  return undefined;
+}
 
 function updateMetric(
   previous: MetricState,
@@ -164,7 +183,7 @@ function updateMetric(
   };
 }
 
-function success(branch: MetricBranch, state: MetricState) {
+function success(branch: MetricBranch, state: MetricState, mode: MetricMode, maxSamples: number) {
   const average = state.count > 0 ? state.sum / state.count : 0;
   return {
     kind: "success" as const,
@@ -172,6 +191,8 @@ function success(branch: MetricBranch, state: MetricState) {
       [branch]: null,
       state,
       name: state.name,
+      mode,
+      maxSamples,
       value: state.value,
       count: state.count,
       sum: state.sum,
@@ -230,6 +251,11 @@ function readTimestamp(value: unknown): number | undefined {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? Math.trunc(number) : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
