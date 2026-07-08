@@ -108,9 +108,11 @@ export const resumePointNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "snapshot", direction: "input", kind: "data", label: "Snapshot" },
     { id: "targetNodeId", direction: "input", kind: "data", label: "Target Node Id", schema: { type: "string" } },
     { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "marked", direction: "output", kind: "control", label: "Marked" },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
@@ -121,6 +123,7 @@ export const resumePointNode = defineNode({
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "targetNodeId", direction: "output", kind: "data", label: "Target Node Id", schema: { type: "string" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
     { id: "sourceRunId", direction: "output", kind: "data", label: "Source Run Id", schema: { type: "string" } },
@@ -170,11 +173,12 @@ export const resumePointNode = defineNode({
     }
 
     const now = Date.now();
-    const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 0)));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "mark";
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 0;
     const previous = readResumePoint(store.get(name));
     const decision = applyMode(normalizeExpired(previous, now), {
       name,
-      mode: config.mode ?? "mark",
+      mode,
       targetNodeId: String(input.targetNodeId ?? config.targetNodeId ?? "").trim(),
       snapshot: toJsonValue(input.snapshot ?? input.input ?? input.in ?? config.snapshot ?? null),
       reason: String(input.reason ?? config.reason ?? ""),
@@ -206,7 +210,7 @@ export const resumePointNode = defineNode({
 
     ctx.log.debug("resume_point selected branch", {
       name,
-      mode: config.mode ?? "mark",
+      mode,
       branch: decision.branch,
       targetNodeId: decision.state?.targetNodeId ?? "",
       version: decision.state?.version ?? 0,
@@ -221,6 +225,7 @@ export const resumePointNode = defineNode({
         name: state?.name ?? name,
         targetNodeId: state?.targetNodeId ?? "",
         reason: state?.reason ?? "",
+        mode,
         status: decision.branch,
         stateStatus: state?.status ?? "",
         sourceRunId: state?.sourceRunId ?? "",
@@ -377,6 +382,24 @@ function readTimestamp(value: unknown): number | null {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readMode(value: unknown): ResumePointMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "mark" ||
+    normalized === "load" ||
+    normalized === "clear" ||
+    normalized === "touch"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {

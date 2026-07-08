@@ -5697,6 +5697,115 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("marks a resume_point with dynamic policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: -200 },
+      config: { value: "ORDER_DYNAMIC_POLICY_RESUME" },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -120 },
+      config: { value: "mark" },
+    });
+    const target = flow.node("transform", {
+      id: "target",
+      position: { x: 120, y: -40 },
+      config: { value: "retry_charge" },
+    });
+    const reason = flow.node("transform", {
+      id: "reason",
+      position: { x: 120, y: 40 },
+      config: { value: "dynamic retry window" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 120 },
+      config: { value: 90_000 },
+    });
+    const snapshot = flow.node("transform", {
+      id: "snapshot",
+      position: { x: 120, y: 200 },
+      config: { value: { orderId: "order-policy", step: "retry_charge" } },
+    });
+    const mark = flow.node("resume_point", {
+      id: "mark",
+      position: { x: 340, y: 0 },
+      config: {
+        mode: "load",
+        reason: "static ignored",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), target.in("in"));
+    flow.connect(start.out("out"), reason.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), snapshot.in("in"));
+    flow.connect(start.out("out"), mark.in("in"));
+    flow.connect(name.out("output"), mark.in("name"));
+    flow.connect(mode.out("output"), mark.in("mode"));
+    flow.connect(target.out("output"), mark.in("targetNodeId"));
+    flow.connect(reason.out("output"), mark.in("reason"));
+    flow.connect(ttl.out("output"), mark.in("ttlMs"));
+    flow.connect(snapshot.out("output"), mark.in("snapshot"));
+    flow.connect(mark.out("marked"), report.in("in"));
+    flow.connect(mark.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:mark");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const markOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "mark") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(markOutput).toMatchObject({
+      mode: "mark",
+      status: "marked",
+      stateStatus: "ready",
+      name: "ORDER_DYNAMIC_POLICY_RESUME",
+      targetNodeId: "retry_charge",
+      reason: "dynamic retry window",
+      version: 1,
+      ttlMs: 90_000,
+      remainingMs: expect.any(Number),
+      stateExists: true,
+      markedValue: true,
+    });
+    expect(variables.get("ORDER_DYNAMIC_POLICY_RESUME")).toMatchObject({
+      status: "ready",
+      targetNodeId: "retry_charge",
+      reason: "dynamic retry window",
+      snapshot: { orderId: "order-policy", step: "retry_charge" },
+      version: 1,
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("routes resume_point load to missing when no recovery target exists", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

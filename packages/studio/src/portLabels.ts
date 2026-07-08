@@ -916,6 +916,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         state: "恢复状态",
         name: "恢复点名",
         reason: "恢复原因",
+        mode: "模式",
         status: "状态",
         stateStatus: "持久状态",
         sourceRunId: "来源运行 ID",
