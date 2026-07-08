@@ -1986,6 +1986,58 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(third.output).toBe("changed:changed");
   });
 
+  it("routes a dynamically named distinct_until_changed stream", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "distinct_until_changed_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const streamName = flow.node("transform", {
+      id: "streamName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_STATUS_STREAM" },
+    });
+    const distinct = flow.node("distinct_until_changed", {
+      id: "distinct",
+      position: { x: 260, y: 0 },
+      config: {
+        path: "status",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "changed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), streamName.in("in"));
+    flow.connect(start.out("out"), distinct.in("in"));
+    flow.connect(start.out("runInput"), distinct.in("value"));
+    flow.connect(streamName.out("output"), distinct.in("name"));
+    flow.connect(distinct.out("changed"), report.in("in"));
+    flow.connect(distinct.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_dynamic_name_e2e",
+      input: { status: "open" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("changed:ORDER_DYNAMIC_STATUS_STREAM");
+    expect(variables.get("ORDER_DYNAMIC_STATUS_STREAM")).toMatchObject({
+      value: "open",
+      evaluations: 1,
+      changes: 1,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("can record the first distinct_until_changed value without emitting changed", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

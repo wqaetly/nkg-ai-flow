@@ -87,9 +87,11 @@ export const distinctUntilChangedNode = defineNode({
   },
   ports: [
     controlIn,
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "changed", direction: "output", kind: "control", label: "Changed" },
     { id: "unchanged", direction: "output", kind: "control", label: "Unchanged" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "previous", direction: "output", kind: "data", label: "Previous" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -100,11 +102,11 @@ export const distinctUntilChangedNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.distinct_until_changed.missing_name",
-        "distinct_until_changed requires config.name",
+        "distinct_until_changed requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -168,6 +170,7 @@ export const distinctUntilChangedNode = defineNode({
       kind: "success",
       outputs: {
         [status]: null,
+        name,
         value,
         previous: previous?.value ?? null,
         status,

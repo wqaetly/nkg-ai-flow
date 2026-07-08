@@ -430,6 +430,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       distinct_until_changed: {
         in: "输入",
+        name: "状态键名",
         value: "比较值",
         changed: "已变化",
         unchanged: "未变化",
