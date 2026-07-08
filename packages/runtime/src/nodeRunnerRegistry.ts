@@ -236,7 +236,7 @@ export class InMemoryNodeRunnerRegistry implements NodeRunnerRegistry {
     // can land on this sandbox while we're draining. We re-insert on
     // failure to preserve the "atomic" contract.
     perType.delete(version);
-    const wasLatest = this.latest.get(version) === version;
+    const wasLatest = this.latest.get(type) === version;
     if (perType.size === 0) {
       this.entries.delete(type);
       this.latest.delete(type);

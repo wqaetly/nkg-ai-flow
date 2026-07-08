@@ -219,6 +219,16 @@ describe("InMemoryNodeRunnerRegistry · drainAndUnregister (Phase 3 T2)", () => 
     expect(r.get("multi", "anything")).toBe(altRunner);
   });
 
+  it("recomputes latest after T2 drains the newest version", async () => {
+    const r = new InMemoryNodeRunnerRegistry();
+    r.register("multi", "1.0.0", noopRunner);
+    r.register("multi", "2.0.0", altRunner);
+    await r.drainAndUnregister("multi", "2.0.0");
+    expect(r.has("multi", "1.0.0")).toBe(true);
+    expect(r.has("multi", "2.0.0")).toBe(false);
+    expect(r.get("multi", "anything")).toBe(noopRunner);
+  });
+
   it("drainAndUnregister() of a missing pair throws not_found", async () => {
     const r = new InMemoryNodeRunnerRegistry();
     try {
