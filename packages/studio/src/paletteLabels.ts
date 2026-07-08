@@ -109,6 +109,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "并行分支",
         description: "把流程扇出到多个命名分支。",
       },
+      reduce_items: {
+        title: "汇总数组",
+        description: "对数组执行计数、求和或拼接汇总。",
+      },
       skill_parser: {
         title: "Skill 解析器",
         description: "解析 SKILL.md 的 frontmatter 和正文，输出结构化定义。",

@@ -182,6 +182,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         branch4: "分支 4",
         value: "透传数据",
       },
+      reduce_items: {
+        items: "数组",
+        result: "汇总结果",
+        count: "数量",
+      },
       skill_parser: {
         skill_def: "Skill 定义",
       },

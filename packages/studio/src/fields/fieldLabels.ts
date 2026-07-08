@@ -61,9 +61,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       max_steps: "最多步骤数",
       method: "请求方法",
       min_steps: "最少步骤数",
+      mode: "模式",
       model: "模型",
       package_scope: "包作用域",
+      path: "字段路径",
       prompt: "提示词",
+      separator: "分隔符",
       strict: "严格模式",
       start: "起始值",
       step: "步长",
@@ -165,6 +168,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       parallel: {
         branchCount: "分支数量",
+      },
+      reduce_items: {
+        mode: "汇总模式",
+        path: "字段路径",
+        separator: "分隔符",
       },
       skill_parser: {
         default_name: "默认 Skill 名称",

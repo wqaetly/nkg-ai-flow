@@ -290,6 +290,45 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("mapped=0:alpha,1:beta,2:gamma");
   });
 
+  it("reduces array items with reduce_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: [{ amount: 2 }, { amount: "3" }, { amount: 5 }] },
+    });
+    const reduce = flow.node("reduce_items", {
+      id: "reduce",
+      position: { x: 260, y: 0 },
+      config: { mode: "sum", path: "amount" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "sum=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), reduce.in("in"));
+    flow.connect(input.out("output"), reduce.in("items"));
+    flow.connect(reduce.out("out"), report.in("in"));
+    flow.connect(reduce.out("result"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "reduce_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sum=10");
+  });
+
   it("executes every item in a foreach begin/end block", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

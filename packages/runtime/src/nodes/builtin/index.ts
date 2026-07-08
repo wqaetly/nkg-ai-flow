@@ -22,6 +22,7 @@ export { httpNode } from "./http.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
 export { parallelNode } from "./parallel.js";
+export { reduceItemsNode } from "./reduceItems.js";
 export { toolNode } from "./tool.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";

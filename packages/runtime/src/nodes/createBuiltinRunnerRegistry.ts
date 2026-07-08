@@ -41,6 +41,7 @@ import {
   joinNode,
   mapItemsNode,
   parallelNode,
+  reduceItemsNode,
   foreachBeginNode,
   foreachEndNode,
   forBeginNode,
@@ -152,6 +153,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, joinNode);
   installNode(target, mapItemsNode);
   installNode(target, parallelNode);
+  installNode(target, reduceItemsNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);
   installNode(target, llmNode, { llmProvider });

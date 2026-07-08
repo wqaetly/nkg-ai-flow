@@ -22,6 +22,7 @@ const BUILTIN_TYPES = [
   "join",
   "map_items",
   "parallel",
+  "reduce_items",
   "tool",
   "text_input",
   "llm",
