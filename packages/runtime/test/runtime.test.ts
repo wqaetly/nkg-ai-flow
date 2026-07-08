@@ -8287,9 +8287,16 @@ describe("runtime / hello-flow end-to-end", () => {
       flowId: "parallel_join_e2e",
       input: { name: "Flow" },
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fanoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fanout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
+    expect(fanoutOutput).toMatchObject({ branchCount: 2, concurrency: 2 });
   });
 
   it("executes ready parallel branches concurrently before joining", async () => {

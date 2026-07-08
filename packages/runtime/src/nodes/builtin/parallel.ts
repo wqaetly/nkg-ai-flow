@@ -58,12 +58,27 @@ export const parallelNode = defineNode({
     { id: "branch3", direction: "output", kind: "control", label: "Branch 3" },
     { id: "branch4", direction: "output", kind: "control", label: "Branch 4" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
+    {
+      id: "branchCount",
+      direction: "output",
+      kind: "data",
+      label: "Branch count",
+      schema: { type: "number" },
+    },
+    {
+      id: "concurrency",
+      direction: "output",
+      kind: "data",
+      label: "Concurrency",
+      schema: { type: "number" },
+    },
   ],
   validateInput: false,
   run({ input, config }) {
     const branchCount = clampBranchCount(config.branchCount);
+    const concurrency = clampConcurrency(config.concurrency, branchCount);
     const value = input.input ?? input.in ?? input.__runInput__ ?? null;
-    const outputs: Record<string, unknown> = { value };
+    const outputs: Record<string, unknown> = { value, branchCount, concurrency };
     for (let index = 1; index <= branchCount; index++) {
       outputs[`branch${index}`] = null;
     }
@@ -77,4 +92,9 @@ export const parallelNode = defineNode({
 function clampBranchCount(value: unknown): number {
   if (typeof value !== "number" || !Number.isFinite(value)) return 2;
   return Math.min(MAX_BRANCHES, Math.max(1, Math.trunc(value)));
+}
+
+function clampConcurrency(value: unknown, branchCount: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return branchCount;
+  return Math.min(branchCount, Math.max(1, Math.trunc(value)));
 }
