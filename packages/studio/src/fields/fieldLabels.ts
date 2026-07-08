@@ -125,6 +125,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxOutputChars: "最大输出字符数",
         systemPrompt: "系统提示词",
       },
+      all_success: {
+        mode: "成功判定模式",
+        statusPath: "状态字段路径",
+        successValues: "成功状态值",
+        errorPath: "错误字段路径",
+      },
       any_success: {
         mode: "成功判定模式",
         statusPath: "状态字段路径",

@@ -25,6 +25,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "智能体",
         description: "通过大模型循环调用文件、搜索、编辑和命令工具。",
       },
+      all_success: {
+        title: "全部成功",
+        description: "所有分支结果成功才继续，用于显式 all 汇聚。",
+      },
       any_success: {
         title: "任一成功",
         description: "多分支结果中任一成功即继续，用于显式 any 汇聚。",

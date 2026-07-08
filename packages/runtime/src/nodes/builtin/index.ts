@@ -14,6 +14,7 @@
 
 export { startNode } from "./start.js";
 export { endNode } from "./end.js";
+export { allSuccessNode } from "./allSuccess.js";
 export { anySuccessNode } from "./anySuccess.js";
 export { errorClassifierNode } from "./errorClassifier.js";
 export { fallbackNode } from "./fallback.js";

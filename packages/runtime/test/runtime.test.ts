@@ -6261,6 +6261,130 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("failed=1/2");
   });
 
+  it("routes all_success when every branch result succeeds", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "all_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { status: "ok", label: "a" },
+          { status: "ready", label: "b" },
+        ],
+      },
+    });
+    const all = flow.node("all_success", {
+      id: "all",
+      position: { x: 260, y: 0 },
+      config: { mode: "status" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "all=${input.successCount}/${input.total}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), all.in("results"));
+    flow.connect(all.out("all_success"), report.in("in"));
+    flow.connect(all.out("summary"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "all_success_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("all=2/2");
+  });
+
+  it("routes all_success to failed when any branch result fails", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "all_success_failed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { status: "ok", label: "a" },
+          { status: "failed", error: "api timeout", label: "b" },
+        ],
+      },
+    });
+    const all = flow.node("all_success", {
+      id: "all",
+      position: { x: 260, y: 0 },
+      config: { mode: "status" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "failed=${input.label}:${input.error}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), all.in("results"));
+    flow.connect(all.out("failed"), report.in("in"));
+    flow.connect(all.out("firstFailure"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "all_success_failed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed=b:api timeout");
+  });
+
+  it("routes all_success to empty when no result has arrived", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "all_success_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: [] },
+    });
+    const all = flow.node("all_success", {
+      id: "all",
+      position: { x: 260, y: 0 },
+      config: { mode: "status" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "all=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), all.in("results"));
+    flow.connect(all.out("empty"), report.in("in"));
+    flow.connect(all.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "all_success_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("all=empty");
+  });
+
   it("routes any_success when at least one branch result succeeds", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "any_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

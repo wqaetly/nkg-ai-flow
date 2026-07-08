@@ -21,6 +21,7 @@
 import type { NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import {
   agentNode,
+  allSuccessNode,
   anySuccessNode,
   approvalNode,
   auditLogNode,
@@ -136,6 +137,7 @@ export function getBuiltinNodeDefinitions(
   return [
     startNode.definition,
     endNode.definition,
+    allSuccessNode.definition,
     anySuccessNode.definition,
     errorClassifierNode.definition,
     fallbackNode.definition,

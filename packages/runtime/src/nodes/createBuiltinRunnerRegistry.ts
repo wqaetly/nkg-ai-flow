@@ -31,6 +31,7 @@ import type { SandboxAdapter } from "@ai-native-flow/sandbox";
 import { InMemoryNodeRunnerRegistry } from "../nodeRunnerRegistry.js";
 import type { NodeRunner } from "../nodeContext.js";
 import {
+  allSuccessNode,
   anySuccessNode,
   approvalNode,
   auditLogNode,
@@ -208,6 +209,7 @@ export function createBuiltinRunnerRegistry(
 
   installNode(target, startNode);
   installNode(target, endNode);
+  installNode(target, allSuccessNode);
   installNode(target, anySuccessNode);
   installNode(target, errorClassifierNode);
   installNode(target, fallbackNode);
