@@ -15,6 +15,7 @@ const BUILTIN_TYPES = [
   "start",
   "end",
   "transform",
+  "checkpoint",
   "circuit_breaker",
   "compensation",
   "condition",

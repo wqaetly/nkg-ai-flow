@@ -1184,6 +1184,155 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("state=ready");
   });
 
+  it("saves a checkpoint snapshot for later recovery", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_save_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const snapshot = flow.node("transform", {
+      id: "snapshot",
+      position: { x: 120, y: 0 },
+      config: { value: { step: "payment", status: "authorized" } },
+    });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_CHECKPOINT",
+        mode: "save",
+        label: "after payment authorization",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "checkpoint:v${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), snapshot.in("in"));
+    flow.connect(snapshot.out("out"), checkpoint.in("in"));
+    flow.connect(snapshot.out("output"), checkpoint.in("snapshot"));
+    flow.connect(checkpoint.out("saved"), report.in("in"));
+    flow.connect(checkpoint.out("version"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_save_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:v1");
+    expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
+      name: "ORDER_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "payment", status: "authorized" },
+      version: 1,
+      label: "after payment authorization",
+    });
+  });
+
+  it("loads an existing checkpoint snapshot", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_CHECKPOINT", {
+      name: "ORDER_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "shipping", status: "ready" },
+      label: "shipping gate",
+      version: 3,
+      savedAt: now - 1000,
+      loadedAt: null,
+      expiresAt: now + 60_000,
+      updatedAt: now - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_load_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "loaded:${input.step}:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(checkpoint.out("loaded"), report.in("in"));
+    flow.connect(checkpoint.out("snapshot"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_load_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("loaded:shipping:ready");
+    expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
+      status: "loaded",
+      version: 3,
+    });
+  });
+
+  it("routes checkpoint load to missing when no snapshot exists", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "checkpoint:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(checkpoint.out("missing"), report.in("in"));
+    flow.connect(checkpoint.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:missing");
+    expect(variables.has("ORDER_CHECKPOINT")).toBe(false);
+  });
+
   it("joins fan-out branches and collects their values", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

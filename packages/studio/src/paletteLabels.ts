@@ -29,6 +29,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",
       },
+      checkpoint: {
+        title: "检查点",
+        description: "保存、读取、续期或清除流程断点快照。",
+      },
       circuit_breaker: {
         title: "熔断器",
         description: "根据持久化熔断状态路由到 closed / open / half-open 分支。",

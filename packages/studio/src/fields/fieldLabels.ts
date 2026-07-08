@@ -64,6 +64,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       headers: "请求头",
       inputMode: "输入模式",
       inputValue: "静态输入",
+      label: "标签",
       lint_sources: "校验源码",
       limit: "额度上限",
       baseDelayMs: "基础等待毫秒",
@@ -145,6 +146,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         failureThreshold: "失败阈值",
         resetTimeoutMs: "重置等待毫秒",
         mode: "模式",
+      },
+      checkpoint: {
+        name: "检查点名",
+        mode: "模式",
+        snapshot: "静态快照",
+        label: "标签",
+        ttlMs: "TTL（毫秒）",
       },
       compensation: {
         name: "补偿栈名",
