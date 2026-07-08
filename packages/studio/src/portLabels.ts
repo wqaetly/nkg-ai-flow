@@ -1151,6 +1151,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         total: "总数",
         start: "起点",
         end: "终点",
+        fromEnd: "从末尾开始",
         hasMore: "还有更多",
       },
       sort_items: {

@@ -71,6 +71,10 @@ export const sliceItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "start", direction: "input", kind: "data", label: "Start", schema: { type: "number" } },
+    { id: "end", direction: "input", kind: "data", label: "End", schema: { type: "number" } },
+    { id: "count", direction: "input", kind: "data", label: "Count", schema: { type: "number" } },
+    { id: "fromEnd", direction: "input", kind: "data", label: "From end", schema: { type: "boolean" } },
     {
       id: "items",
       direction: "output",
@@ -107,6 +111,13 @@ export const sliceItemsNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "fromEnd",
+      direction: "output",
+      kind: "data",
+      label: "From end",
+      schema: { type: "boolean" },
+    },
+    {
       id: "hasMore",
       direction: "output",
       kind: "data",
@@ -122,10 +133,10 @@ export const sliceItemsNode = defineNode({
         ? input.input
         : [];
     const total = source.length;
-    const requestedStart = readNonNegativeInteger(config.start);
-    const requestedEnd = readNonNegativeInteger(config.end);
-    const requestedCount = readNonNegativeInteger(config.count);
-    const fromEnd = config.fromEnd === true;
+    const requestedStart = readConfigInteger(input, "start", config.start);
+    const requestedEnd = readConfigInteger(input, "end", config.end);
+    const requestedCount = readConfigInteger(input, "count", config.count);
+    const fromEnd = readBoolean(input.fromEnd) ?? readBoolean(config.fromEnd) ?? false;
     const start = fromEnd
       ? clamp(total - requestedStart - (requestedCount > 0 ? requestedCount : 0), 0, total)
       : clamp(requestedStart, 0, total);
@@ -153,15 +164,38 @@ export const sliceItemsNode = defineNode({
         total,
         start,
         end,
+        fromEnd,
         hasMore: end < total,
       },
     };
   },
 });
 
-function readNonNegativeInteger(value: unknown): number {
+function readConfigInteger(
+  input: Record<string, unknown>,
+  key: "start" | "end" | "count",
+  fallback: unknown,
+): number {
+  if (Object.prototype.hasOwnProperty.call(input, key)) return readNonNegativeInteger(input[key]) ?? 0;
+  return readNonNegativeInteger(fallback) ?? 0;
+}
+
+function readNonNegativeInteger(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined;
   const parsed = Math.trunc(Number(value ?? 0));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+  if (!Number.isFinite(parsed)) return undefined;
+  return parsed > 0 ? parsed : 0;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function clamp(value: number, min: number, max: number): number {
