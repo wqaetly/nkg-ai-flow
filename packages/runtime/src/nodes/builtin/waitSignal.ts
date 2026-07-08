@@ -67,11 +67,13 @@ export const waitSignalNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "signal", direction: "input", kind: "data", label: "Signal" },
     { id: "received", direction: "output", kind: "control", label: "Received" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     { id: "signal", direction: "output", kind: "data", label: "Signal" },
     { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
@@ -97,11 +99,11 @@ export const waitSignalNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.wait_signal.missing_name",
-        "wait_signal node requires config.name",
+        "wait_signal node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -143,6 +145,7 @@ export const waitSignalNode = defineNode({
       outputs: {
         [branch]: null,
         state: next,
+        name,
         status: next.status,
         signal: next.signal,
         expected: next.expected,

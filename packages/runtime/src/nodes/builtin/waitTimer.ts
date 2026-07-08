@@ -89,6 +89,7 @@ export const waitTimerNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "dueAt", direction: "input", kind: "data", label: "Due At" },
     {
       id: "durationMs",
@@ -101,6 +102,7 @@ export const waitTimerNode = defineNode({
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
     { id: "dueAt", direction: "output", kind: "data", label: "Due At", schema: { type: "string" } },
@@ -132,11 +134,11 @@ export const waitTimerNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.wait_timer.missing_name",
-        "wait_timer node requires config.name",
+        "wait_timer node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -185,6 +187,7 @@ export const waitTimerNode = defineNode({
       outputs: {
         [next.status]: null,
         state: next,
+        name,
         status: next.status,
         requestedAt: requestedAtIso,
         dueAt: dueAtIso,

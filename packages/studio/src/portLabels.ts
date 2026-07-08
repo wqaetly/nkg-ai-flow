@@ -1154,6 +1154,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       wait_signal: {
         in: "输入",
+        name: "名称",
         signal: "信号",
         received: "已收到",
         waiting: "等待中",
@@ -1171,6 +1172,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       wait_timer: {
         in: "输入",
+        name: "名称",
         dueAt: "到期时间",
         durationMs: "等待时长毫秒",
         due: "已到期",

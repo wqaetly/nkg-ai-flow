@@ -4518,6 +4518,56 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("creates a wait_signal checkpoint with a dynamic name input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: 0 },
+      config: { value: "ORDER_APPROVAL_DYNAMIC" },
+    });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 260, y: 0 },
+      config: {
+        expected: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "signal:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(name.out("out"), wait.in("in"));
+    flow.connect(name.out("output"), wait.in("name"));
+    flow.connect(wait.out("waiting"), report.in("in"));
+    flow.connect(wait.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("signal:ORDER_APPROVAL_DYNAMIC");
+    expect(variables.get("ORDER_APPROVAL_DYNAMIC")).toMatchObject({
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+    });
+  });
+
   it("resumes a wait_signal checkpoint through signal_resume", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
@@ -5124,6 +5174,57 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "waiting",
     });
     expect((variables.get("ORDER_RETRY_TIMER") as { dueAt?: number }).dueAt).toBeGreaterThan(
+      Date.now(),
+    );
+  });
+
+  it("creates a wait_timer checkpoint with a dynamic name input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_timer_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: 0 },
+      config: { value: "ORDER_RETRY_TIMER_DYNAMIC" },
+    });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 260, y: 0 },
+      config: {
+        durationMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(name.out("out"), timer.in("in"));
+    flow.connect(name.out("output"), timer.in("name"));
+    flow.connect(timer.out("waiting"), report.in("in"));
+    flow.connect(timer.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:ORDER_RETRY_TIMER_DYNAMIC");
+    expect(variables.get("ORDER_RETRY_TIMER_DYNAMIC")).toMatchObject({
+      status: "waiting",
+    });
+    expect((variables.get("ORDER_RETRY_TIMER_DYNAMIC") as { dueAt?: number }).dueAt).toBeGreaterThan(
       Date.now(),
     );
   });
