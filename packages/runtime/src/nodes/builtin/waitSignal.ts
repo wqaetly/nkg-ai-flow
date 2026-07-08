@@ -140,6 +140,20 @@ function evaluateState(
   now: number,
 ): WaitSignalState {
   const converted = toJsonValue(signal);
+  if (previous.status === "expired") {
+    return {
+      ...previous,
+      status: "expired",
+      updatedAt: now,
+    };
+  }
+  if (previous.status === "received") {
+    return {
+      ...previous,
+      status: "received",
+      updatedAt: now,
+    };
+  }
   if (converted !== undefined && String(converted) === expected) {
     return {
       ...previous,

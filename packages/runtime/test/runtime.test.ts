@@ -3433,6 +3433,65 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("keeps received wait_signal state terminal when a later signal mismatches", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_RECEIVED", {
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      requestedAt: Date.now() - 1_000,
+      expiresAt: null,
+      updatedAt: Date.now() - 500,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_received_terminal_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const staleSignal = flow.node("transform", {
+      id: "stale_signal",
+      position: { x: 120, y: 0 },
+      config: { template: "denied" },
+    });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_RECEIVED",
+        expected: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "signal:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), staleSignal.in("in"));
+    flow.connect(staleSignal.out("out"), wait.in("in"));
+    flow.connect(staleSignal.out("output"), wait.in("signal"));
+    flow.connect(wait.out("received"), report.in("in"));
+    flow.connect(wait.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_received_terminal_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("signal:received");
+    expect(variables.get("ORDER_APPROVAL_RECEIVED")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+    });
+  });
+
   it("creates a wait_signal checkpoint and routes to waiting", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
@@ -3889,6 +3948,58 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "expired",
       signal: null,
+    });
+  });
+
+  it("does not revive explicitly expired wait_signal state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_EXPLICIT_EXPIRED", {
+      status: "expired",
+      signal: "approved",
+      expected: "approved",
+      requestedAt: Date.now() - 10_000,
+      expiresAt: null,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_explicit_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_EXPLICIT_EXPIRED",
+        expected: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "signal:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), wait.in("in"));
+    flow.connect(wait.out("expired"), report.in("in"));
+    flow.connect(wait.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_explicit_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("signal:expired");
+    expect(variables.get("ORDER_APPROVAL_EXPLICIT_EXPIRED")).toMatchObject({
+      status: "expired",
+      signal: "approved",
+      expected: "approved",
     });
   });
 
