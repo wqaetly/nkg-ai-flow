@@ -1685,6 +1685,135 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("miss:contains_unmatched");
   });
 
+  it("uses dynamic compare_gate operator paths value and case policy ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "compare_gate_dynamic_value_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { message: "Payment Completed" } },
+    });
+    const operator = flow.node("transform", {
+      id: "operator",
+      position: { x: 120, y: 120 },
+      config: { value: "contains" },
+    });
+    const leftPath = flow.node("transform", {
+      id: "leftPath",
+      position: { x: 120, y: 240 },
+      config: { value: "message" },
+    });
+    const rightValue = flow.node("transform", {
+      id: "rightValue",
+      position: { x: 120, y: 360 },
+      config: { value: "completed" },
+    });
+    const caseSensitive = flow.node("transform", {
+      id: "caseSensitive",
+      position: { x: 120, y: 480 },
+      config: { value: false },
+    });
+    const compare = flow.node("compare_gate", {
+      id: "compare",
+      position: { x: 340, y: 0 },
+      config: {
+        operator: "eq",
+        leftPath: "missing",
+        rightValue: "failed",
+        caseSensitive: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "match:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), operator.in("in"));
+    flow.connect(operator.out("out"), leftPath.in("in"));
+    flow.connect(leftPath.out("out"), rightValue.in("in"));
+    flow.connect(rightValue.out("out"), caseSensitive.in("in"));
+    flow.connect(caseSensitive.out("out"), compare.in("in"));
+    flow.connect(input.out("output"), compare.in("left"));
+    flow.connect(operator.out("output"), compare.in("operator"));
+    flow.connect(leftPath.out("output"), compare.in("leftPath"));
+    flow.connect(rightValue.out("output"), compare.in("rightValue"));
+    flow.connect(caseSensitive.out("output"), compare.in("caseSensitive"));
+    flow.connect(compare.out("matched"), report.in("in"));
+    flow.connect(compare.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compare_gate_dynamic_value_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("match:contains_matched");
+  });
+
+  it("uses dynamic compare_gate rightPath ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "compare_gate_dynamic_right_path_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const left = flow.node("transform", {
+      id: "left",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { total: 125 } } },
+    });
+    const right = flow.node("transform", {
+      id: "right",
+      position: { x: 120, y: 120 },
+      config: { value: { thresholds: { min: 100 } } },
+    });
+    const rightPath = flow.node("transform", {
+      id: "rightPath",
+      position: { x: 120, y: 240 },
+      config: { value: "thresholds.min" },
+    });
+    const compare = flow.node("compare_gate", {
+      id: "compare",
+      position: { x: 340, y: 0 },
+      config: {
+        operator: "gte",
+        leftPath: "order.total",
+        rightPath: "thresholds.max",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "match:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), left.in("in"));
+    flow.connect(left.out("out"), right.in("in"));
+    flow.connect(right.out("out"), rightPath.in("in"));
+    flow.connect(rightPath.out("out"), compare.in("in"));
+    flow.connect(left.out("output"), compare.in("left"));
+    flow.connect(right.out("output"), compare.in("right"));
+    flow.connect(rightPath.out("output"), compare.in("rightPath"));
+    flow.connect(compare.out("matched"), report.in("in"));
+    flow.connect(compare.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compare_gate_dynamic_right_path_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("match:gte_matched");
+  });
+
   it("routes schema_guard to valid when the payload matches the schema", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schema_guard_valid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

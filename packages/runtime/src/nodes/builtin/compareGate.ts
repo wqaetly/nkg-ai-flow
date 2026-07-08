@@ -119,24 +119,39 @@ export const compareGateNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "left", direction: "input", kind: "data", label: "Left" },
     { id: "right", direction: "input", kind: "data", label: "Right" },
+    { id: "operator", direction: "input", kind: "data", label: "Operator", schema: { type: "string" } },
+    { id: "leftPath", direction: "input", kind: "data", label: "Left path", schema: { type: "string" } },
+    { id: "rightPath", direction: "input", kind: "data", label: "Right path", schema: { type: "string" } },
+    { id: "rightValue", direction: "input", kind: "data", label: "Right value" },
+    { id: "caseSensitive", direction: "input", kind: "data", label: "Case sensitive", schema: { type: "boolean" } },
     { id: "matched", direction: "output", kind: "control", label: "Matched" },
     { id: "unmatched", direction: "output", kind: "control", label: "Unmatched" },
     { id: "left", direction: "output", kind: "data", label: "Left" },
     { id: "right", direction: "output", kind: "data", label: "Right" },
     { id: "operator", direction: "output", kind: "data", label: "Operator", schema: { type: "string" } },
+    { id: "leftPath", direction: "output", kind: "data", label: "Left path", schema: { type: "string" } },
+    { id: "rightPath", direction: "output", kind: "data", label: "Right path", schema: { type: "string" } },
+    { id: "rightValue", direction: "output", kind: "data", label: "Right value" },
+    { id: "caseSensitive", direction: "output", kind: "data", label: "Case sensitive", schema: { type: "boolean" } },
     { id: "result", direction: "output", kind: "data", label: "Result", schema: { type: "boolean" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const operator = readOperator(config.operator);
+    const operator = readOperator(input.operator ?? config.operator);
     const leftRoot = input.left ?? input.value ?? input.input ?? input.in ?? null;
-    const rightRoot = input.right !== undefined ? input.right : config.rightValue ?? null;
-    const left = selectValue(leftRoot, String(config.leftPath ?? ""));
-    const right = selectValue(rightRoot, String(config.rightPath ?? ""));
+    const hasRightInput = Object.prototype.hasOwnProperty.call(input, "right");
+    const hasRightValueInput = Object.prototype.hasOwnProperty.call(input, "rightValue");
+    const rightValue = hasRightValueInput ? input.rightValue : config.rightValue ?? null;
+    const rightRoot = hasRightInput ? input.right : rightValue;
+    const leftPath = String(input.leftPath ?? config.leftPath ?? "");
+    const rightPath = String(input.rightPath ?? config.rightPath ?? "");
+    const caseSensitive = readBoolean(input.caseSensitive) ?? readBoolean(config.caseSensitive) ?? true;
+    const left = selectValue(leftRoot, leftPath);
+    const right = selectValue(rightRoot, rightPath);
     const result = compare(left, right, {
       operator,
-      caseSensitive: config.caseSensitive !== false,
+      caseSensitive,
     });
     const branch = result.matched ? "matched" : "unmatched";
 
@@ -153,6 +168,10 @@ export const compareGateNode = defineNode({
         left,
         right,
         operator,
+        leftPath,
+        rightPath,
+        rightValue,
+        caseSensitive,
         result: result.matched,
         reason: result.reason,
       },
@@ -173,6 +192,17 @@ function readOperator(value: unknown): CompareOperator {
     value === "in"
     ? value
     : "eq";
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function selectValue(value: unknown, path: string): unknown {
