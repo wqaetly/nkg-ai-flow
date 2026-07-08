@@ -63,6 +63,7 @@ export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";
 export { scheduleWindowNode } from "./scheduleWindow.js";
 export { schemaGuardNode } from "./schemaGuard.js";
+export { schemaTransformNode } from "./schemaTransform.js";
 export { selectPathNode } from "./selectPath.js";
 export { semaphoreNode } from "./semaphore.js";
 export { setPathNode } from "./setPath.js";

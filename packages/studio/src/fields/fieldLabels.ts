@@ -428,6 +428,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       schema_guard: {
         schema: "校验 Schema",
       },
+      schema_transform: {
+        mappings: "字段映射",
+        includeSource: "包含源字段",
+        requireAll: "要求全部映射",
+        defaultValue: "默认值",
+      },
       select_path: {
         path: "读取路径",
         defaultValue: "默认值",

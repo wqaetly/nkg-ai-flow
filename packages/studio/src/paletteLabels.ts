@@ -277,6 +277,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "Schema 校验",
         description: "按 JSON Schema 子集校验数据，并路由到有效或无效分支。",
       },
+      schema_transform: {
+        title: "Schema 转换",
+        description: "按声明式字段映射把输入数据转换成目标结构。",
+      },
       select_path: {
         title: "路径取值",
         description: "从结构化数据中按路径取出字段，并把缺失路径路由到缺失分支。",

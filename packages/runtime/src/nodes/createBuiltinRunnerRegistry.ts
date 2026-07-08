@@ -83,6 +83,7 @@ import {
   retryPolicyNode,
   scheduleWindowNode,
   schemaGuardNode,
+  schemaTransformNode,
   selectPathNode,
   semaphoreNode,
   setPathNode,
@@ -248,6 +249,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, retryPolicyNode);
   installNode(target, scheduleWindowNode);
   installNode(target, schemaGuardNode);
+  installNode(target, schemaTransformNode);
   installNode(target, selectPathNode);
   installNode(target, semaphoreNode);
   installNode(target, setPathNode);

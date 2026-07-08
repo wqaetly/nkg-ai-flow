@@ -805,6 +805,103 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("issues:2");
   });
 
+  it("transforms structured payloads with schema_transform mappings", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_transform_value_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          id: "u1",
+          profile: { name: "Ada" },
+          status: "active",
+        },
+      },
+    });
+    const mapper = flow.node("schema_transform", {
+      id: "mapper",
+      position: { x: 280, y: 0 },
+      config: {
+        mappings: [
+          "user.id = id",
+          "user.name = profile.name",
+          "state = status",
+          "kind = \"customer\"",
+        ].join("\n"),
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "mapped=${input.user.id}:${input.user.name}:${input.kind}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), mapper.in("in"));
+    flow.connect(input.out("output"), mapper.in("input"));
+    flow.connect(mapper.out("transformed"), report.in("in"));
+    flow.connect(mapper.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_transform_value_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("mapped=u1:Ada:customer");
+  });
+
+  it("routes schema_transform to missing when required mappings are absent", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_transform_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { id: "u1" } },
+    });
+    const mapper = flow.node("schema_transform", {
+      id: "mapper",
+      position: { x: 280, y: 0 },
+      config: {
+        mappings: [
+          "user.id = id",
+          "user.email = email",
+        ].join("\n"),
+        requireAll: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "missing=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), mapper.in("in"));
+    flow.connect(input.out("output"), mapper.in("input"));
+    flow.connect(mapper.out("missing"), report.in("in"));
+    flow.connect(mapper.out("missingCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_transform_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("missing=1");
+  });
+
   it("selects the first successful fallback candidate", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "first_success_found_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

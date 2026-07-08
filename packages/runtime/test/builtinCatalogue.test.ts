@@ -63,6 +63,7 @@ const BUILTIN_TYPES = [
   "retry_policy",
   "schedule_window",
   "schema_guard",
+  "schema_transform",
   "select_path",
   "semaphore",
   "set_path",
