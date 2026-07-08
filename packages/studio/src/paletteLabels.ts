@@ -249,6 +249,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "信号量",
         description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",
       },
+      set_path: {
+        title: "路径写入",
+        description: "把值写入结构化数据的指定路径，并按更新、缺失或跳过继续流程。",
+      },
       slice_items: {
         title: "截取数组",
         description: "按起点、终点或数量截取数组窗口，用于分页或批处理。",

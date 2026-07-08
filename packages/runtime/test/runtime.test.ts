@@ -5031,6 +5031,130 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("customer=anonymous");
   });
 
+  it("sets nested values by path with set_path", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "set_path_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const set = flow.node("set_path", {
+      id: "set",
+      position: { x: 260, y: 0 },
+      config: { path: "order.status", value: "paid" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 400, y: 0 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "updated=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), set.in("in"));
+    flow.connect(input.out("output"), set.in("source"));
+    flow.connect(set.out("updated"), stringify.in("in"));
+    flow.connect(set.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "set_path_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('updated={"order":{"id":"ord_1","status":"paid"}}');
+  });
+
+  it("routes set_path to missing when containers cannot be created", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "set_path_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: {} },
+    });
+    const set = flow.node("set_path", {
+      id: "set",
+      position: { x: 260, y: 0 },
+      config: { path: "order.status", value: "paid", createMissing: false },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "missing=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), set.in("in"));
+    flow.connect(input.out("output"), set.in("source"));
+    flow.connect(set.out("missing"), report.in("in"));
+    flow.connect(set.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "set_path_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("missing=path_missing");
+  });
+
+  it("routes set_path to skipped when overwrite is disabled", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "set_path_skipped_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { status: "new" } } },
+    });
+    const set = flow.node("set_path", {
+      id: "set",
+      position: { x: 260, y: 0 },
+      config: { path: "order.status", value: "paid", overwrite: false },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "previous=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), set.in("in"));
+    flow.connect(input.out("output"), set.in("source"));
+    flow.connect(set.out("skipped"), report.in("in"));
+    flow.connect(set.out("previous"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "set_path_skipped_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("previous=new");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

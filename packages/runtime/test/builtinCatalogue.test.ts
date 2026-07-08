@@ -56,6 +56,7 @@ const BUILTIN_TYPES = [
   "schema_guard",
   "select_path",
   "semaphore",
+  "set_path",
   "slice_items",
   "sort_items",
   "split_text",

@@ -404,6 +404,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         ttlMs: "TTL（毫秒）",
         mode: "模式",
       },
+      set_path: {
+        path: "写入路径",
+        value: "静态值",
+        createMissing: "创建缺失路径",
+        overwrite: "覆盖已有值",
+      },
       slice_items: {
         start: "起始索引",
         end: "结束索引",

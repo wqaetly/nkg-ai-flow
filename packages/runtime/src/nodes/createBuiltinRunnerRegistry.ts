@@ -76,6 +76,7 @@ import {
   schemaGuardNode,
   selectPathNode,
   semaphoreNode,
+  setPathNode,
   sliceItemsNode,
   sortItemsNode,
   splitTextNode,
@@ -231,6 +232,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, schemaGuardNode);
   installNode(target, selectPathNode);
   installNode(target, semaphoreNode);
+  installNode(target, setPathNode);
   installNode(target, sliceItemsNode);
   installNode(target, sortItemsNode);
   installNode(target, splitTextNode);
