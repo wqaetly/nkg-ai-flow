@@ -223,6 +223,14 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         messageIncludes: "消息包含",
         label: "分类标签",
       },
+      fallback: {
+        mode: "判定模式",
+        valuePath: "主值路径",
+        fallbackValue: "静态兜底值",
+        errorPath: "错误路径",
+        statusPath: "状态路径",
+        successValues: "成功状态值",
+      },
       event_trigger: {
         event: "触发事件",
       },

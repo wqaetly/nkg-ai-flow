@@ -674,6 +674,92 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("fallback:no_successful_candidate");
   });
 
+  it("routes fallback to primary when the selected value is usable", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fallback_primary_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { status: "ready", payload: { text: "live" } } },
+    });
+    const fallback = flow.node("fallback", {
+      id: "fallback",
+      position: { x: 300, y: 0 },
+      config: {
+        mode: "status",
+        valuePath: "payload.text",
+        fallbackValue: "cached",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "selected:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 640, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), fallback.in("in"));
+    flow.connect(source.out("output"), fallback.in("value"));
+    flow.connect(fallback.out("primary"), report.in("in"));
+    flow.connect(fallback.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fallback_primary_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("selected:live");
+  });
+
+  it("routes fallback to fallback when the primary value carries an error", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fallback_error_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { ok: true, result: "live", error: "upstream timeout" } },
+    });
+    const fallback = flow.node("fallback", {
+      id: "fallback",
+      position: { x: 300, y: 0 },
+      config: {
+        mode: "ok",
+        valuePath: "result",
+        fallbackValue: "cached",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "selected:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 640, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), fallback.in("in"));
+    flow.connect(source.out("output"), fallback.in("value"));
+    flow.connect(fallback.out("fallback"), report.in("in"));
+    flow.connect(fallback.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fallback_error_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("selected:cached");
+  });
+
   it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

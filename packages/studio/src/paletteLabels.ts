@@ -89,6 +89,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "错误分类",
         description: "按错误码、类型、类别、可重试标记或消息内容路由错误。",
       },
+      fallback: {
+        title: "兜底分支",
+        description: "主值不可用或存在错误时切换到备用值或备用流程。",
+      },
       event_trigger: {
         title: "事件触发",
         description: "收到匹配的字符串事件时启动流程。",

@@ -15,6 +15,7 @@ const BUILTIN_TYPES = [
   "start",
   "end",
   "error_classifier",
+  "fallback",
   "transform",
   "approval",
   "audit_log",

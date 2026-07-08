@@ -1,0 +1,233 @@
+/**
+ * `fallback` - explicit primary/fallback router.
+ *
+ * It turns "use the primary value when usable, otherwise continue with a
+ * fallback value" into a visible control-flow decision instead of hiding that
+ * recovery logic in templates or ad-hoc condition nodes.
+ */
+
+import { z } from "zod";
+import { defineNode } from "@ai-native-flow/node-sdk";
+import { readPath } from "./_helpers.js";
+
+type FallbackMode = "present" | "truthy" | "ok" | "status";
+type FallbackStatus = "primary" | "fallback";
+
+const fallbackConfig = z
+  .object({
+    mode: z
+      .enum(["present", "truthy", "ok", "status"])
+      .default("present")
+      .describe("How the primary value is judged usable."),
+    valuePath: z
+      .string()
+      .default("")
+      .describe("Optional dotted path extracted from the primary value."),
+    fallbackValue: z
+      .unknown()
+      .optional()
+      .describe("Static fallback value used when no fallback input is connected."),
+    errorPath: z
+      .string()
+      .default("error")
+      .describe("Optional dotted path; a present value forces the fallback branch."),
+    statusPath: z
+      .string()
+      .default("status")
+      .describe("Dotted path used by status mode."),
+    successValues: z
+      .string()
+      .default("ok,success,succeeded,ready,valid,enabled")
+      .describe("Comma-separated status values treated as primary success."),
+  })
+  .passthrough();
+
+export const fallbackNode = defineNode({
+  type: "fallback",
+  typeVersion: "1.0.0",
+  title: "Fallback",
+  description: "Routes to a primary or fallback branch based on value usability.",
+  kind: "pseudo",
+  config: fallbackConfig,
+  fieldMeta: {
+    mode: {
+      label: "Mode",
+      control: "select",
+      order: 1,
+      enumOptions: [
+        { label: "Present", value: "present" },
+        { label: "Truthy", value: "truthy" },
+        { label: "OK flag", value: "ok" },
+        { label: "Status", value: "status" },
+      ],
+    },
+    valuePath: {
+      label: "Value Path",
+      control: "input",
+      order: 2,
+      placeholder: "data.result",
+    },
+    fallbackValue: {
+      label: "Fallback Value",
+      control: "textarea",
+      order: 3,
+      placeholder: "Static fallback value.",
+    },
+    errorPath: {
+      label: "Error Path",
+      control: "input",
+      order: 4,
+      placeholder: "error",
+    },
+    statusPath: {
+      label: "Status Path",
+      control: "input",
+      order: 5,
+      placeholder: "status",
+    },
+    successValues: {
+      label: "Success Values",
+      control: "input",
+      order: 6,
+      placeholder: "ok,success,succeeded",
+    },
+  },
+  ports: [
+    { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "value", direction: "input", kind: "data", label: "Primary Value" },
+    { id: "fallback", direction: "input", kind: "data", label: "Fallback Value" },
+    { id: "error", direction: "input", kind: "data", label: "Error" },
+    { id: "primary", direction: "output", kind: "control", label: "Primary" },
+    { id: "fallback", direction: "output", kind: "control", label: "Fallback" },
+    { id: "value", direction: "output", kind: "data", label: "Selected Value" },
+    { id: "primaryValue", direction: "output", kind: "data", label: "Primary Value" },
+    { id: "fallbackValue", direction: "output", kind: "data", label: "Fallback Value" },
+    { id: "original", direction: "output", kind: "data", label: "Original Value" },
+    { id: "error", direction: "output", kind: "data", label: "Error" },
+    { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    {
+      id: "usedFallback",
+      direction: "output",
+      kind: "data",
+      label: "Used Fallback",
+      schema: { type: "boolean" },
+    },
+  ],
+  validateInput: false,
+  run({ input, config, ctx }) {
+    const original = input.value ?? input.input ?? input.in ?? null;
+    const primaryValue = selectValue(original, String(config.valuePath ?? ""));
+    const fallbackValue =
+      input.fallback !== undefined ? input.fallback : config.fallbackValue ?? null;
+    const explicitError = input.error ?? readOptionalPath(original, String(config.errorPath ?? ""));
+    const mode = readMode(config.mode);
+    const decision = decide(primaryValue, original, explicitError, {
+      mode,
+      statusPath: String(config.statusPath ?? "status"),
+      successValues: parseSuccessValues(config.successValues),
+    });
+    const selectedValue = decision.status === "primary" ? primaryValue : fallbackValue;
+
+    ctx.log.debug("fallback selected branch", {
+      branch: decision.status,
+      reason: decision.reason,
+      mode,
+    });
+
+    return {
+      kind: "success",
+      outputs: {
+        [decision.status]: null,
+        value: selectedValue,
+        primaryValue,
+        fallbackValue,
+        original,
+        error: explicitError ?? null,
+        status: decision.status,
+        reason: decision.reason,
+        usedFallback: decision.status === "fallback",
+      },
+    };
+  },
+});
+
+function readMode(value: unknown): FallbackMode {
+  return value === "truthy" || value === "ok" || value === "status" ? value : "present";
+}
+
+function selectValue(value: unknown, path: string): unknown {
+  const trimmed = path.trim();
+  if (trimmed === "") return value;
+  const selected = readPath(value, trimmed);
+  return selected === undefined ? null : selected;
+}
+
+function readOptionalPath(value: unknown, path: string): unknown {
+  const trimmed = path.trim();
+  if (trimmed === "") return undefined;
+  return readPath(value, trimmed);
+}
+
+function parseSuccessValues(value: unknown): Set<string> {
+  return new Set(
+    String(value ?? "")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean),
+  );
+}
+
+function decide(
+  value: unknown,
+  original: unknown,
+  error: unknown,
+  config: {
+    mode: FallbackMode;
+    statusPath: string;
+    successValues: ReadonlySet<string>;
+  },
+): { status: FallbackStatus; reason: string } {
+  if (isPresentError(error)) {
+    return { status: "fallback", reason: "error_present" };
+  }
+
+  if (config.mode === "present") {
+    const present = value !== undefined && value !== null;
+    return present
+      ? { status: "primary", reason: "value_present" }
+      : { status: "fallback", reason: "value_missing" };
+  }
+
+  if (config.mode === "truthy") {
+    return value
+      ? { status: "primary", reason: "truthy" }
+      : { status: "fallback", reason: "falsy" };
+  }
+
+  if (config.mode === "ok") {
+    const ok =
+      readOptionalPath(original, "ok") ??
+      readOptionalPath(original, "success") ??
+      readOptionalPath(original, "succeeded");
+    return ok === true
+      ? { status: "primary", reason: "ok_flag" }
+      : { status: "fallback", reason: "ok_flag_missing" };
+  }
+
+  const status = readOptionalPath(original, config.statusPath);
+  if (!isPresentStatus(status)) {
+    return { status: "fallback", reason: "status_missing" };
+  }
+  return config.successValues.has(String(status).toLowerCase())
+    ? { status: "primary", reason: "status_match" }
+    : { status: "fallback", reason: "status_mismatch" };
+}
+
+function isPresentError(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== false && value !== "";
+}
+
+function isPresentStatus(value: unknown): boolean {
+  return value !== undefined && value !== null && value !== "";
+}
