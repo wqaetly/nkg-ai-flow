@@ -57,6 +57,14 @@ export const cronScheduleNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "now", direction: "input", kind: "data", label: "Now" },
+    { id: "cron", direction: "input", kind: "data", label: "Cron", schema: { type: "string" } },
+    {
+      id: "timezoneOffsetMinutes",
+      direction: "input",
+      kind: "data",
+      label: "Timezone Offset Minutes",
+      schema: { type: "number" },
+    },
     { id: "due", direction: "output", kind: "control", label: "Due" },
     { id: "not_due", direction: "output", kind: "control", label: "Not due" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -94,7 +102,8 @@ export const cronScheduleNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const spec = parseCron(String(config.cron ?? "* * * * *"));
+    const cron = String(input.cron ?? config.cron ?? "* * * * *");
+    const spec = parseCron(cron);
     if (!spec) {
       return error(
         "node.cron_schedule.invalid_cron",
@@ -104,7 +113,8 @@ export const cronScheduleNode = defineNode({
     }
 
     const now = readTimestamp(input.now ?? input.input ?? input.in) ?? Date.now();
-    const offsetMinutes = Math.trunc(Number(config.timezoneOffsetMinutes ?? 0));
+    const offsetMinutes =
+      readInteger(input.timezoneOffsetMinutes) ?? readInteger(config.timezoneOffsetMinutes) ?? 0;
     const local = localParts(now, offsetMinutes);
     const due = matchesCron(local, spec);
     const nextAt = due ? now : findNextAt(now, offsetMinutes, spec);
@@ -113,7 +123,7 @@ export const cronScheduleNode = defineNode({
 
     ctx.log.debug("cron_schedule selected branch", {
       status,
-      cron: config.cron,
+      cron,
       nextAt,
       waitMs,
     });
@@ -123,7 +133,7 @@ export const cronScheduleNode = defineNode({
       outputs: {
         [status]: null,
         status,
-        cron: String(config.cron ?? "* * * * *"),
+        cron,
         timezoneOffsetMinutes: offsetMinutes,
         now,
         nextAt,
@@ -247,6 +257,11 @@ function readTimestamp(value: unknown): number | undefined {
     return Number.isFinite(parsed) ? parsed : undefined;
   }
   return undefined;
+}
+
+function readInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.trunc(number) : undefined;
 }
 
 function error(

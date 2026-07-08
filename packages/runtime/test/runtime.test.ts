@@ -1236,6 +1236,81 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic cron_schedule policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "cron_schedule_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const nowValue = Date.UTC(2026, 0, 5, 9, 30);
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 160 } });
+    const now = flow.node("transform", {
+      id: "now",
+      position: { x: 140, y: 60 },
+      config: { value: nowValue },
+    });
+    const cronInput = flow.node("transform", {
+      id: "cron_input",
+      position: { x: 140, y: 160 },
+      config: { value: "30 9 * * 1" },
+    });
+    const timezoneOffset = flow.node("transform", {
+      id: "timezone_offset",
+      position: { x: 140, y: 260 },
+      config: { value: 0 },
+    });
+    const cron = flow.node("cron_schedule", {
+      id: "cron",
+      position: { x: 360, y: 160 },
+      config: { cron: "0 0 * * 0", timezoneOffsetMinutes: 60 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 160 },
+      config: { template: "cron=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 720, y: 160 } });
+
+    flow.connect(start.out("out"), now.in("in"));
+    flow.connect(start.out("out"), cronInput.in("in"));
+    flow.connect(start.out("out"), timezoneOffset.in("in"));
+    flow.connect(now.out("out"), cron.in("in"));
+    flow.connect(now.out("output"), cron.in("now"));
+    flow.connect(cronInput.out("output"), cron.in("cron"));
+    flow.connect(timezoneOffset.out("output"), cron.in("timezoneOffsetMinutes"));
+    flow.connect(cron.out("due"), report.in("in"));
+    flow.connect(cron.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cron_schedule_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cron=due");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cronOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cron") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cronOutput).toMatchObject({
+      status: "due",
+      cron: "30 9 * * 1",
+      timezoneOffsetMinutes: 0,
+      now: nowValue,
+      nextAt: nowValue,
+      nextAtIso: new Date(nowValue).toISOString(),
+      waitMs: 0,
+      dueValue: true,
+      notDueValue: false,
+    });
+  });
+
   it("routes cron_schedule to not_due and reports wait time", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "cron_schedule_not_due_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
