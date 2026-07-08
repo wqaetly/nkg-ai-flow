@@ -115,6 +115,39 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("Hello, Node");
   });
 
+  it("evaluates safe transform expressions with expr prefix", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "transform_expr_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const summarize = flow.node("transform", {
+      id: "summarize",
+      position: { x: 120, y: 0 },
+      config: { expression: "expr:sum(input.amounts)" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "sum=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), summarize.in("in"));
+    flow.connect(start.out("runInput"), summarize.in("input"));
+    flow.connect(summarize.out("out"), report.in("in"));
+    flow.connect(summarize.out("output"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "transform_expr_e2e",
+      input: { amounts: [2, "3", 5] },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sum=10");
+  });
+
   it("exposes start runInput as an explicit data output port", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "start_run_input_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

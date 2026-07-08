@@ -8,15 +8,13 @@
  *                                              (so `defineFlow` examples can
  *                                              author plain JS template
  *                                              strings without leaving JSON)
+ *   - `{ expression: "expr:sum(input.values)" }` safe expression evaluation
  *   - `{ value: <any> }`                       static replacement value
- *
- * A real expression evaluator (jsonata, jmespath, JS sandbox) lands in
- * Phase 3 alongside the sandboxed Node Logic Provider.
  */
 
 import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
-import { renderTemplate } from "./_helpers.js";
+import { evaluateExpression, renderTemplate } from "./_helpers.js";
 
 const transformConfig = z
   .object({
@@ -27,7 +25,7 @@ const transformConfig = z
     expression: z
       .string()
       .optional()
-      .describe("Back-ticked template literal alternative."),
+      .describe("Back-ticked template literal alternative, or expr:<safe expression>."),
     value: z
       .unknown()
       .optional()
@@ -69,7 +67,10 @@ export const transformNode = defineNode({
         expression.startsWith("`") && expression.endsWith("`")
           ? expression.slice(1, -1)
           : expression;
-      output = renderTemplate(stripped, raw);
+      const trimmed = stripped.trim();
+      output = trimmed.startsWith("expr:")
+        ? evaluateExpression(trimmed.slice("expr:".length), raw)
+        : renderTemplate(stripped, raw);
     } else if (value !== undefined) {
       output = value;
     } else {
