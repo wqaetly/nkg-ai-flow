@@ -71,6 +71,41 @@ export const branchTimeoutNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "branch", direction: "input", kind: "data", label: "Branch result" },
+    {
+      id: "timeoutMs",
+      direction: "input",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "graceMs",
+      direction: "input",
+      kind: "data",
+      label: "Grace ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "durationMsPath",
+      direction: "input",
+      kind: "data",
+      label: "Duration Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "startedAtPath",
+      direction: "input",
+      kind: "data",
+      label: "Started At Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "finishedAtPath",
+      direction: "input",
+      kind: "data",
+      label: "Finished At Path",
+      schema: { type: "string" },
+    },
     { id: "on_time", direction: "output", kind: "control", label: "On time" },
     { id: "timed_out", direction: "output", kind: "control", label: "Timed out" },
     { id: "unknown", direction: "output", kind: "control", label: "Unknown" },
@@ -105,6 +140,27 @@ export const branchTimeoutNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "durationMsPath",
+      direction: "output",
+      kind: "data",
+      label: "Duration Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "startedAtPath",
+      direction: "output",
+      kind: "data",
+      label: "Started At Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "finishedAtPath",
+      direction: "output",
+      kind: "data",
+      label: "Finished At Path",
+      schema: { type: "string" },
+    },
+    {
       id: "timedOut",
       direction: "output",
       kind: "data",
@@ -130,12 +186,15 @@ export const branchTimeoutNode = defineNode({
   run({ input, config, ctx }) {
     const branch = input.branch ?? input.input ?? null;
     const now = Date.now();
-    const timeoutMs = Math.max(0, Math.trunc(Number(config.timeoutMs ?? 0)));
-    const graceMs = Math.max(0, Math.trunc(Number(config.graceMs ?? 0)));
+    const timeoutMs = readIntegerAtLeast(input.timeoutMs, 0) ?? readIntegerAtLeast(config.timeoutMs, 0) ?? 0;
+    const graceMs = readIntegerAtLeast(input.graceMs, 0) ?? readIntegerAtLeast(config.graceMs, 0) ?? 0;
+    const durationMsPath = String(input.durationMsPath ?? config.durationMsPath ?? "durationMs");
+    const startedAtPath = String(input.startedAtPath ?? config.startedAtPath ?? "startedAt");
+    const finishedAtPath = String(input.finishedAtPath ?? config.finishedAtPath ?? "finishedAt");
     const elapsedMs = readElapsedMs(branch, {
-      durationMsPath: String(config.durationMsPath ?? "durationMs"),
-      startedAtPath: String(config.startedAtPath ?? "startedAt"),
-      finishedAtPath: String(config.finishedAtPath ?? "finishedAt"),
+      durationMsPath,
+      startedAtPath,
+      finishedAtPath,
       now,
     });
     const effectiveTimeoutMs = timeoutMs + graceMs;
@@ -149,6 +208,9 @@ export const branchTimeoutNode = defineNode({
       elapsedMs: elapsedMs ?? null,
       timeoutMs,
       graceMs,
+      durationMsPath,
+      startedAtPath,
+      finishedAtPath,
       remainingMs,
       overdueByMs,
     });
@@ -163,6 +225,9 @@ export const branchTimeoutNode = defineNode({
         timeoutMs,
         graceMs,
         effectiveTimeoutMs,
+        durationMsPath,
+        startedAtPath,
+        finishedAtPath,
         timedOut: status === "timed_out",
         remainingMs,
         overdueByMs,
@@ -200,6 +265,13 @@ function readOptionalPath(value: unknown, path: string): unknown {
 function readNumber(value: unknown): number | undefined {
   const number = Number(value);
   return Number.isFinite(number) ? number : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | undefined {

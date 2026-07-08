@@ -658,6 +658,89 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic branch_timeout policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "branch_timeout_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 180 } });
+    const branch = flow.node("transform", {
+      id: "branch",
+      position: { x: 140, y: 60 },
+      config: { value: { branch: "slow-api", metrics: { elapsed: 650 } } },
+    });
+    const timeoutMs = flow.node("transform", {
+      id: "timeout_ms",
+      position: { x: 140, y: 160 },
+      config: { value: 500 },
+    });
+    const graceMs = flow.node("transform", {
+      id: "grace_ms",
+      position: { x: 140, y: 260 },
+      config: { value: 100 },
+    });
+    const durationMsPath = flow.node("transform", {
+      id: "duration_path",
+      position: { x: 140, y: 360 },
+      config: { value: "metrics.elapsed" },
+    });
+    const timeout = flow.node("branch_timeout", {
+      id: "timeout",
+      position: { x: 380, y: 180 },
+      config: { timeoutMs: 1000, graceMs: 0, durationMsPath: "durationMs" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 580, y: 180 },
+      config: { template: "timeout:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 180 } });
+
+    flow.connect(start.out("out"), branch.in("in"));
+    flow.connect(start.out("out"), timeoutMs.in("in"));
+    flow.connect(start.out("out"), graceMs.in("in"));
+    flow.connect(start.out("out"), durationMsPath.in("in"));
+    flow.connect(branch.out("out"), timeout.in("in"));
+    flow.connect(branch.out("output"), timeout.in("branch"));
+    flow.connect(timeoutMs.out("output"), timeout.in("timeoutMs"));
+    flow.connect(graceMs.out("output"), timeout.in("graceMs"));
+    flow.connect(durationMsPath.out("output"), timeout.in("durationMsPath"));
+    flow.connect(timeout.out("timed_out"), report.in("in"));
+    flow.connect(timeout.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "branch_timeout_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timeout:timed_out");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timeoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timeout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timeoutOutput).toMatchObject({
+      status: "timed_out",
+      elapsedMs: 650,
+      timeoutMs: 500,
+      graceMs: 100,
+      effectiveTimeoutMs: 600,
+      durationMsPath: "metrics.elapsed",
+      startedAtPath: "startedAt",
+      finishedAtPath: "finishedAt",
+      timedOut: true,
+      remainingMs: 0,
+      overdueByMs: 50,
+    });
+  });
+
   it("routes branch_timeout to on_time from started and finished timestamps", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "branch_timeout_timestamps_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
