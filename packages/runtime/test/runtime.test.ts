@@ -8073,6 +8073,65 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("failed=branch.a_failed");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const failFastOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fail_fast") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(failFastOutput).toMatchObject({
+      status: "failed",
+      hasFailure: true,
+      failedIndex: 0,
+      count: 1,
+      errorCode: "branch.a_failed",
+      errorMessage: "A failed",
+    });
+  });
+
+  it("routes fail_fast to clear when no branch errors arrive", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fail_fast_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failFast = flow.node("fail_fast", {
+      id: "fail_fast",
+      position: { x: 140, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "status=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 460, y: 0 } });
+
+    flow.connect(start.out("out"), failFast.in("in"));
+    flow.connect(failFast.out("clear"), report.in("in"));
+    flow.connect(failFast.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fail_fast_clear_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const failFastOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fail_fast") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("status=clear");
+    expect(failFastOutput).toMatchObject({
+      status: "clear",
+      hasFailure: false,
+      failedIndex: -1,
+      count: 0,
+      errorCode: "",
+      errorMessage: "",
+    });
   });
 
   it("routes fail_fast before slow in-flight siblings finish", async () => {
