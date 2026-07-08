@@ -893,6 +893,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         all_success: "全部成功",
         partial: "部分成功",
         failed: "失败",
+        values: "结果数组",
         successes: "成功结果",
         failures: "失败结果",
         firstSuccess: "首个成功",

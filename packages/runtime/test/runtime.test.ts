@@ -15121,6 +15121,11 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(partialOutput).toMatchObject({
       status: "partial",
+      values: [
+        { status: "ok", label: "a" },
+        { status: "failed", error: "branch failed", label: "b" },
+        { status: "ready", label: "c" },
+      ],
       successCount: 2,
       failureCount: 1,
       total: 3,
@@ -15183,6 +15188,10 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(partialOutput).toMatchObject({
       status: "failed",
+      values: [
+        { ok: true, label: "a" },
+        { ok: false, error: "bad", label: "b" },
+      ],
       successCount: 1,
       failureCount: 1,
       total: 2,
@@ -15289,6 +15298,11 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(partialOutput).toMatchObject({
       status: "partial",
+      values: [
+        { state: "ready", label: "a" },
+        { state: "blocked", failure: "api timeout", label: "b" },
+        { state: "done", label: "c" },
+      ],
       successCount: 2,
       failureCount: 1,
       total: 3,

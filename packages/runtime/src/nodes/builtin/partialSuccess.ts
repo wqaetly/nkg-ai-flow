@@ -134,6 +134,7 @@ export const partialSuccessNode = defineNode({
     { id: "all_success", direction: "output", kind: "control", label: "All success" },
     { id: "partial", direction: "output", kind: "control", label: "Partial" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
+    { id: "values", direction: "output", kind: "data", label: "Values" },
     { id: "successes", direction: "output", kind: "data", label: "Successes" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
     { id: "firstSuccess", direction: "output", kind: "data", label: "First Success" },
@@ -206,6 +207,7 @@ export const partialSuccessNode = defineNode({
       kind: "success",
       outputs: {
         [status]: null,
+        values: results,
         successes,
         failures,
         firstSuccess: successes[0] ?? null,
