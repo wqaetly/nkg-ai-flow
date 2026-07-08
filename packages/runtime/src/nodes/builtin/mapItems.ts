@@ -1,14 +1,14 @@
 /**
  * `map_items` — array mapping data-flow node.
  *
- * Applies a string template to every item with `{ item, index, input }`
- * in scope. This keeps the node deterministic and safe while covering
- * common formatting / projection workflows.
+ * Applies a string template or safe expression to every item with
+ * `{ item, index, input, items, count }` in scope. This keeps the node
+ * deterministic and safe while covering common projection workflows.
  */
 
 import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
-import { renderTemplate } from "./_helpers.js";
+import { evaluateExpression, renderTemplate } from "./_helpers.js";
 
 const mapItemsConfig = z
   .object({
@@ -16,6 +16,10 @@ const mapItemsConfig = z
       .string()
       .default("${item}")
       .describe("Template rendered once per item. Example: ${index}:${item.name}."),
+    expression: z
+      .string()
+      .optional()
+      .describe("Safe expression evaluated once per item; overrides template when provided."),
   })
   .passthrough();
 
@@ -31,6 +35,12 @@ export const mapItemsNode = defineNode({
       control: "textarea",
       placeholder: "${index}:${item.name}",
       order: 1,
+    },
+    expression: {
+      label: "Expression",
+      control: "input",
+      placeholder: "upper(item.name)",
+      order: 2,
     },
   },
   ports: [
@@ -64,9 +74,21 @@ export const mapItemsNode = defineNode({
         ? input.input
         : [];
     const template = String(config.template ?? "${item}");
-    const items = source.map((item, index) =>
-      renderTemplate(template, { item, index, input: item }),
-    );
+    const expression = typeof config.expression === "string"
+      ? config.expression.trim()
+      : "";
+    const items = source.map((item, index) => {
+      const scope = {
+        item,
+        index,
+        input: item,
+        items: source,
+        count: source.length,
+      };
+      return expression.length > 0
+        ? evaluateExpression(expression, scope)
+        : renderTemplate(template, scope);
+    });
 
     return {
       kind: "success",

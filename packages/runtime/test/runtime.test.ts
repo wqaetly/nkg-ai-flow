@@ -9611,6 +9611,45 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("mapped=0:alpha,1:beta,2:gamma");
   });
 
+  it("maps array items with map_items expressions", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "map_items_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: [{ name: "alpha" }, { name: "beta" }] },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 260, y: 0 },
+      config: { expression: "upper(item.name)" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "mapped=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), map.in("in"));
+    flow.connect(input.out("output"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "map_items_expression_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("mapped=ALPHA,BETA");
+  });
+
   it("sorts array items with sort_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "sort_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

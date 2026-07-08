@@ -355,6 +355,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       map_items: {
         template: "映射模板",
+        expression: "映射表达式",
       },
       merge_object: {
         mode: "合并模式",
