@@ -2933,6 +2933,59 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("resets idempotency_key by deleting the stored business key", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("IDEMPOTENCY:payments:order-3", {
+      key: "order-3",
+      status: "completed",
+      owner: "previous-run",
+      value: "receipt-3",
+      error: null,
+      startedAt: Date.now() - 1000,
+      completedAt: Date.now() - 500,
+      failedAt: null,
+      expiresAt: Date.now() + 60_000,
+      updatedAt: Date.now() - 500,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_reset_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "payments",
+        key: "order-3",
+        mode: "reset",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "idem:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), idem.in("in"));
+    flow.connect(idem.out("reset"), report.in("in"));
+    flow.connect(idem.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_reset_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("idem:reset");
+    expect(variables.has("IDEMPOTENCY:payments:order-3")).toBe(false);
+  });
+
   it("opens a circuit_breaker after recorded failures and routes checks to open", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

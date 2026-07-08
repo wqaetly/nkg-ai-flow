@@ -145,7 +145,7 @@ export const idempotencyKeyNode = defineNode({
     });
 
     if (decision.state === null) {
-      store.set(stateName, null, metadata(ctx.flowId, namespace));
+      store.delete(stateName);
     } else {
       store.set(stateName, toVariableValue(decision.state), metadata(ctx.flowId, namespace));
     }
@@ -306,7 +306,8 @@ function asMutableVariableStore(value: unknown): MutableVariableStore | undefine
   if (
     value &&
     typeof value === "object" &&
-    typeof (value as { set?: unknown }).set === "function"
+    typeof (value as { set?: unknown }).set === "function" &&
+    typeof (value as { delete?: unknown }).delete === "function"
   ) {
     return value as MutableVariableStore;
   }
