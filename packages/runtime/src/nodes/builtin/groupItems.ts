@@ -93,6 +93,17 @@ export const groupItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "missingKey", direction: "input", kind: "data", label: "Missing key", schema: { type: "string" } },
+    {
+      id: "caseSensitive",
+      direction: "input",
+      kind: "data",
+      label: "Case sensitive",
+      schema: { type: "boolean" },
+    },
+    { id: "sortBy", direction: "input", kind: "data", label: "Sort by", schema: { type: "string" } },
+    { id: "sortDirection", direction: "input", kind: "data", label: "Sort direction", schema: { type: "string" } },
     {
       id: "groups",
       direction: "output",
@@ -114,6 +125,17 @@ export const groupItemsNode = defineNode({
       label: "Group keys",
       schema: { type: "array" },
     },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "missingKey", direction: "output", kind: "data", label: "Missing key", schema: { type: "string" } },
+    {
+      id: "caseSensitive",
+      direction: "output",
+      kind: "data",
+      label: "Case sensitive",
+      schema: { type: "boolean" },
+    },
+    { id: "sortBy", direction: "output", kind: "data", label: "Sort by", schema: { type: "string" } },
+    { id: "sortDirection", direction: "output", kind: "data", label: "Sort direction", schema: { type: "string" } },
     {
       id: "count",
       direction: "output",
@@ -136,14 +158,17 @@ export const groupItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const path = String(config.path ?? "");
-    const missingKey = String(config.missingKey ?? "__missing__");
+    const path = String(input.path ?? config.path ?? "");
+    const missingKey = String(input.missingKey ?? config.missingKey ?? "__missing__");
+    const caseSensitive = readBoolean(input.caseSensitive) ?? readBoolean(config.caseSensitive) ?? true;
+    const sortBy = readSortBy(input.sortBy ?? config.sortBy);
+    const sortDirection = readSortDirection(input.sortDirection ?? config.sortDirection);
     const entries = groupItems(source, {
       path,
       missingKey,
-      caseSensitive: config.caseSensitive !== false,
-      sortBy: config.sortBy ?? "first",
-      sortDirection: config.sortDirection ?? "asc",
+      caseSensitive,
+      sortBy,
+      sortDirection,
     });
     const groups = Object.fromEntries(entries.map((entry) => [entry.key, entry.items]));
 
@@ -160,12 +185,34 @@ export const groupItemsNode = defineNode({
         groups,
         entries,
         keys: entries.map((entry) => entry.key),
+        path,
+        missingKey,
+        caseSensitive,
+        sortBy,
+        sortDirection,
         count: entries.length,
         total: source.length,
       },
     };
   },
 });
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+}
+
+function readSortBy(value: unknown): GroupSortBy {
+  return value === "key" || value === "count" ? value : "first";
+}
+
+function readSortDirection(value: unknown): SortDirection {
+  return value === "desc" ? "desc" : "asc";
+}
 
 function groupItems(
   source: unknown[],

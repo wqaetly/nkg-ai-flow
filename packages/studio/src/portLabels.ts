@@ -613,6 +613,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       group_items: {
         items: "分组项",
+        path: "路径",
+        missingKey: "缺失键",
+        caseSensitive: "大小写敏感",
+        sortBy: "排序方式",
+        sortDirection: "排序方向",
         groups: "分组对象",
         entries: "分组列表",
         keys: "分组键",

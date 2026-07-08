@@ -17587,6 +17587,108 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("sorted=open:3,closed:2,pending:1");
   });
 
+  it("uses dynamic group_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "group_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a", status: "Open" },
+          { id: "b", status: "open" },
+          { id: "c" },
+        ],
+      },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 100 },
+      config: { value: "status" },
+    });
+    const missingKey = flow.node("transform", {
+      id: "missingKey",
+      position: { x: 120, y: 180 },
+      config: { value: "unknown" },
+    });
+    const caseSensitive = flow.node("transform", {
+      id: "caseSensitive",
+      position: { x: 120, y: 260 },
+      config: { value: false },
+    });
+    const sortBy = flow.node("transform", {
+      id: "sortBy",
+      position: { x: 120, y: 340 },
+      config: { value: "key" },
+    });
+    const sortDirection = flow.node("transform", {
+      id: "sortDirection",
+      position: { x: 120, y: 420 },
+      config: { value: "asc" },
+    });
+    const group = flow.node("group_items", {
+      id: "group",
+      position: { x: 340, y: 0 },
+      config: {
+        path: "type",
+        missingKey: "__missing__",
+        caseSensitive: true,
+        sortBy: "first",
+        sortDirection: "desc",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "keys=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), missingKey.in("in"));
+    flow.connect(start.out("out"), caseSensitive.in("in"));
+    flow.connect(start.out("out"), sortBy.in("in"));
+    flow.connect(start.out("out"), sortDirection.in("in"));
+    flow.connect(input.out("out"), group.in("in"));
+    flow.connect(input.out("output"), group.in("items"));
+    flow.connect(path.out("output"), group.in("path"));
+    flow.connect(missingKey.out("output"), group.in("missingKey"));
+    flow.connect(caseSensitive.out("output"), group.in("caseSensitive"));
+    flow.connect(sortBy.out("output"), group.in("sortBy"));
+    flow.connect(sortDirection.out("output"), group.in("sortDirection"));
+    flow.connect(group.out("out"), report.in("in"));
+    flow.connect(group.out("keys"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "group_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("keys=open,unknown");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const groupOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "group") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(groupOutput).toMatchObject({
+      path: "status",
+      missingKey: "unknown",
+      caseSensitive: false,
+      sortBy: "key",
+      sortDirection: "asc",
+      keys: ["open", "unknown"],
+      count: 2,
+      total: 3,
+    });
+  });
+
   it("reduces array items with reduce_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
