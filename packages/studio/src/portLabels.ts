@@ -905,6 +905,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       reduce_items: {
         items: "数组",
+        mode: "模式",
+        path: "路径",
+        separator: "分隔符",
         result: "汇总结果",
         count: "数量",
         numericCount: "数值数量",

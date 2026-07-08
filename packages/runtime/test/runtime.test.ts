@@ -17413,6 +17413,90 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("sum=10");
   });
 
+  it("uses dynamic reduce_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "reduce_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { label: "alpha", amount: 2 },
+          { label: "beta", amount: 3 },
+          { label: "gamma", amount: 5 },
+        ],
+      },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 100 },
+      config: { value: "join" },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 180 },
+      config: { value: "label" },
+    });
+    const separator = flow.node("transform", {
+      id: "separator",
+      position: { x: 120, y: 260 },
+      config: { value: "|" },
+    });
+    const reduce = flow.node("reduce_items", {
+      id: "reduce",
+      position: { x: 340, y: 0 },
+      config: {
+        mode: "count",
+        path: "amount",
+        separator: ",",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "joined=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), separator.in("in"));
+    flow.connect(input.out("out"), reduce.in("in"));
+    flow.connect(input.out("output"), reduce.in("items"));
+    flow.connect(mode.out("output"), reduce.in("mode"));
+    flow.connect(path.out("output"), reduce.in("path"));
+    flow.connect(separator.out("output"), reduce.in("separator"));
+    flow.connect(reduce.out("out"), report.in("in"));
+    flow.connect(reduce.out("result"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "reduce_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("joined=alpha|beta|gamma");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const reduceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "reduce") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(reduceOutput).toMatchObject({
+      mode: "join",
+      path: "label",
+      separator: "|",
+      result: "alpha|beta|gamma",
+      count: 3,
+      numericCount: 0,
+    });
+  });
+
   it("reduces array items with numeric and positional reduce_items modes", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_modes_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

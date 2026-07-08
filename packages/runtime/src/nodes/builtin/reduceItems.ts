@@ -10,6 +10,8 @@ import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
 import { readPath } from "./_helpers.js";
 
+type ReduceItemsMode = "count" | "sum" | "average" | "min" | "max" | "first" | "last" | "join";
+
 const reduceItemsConfig = z
   .object({
     mode: z
@@ -62,12 +64,18 @@ export const reduceItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "separator", direction: "input", kind: "data", label: "Separator", schema: { type: "string" } },
     {
       id: "result",
       direction: "output",
       kind: "data",
       label: "Result",
     },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "separator", direction: "output", kind: "data", label: "Separator", schema: { type: "string" } },
     {
       id: "count",
       direction: "output",
@@ -90,9 +98,10 @@ export const reduceItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const path = String(config.path ?? "");
+    const mode = readMode(input.mode ?? config.mode);
+    const path = String(input.path ?? config.path ?? "");
+    const separator = String(input.separator ?? config.separator ?? ",");
     const values = source.map((item) => valueAtPath(item, path));
-    const mode = config.mode ?? "count";
     const numbers = values.flatMap((value) => {
       const number = numberOrUndefined(value);
       return number === undefined ? [] : [number];
@@ -101,7 +110,7 @@ export const reduceItemsNode = defineNode({
       mode,
       values,
       numbers,
-      separator: String(config.separator ?? ","),
+      separator,
       sourceCount: source.length,
     });
 
@@ -110,12 +119,27 @@ export const reduceItemsNode = defineNode({
       outputs: {
         out: null,
         result,
+        mode,
+        path,
+        separator,
         count: source.length,
         numericCount: numbers.length,
       },
     };
   },
 });
+
+function readMode(value: unknown): ReduceItemsMode {
+  return value === "sum" ||
+    value === "average" ||
+    value === "min" ||
+    value === "max" ||
+    value === "first" ||
+    value === "last" ||
+    value === "join"
+    ? value
+    : "count";
+}
 
 function valueAtPath(item: unknown, path: string): unknown {
   return path.length > 0 ? readPath(item, path) : item;
