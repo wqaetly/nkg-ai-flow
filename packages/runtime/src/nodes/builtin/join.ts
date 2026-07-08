@@ -44,6 +44,32 @@ export const joinNode = defineNode({
       label: "Count",
       schema: { type: "number" },
     },
+    {
+      id: "empty",
+      direction: "output",
+      kind: "data",
+      label: "Empty",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "firstValue",
+      direction: "output",
+      kind: "data",
+      label: "First Value",
+    },
+    {
+      id: "lastValue",
+      direction: "output",
+      kind: "data",
+      label: "Last Value",
+    },
+    {
+      id: "status",
+      direction: "output",
+      kind: "data",
+      label: "Status",
+      schema: { type: "string" },
+    },
   ],
   validateInput: false,
   run({ input }) {
@@ -53,12 +79,18 @@ export const joinNode = defineNode({
         : Array.isArray(input.values)
           ? input.values
           : [input.values];
+    const count = values.length;
+    const empty = count === 0;
     return {
       kind: "success",
       outputs: {
         out: null,
         values,
-        count: values.length,
+        count,
+        empty,
+        firstValue: values[0] ?? null,
+        lastValue: values[count - 1] ?? null,
+        status: empty ? "empty" : "joined",
       },
     };
   },

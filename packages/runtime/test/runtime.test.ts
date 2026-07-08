@@ -7648,6 +7648,60 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("joined=upper:Flow,lower:Flow");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(joinOutput).toMatchObject({
+      status: "joined",
+      empty: false,
+      count: 2,
+      firstValue: "upper:Flow",
+      lastValue: "lower:Flow",
+    });
+  });
+
+  it("emits empty join diagnostics when no values arrive", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "join_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const join = flow.node("join", { id: "join", position: { x: 140, y: 0 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 280, y: 0 },
+      config: { template: "join=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 420, y: 0 } });
+
+    flow.connect(start.out("out"), join.in("in"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "join_empty_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("join=empty");
+    expect(joinOutput).toMatchObject({
+      status: "empty",
+      empty: true,
+      count: 0,
+      firstValue: null,
+      lastValue: null,
+    });
   });
 
   it("continues through quorum once the threshold of values arrives", async () => {
@@ -8483,10 +8537,22 @@ describe("runtime / hello-flow end-to-end", () => {
         | { payload?: { output?: Record<string, unknown> } }
         | undefined
     )?.payload?.output;
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
     expect(fanoutOutput).toMatchObject({ branchCount: 2, concurrency: 2 });
+    expect(joinOutput).toMatchObject({
+      status: "joined",
+      empty: false,
+      count: 2,
+      firstValue: "upper:Flow",
+      lastValue: "lower:Flow",
+    });
   });
 
   it("executes ready parallel branches concurrently before joining", async () => {

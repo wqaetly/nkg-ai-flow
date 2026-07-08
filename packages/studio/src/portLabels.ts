@@ -494,6 +494,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         out: "继续",
         values: "多路数据",
         count: "数量",
+        empty: "是否为空",
+        firstValue: "首个值",
+        lastValue: "最后值",
+        status: "状态",
       },
       map_items: {
         items: "映射项",
