@@ -3,6 +3,7 @@ import type {
   ExecuteResult,
   InvokeArgs,
   InvokeNodeArgs,
+  ResumeFromPointArgs,
   RunRecord,
   Runtime,
   StartedRun,
@@ -115,6 +116,32 @@ export class FlowSdkClient {
     return this.wrapStartedRun(started);
   }
 
+  /**
+   * Resume a flow from a durable `resume_point` marker. The runtime
+   * resolves the marker's target node and snapshot; callers only name
+   * the flow and marker.
+   */
+  async resumeFromPoint(
+    flowId: string,
+    resumePointName: string,
+    options: SdkInvokeOptions = {},
+  ): Promise<ExecuteResult> {
+    return this.runtime.invocationRouter.resumeFromPoint(
+      toResumeFromPointArgs(flowId, resumePointName, options),
+    );
+  }
+
+  async startFromPoint(
+    flowId: string,
+    resumePointName: string,
+    options: SdkInvokeOptions = {},
+  ): Promise<SdkStartedRun> {
+    const started = await this.runtime.invocationRouter.startFromPoint(
+      toResumeFromPointArgs(flowId, resumePointName, options),
+    );
+    return this.wrapStartedRun(started);
+  }
+
   async *stream(
     flowId: string,
     input: unknown,
@@ -136,6 +163,15 @@ export class FlowSdkClient {
     options: SdkStreamOptions = {},
   ): AsyncIterable<NodeEvent> {
     const started = await this.startNode(flowId, nodeId, input, options);
+    yield* this.iterateStartedRun(started, options);
+  }
+
+  async *streamFromPoint(
+    flowId: string,
+    resumePointName: string,
+    options: SdkStreamOptions = {},
+  ): AsyncIterable<NodeEvent> {
+    const started = await this.startFromPoint(flowId, resumePointName, options);
     yield* this.iterateStartedRun(started, options);
   }
 
@@ -304,6 +340,21 @@ function toInvokeNodeArgs(
     flowId,
     nodeId,
     input,
+    ...(options.flowVersion !== undefined
+      ? { flowVersion: options.flowVersion }
+      : {}),
+    ...(options.traceId !== undefined ? { traceId: options.traceId } : {}),
+  };
+}
+
+function toResumeFromPointArgs(
+  flowId: string,
+  resumePointName: string,
+  options: SdkInvokeOptions,
+): ResumeFromPointArgs {
+  return {
+    flowId,
+    resumePointName,
     ...(options.flowVersion !== undefined
       ? { flowVersion: options.flowVersion }
       : {}),

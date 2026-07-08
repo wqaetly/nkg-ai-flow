@@ -98,6 +98,35 @@ async function registerSubGraphFlow(
   await rt.registry.promote(id, "1.0.0");
 }
 
+async function registerResumeFlow(
+  rt: ReturnType<typeof createRuntime>,
+  id = "resume_http",
+) {
+  const flow = defineFlow({
+    id,
+    version: "1.0.0",
+    registry: rt.nodeTypeRegistry,
+  });
+  const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+  const prep = flow.node("transform", {
+    id: "prep",
+    position: { x: 100, y: 0 },
+    config: { template: "prep:${input.name}" },
+  });
+  const recover = flow.node("transform", {
+    id: "recover",
+    position: { x: 220, y: 0 },
+    config: { template: "recover:${input.orderId}" },
+  });
+  const end = flow.node("end", { id: "e", position: { x: 340, y: 0 } });
+  flow.connect(start.out("out"), prep.in("in"));
+  flow.connect(prep.out("output"), recover.in("input"));
+  flow.connect(recover.out("out"), end.in("in"));
+  const json = flow.dump();
+  await rt.registry.register({ graph: JSON.parse(json), json, status: "staging" });
+  await rt.registry.promote(id, "1.0.0");
+}
+
 describe("transport-http / nodes invoke endpoint", () => {
   it("POST /flows/:id/nodes/:id/invoke returns the sink's output", async () => {
     const { rt, handler } = buildHandler();
@@ -191,6 +220,91 @@ describe("transport-http / nodes stream endpoint", () => {
     // data output.
     const last = events[events.length - 1];
     expect(last?.data).toContain('"output":"Hi Node"');
+  });
+});
+
+describe("transport-http / resume endpoint", () => {
+  it("POST /flows/:id/resume starts from the saved resume_point target", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const handler = createHttpHandler({ runtime: rt });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-1" },
+      reason: "manual resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(rt, "resume_http");
+
+    const res = await handler(
+      new Request("http://test/flows/resume_http/resume", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ resumePointName: "ORDER_RESUME_POINT" }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      status: string;
+      output: unknown;
+      resumePointName: string;
+    };
+    expect(body.status).toBe("succeeded");
+    expect(body.output).toBe("recover:order-1");
+    expect(body.resumePointName).toBe("ORDER_RESUME_POINT");
+  });
+
+  it("POST /flows/:id/resume/stream emits resume-point run events", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const handler = createHttpHandler({ runtime: rt });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-2" },
+      reason: "stream resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(rt, "resume_http_stream");
+
+    const res = await handler(
+      new Request("http://test/flows/resume_http_stream/resume/stream", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ resumePointName: "ORDER_RESUME_POINT" }),
+      }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const body = await readResponseBody(res);
+    const events = parseSseStream(body);
+    const kinds = events.map((e) => e.event);
+    expect(kinds[0]).toBe("run_started");
+    expect(kinds[kinds.length - 1]).toBe("run_finished");
+    expect(events[events.length - 1]?.data).toContain('"output":"recover:order-2"');
   });
 });
 

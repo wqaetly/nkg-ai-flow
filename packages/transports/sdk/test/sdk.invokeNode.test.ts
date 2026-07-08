@@ -62,6 +62,36 @@ async function registerSubGraph(
   await rt.registry.promote(id, "1.0.0");
 }
 
+async function registerResumeFlow(rt: Runtime, id = "sdk_resume_point"): Promise<void> {
+  const flow = defineFlow({
+    id,
+    version: "1.0.0",
+    registry: rt.nodeTypeRegistry,
+  });
+  const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+  const prep = flow.node("transform", {
+    id: "prep",
+    position: { x: 100, y: 0 },
+    config: { template: "prep:${input.name}" },
+  });
+  const recover = flow.node("transform", {
+    id: "recover",
+    position: { x: 220, y: 0 },
+    config: { template: "recover:${input.orderId}" },
+  });
+  const end = flow.node("end", { id: "e", position: { x: 340, y: 0 } });
+  flow.connect(start.out("out"), prep.in("in"));
+  flow.connect(prep.out("output"), recover.in("input"));
+  flow.connect(recover.out("out"), end.in("in"));
+  const json = flow.dump();
+  await rt.registry.register({
+    graph: JSON.parse(json),
+    json,
+    status: "staging",
+  });
+  await rt.registry.promote(id, "1.0.0");
+}
+
 describe("transport-sdk / invokeNode", () => {
   it("returns the sink output and pins the run to the original flow", async () => {
     const rt = newRuntime();
@@ -127,6 +157,77 @@ describe("transport-sdk / startNode", () => {
     const result = await started.completed;
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("Hi Node");
+  });
+});
+
+describe("transport-sdk / resumeFromPoint", () => {
+  it("delegates resume-point execution to the runtime", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-1" },
+      reason: "manual resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(rt, "sdk_resume_point");
+    const client = createFlowSdkClient({ runtime: rt });
+
+    const result = await client.resumeFromPoint(
+      "sdk_resume_point",
+      "ORDER_RESUME_POINT",
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("recover:order-1");
+    expect(result.runRecord.input).toEqual({ orderId: "order-1" });
+  });
+
+  it("streams resume-point events through the SDK iterator", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-2" },
+      reason: "stream resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(rt, "sdk_stream_resume_point");
+    const client = createFlowSdkClient({ runtime: rt });
+
+    const kinds: string[] = [];
+    for await (const event of client.streamFromPoint(
+      "sdk_stream_resume_point",
+      "ORDER_RESUME_POINT",
+    )) {
+      kinds.push(event.kind);
+    }
+
+    expect(kinds[0]).toBe("run_started");
+    expect(kinds).toContain("node_started");
+    expect(kinds[kinds.length - 1]).toBe("run_finished");
   });
 });
 

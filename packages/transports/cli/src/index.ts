@@ -45,10 +45,14 @@ export class FlowCli {
           return await this.runFlow(rest);
         case "run-node":
           return await this.runNode(rest);
+        case "run-resume":
+          return await this.runResume(rest);
         case "stream":
           return await this.streamFlow(rest);
         case "stream-node":
           return await this.streamNode(rest);
+        case "stream-resume":
+          return await this.streamResume(rest);
         case "inspect":
           return await this.inspectRun(rest);
         case "replay":
@@ -125,6 +129,33 @@ export class FlowCli {
     };
   }
 
+  private async runResume(args: readonly string[]): Promise<FlowCliResult> {
+    const parsed = parseResumePointArgs(args);
+    const result = await this.client.resumeFromPoint(
+      parsed.flowId,
+      parsed.resumePointName,
+      {
+        flowVersion: parsed.flowVersion,
+        traceId: parsed.traceId,
+      },
+    );
+    await writeJsonLine(this.io.stdout, {
+      runId: result.runRecord.runId,
+      flowId: result.runRecord.flowId,
+      flowVersion: result.runRecord.flowVersion,
+      resumePointName: parsed.resumePointName,
+      status: result.runRecord.status,
+      succeeded: result.succeeded,
+      cancelled: result.cancelled,
+      output: result.output,
+      error: result.error,
+    });
+    return {
+      exitCode: result.succeeded ? 0 : 1,
+      runId: result.runRecord.runId,
+    };
+  }
+
   private async streamFlow(args: readonly string[]): Promise<FlowCliResult> {
     const parsed = await parseFlowInvocationArgs(args, this.io);
     let runId: string | undefined;
@@ -155,6 +186,28 @@ export class FlowCli {
       parsed.flowId,
       parsed.nodeId,
       parsed.input,
+      {
+        flowVersion: parsed.flowVersion,
+        traceId: parsed.traceId,
+        cursor: parsed.cursor,
+      },
+    )) {
+      runId = event.runId;
+      if (event.kind === "run_failed" || event.kind === "run_cancelled") {
+        failed = true;
+      }
+      await writeJsonLine(this.io.stdout, event);
+    }
+    return { exitCode: failed ? 1 : 0, runId };
+  }
+
+  private async streamResume(args: readonly string[]): Promise<FlowCliResult> {
+    const parsed = parseResumePointArgs(args);
+    let runId: string | undefined;
+    let failed = false;
+    for await (const event of this.client.streamFromPoint(
+      parsed.flowId,
+      parsed.resumePointName,
       {
         flowVersion: parsed.flowVersion,
         traceId: parsed.traceId,
@@ -214,8 +267,10 @@ export class FlowCli {
         "Usage:",
         "  flow run <flowId> --input <json-or-file>",
         "  flow run-node <flowId> <nodeId> --input <json-or-file>",
+        "  flow run-resume <flowId> <resumePointName>",
         "  flow stream <flowId> --input <json-or-file> [--cursor <eventId>]",
         "  flow stream-node <flowId> <nodeId> --input <json-or-file> [--cursor <eventId>]",
+        "  flow stream-resume <flowId> <resumePointName> [--cursor <eventId>]",
         "  flow inspect <runId> [--cursor <eventId>] [--limit <n>]",
         "  flow replay <runId> [--cursor <eventId>] [--limit <n>]",
         "  flow cancel <runId> [--reason <text>]",
@@ -234,6 +289,14 @@ interface ParsedFlowArgs {
 
 interface ParsedFlowNodeArgs extends ParsedFlowArgs {
   nodeId: string;
+}
+
+interface ParsedResumePointArgs {
+  flowId: string;
+  resumePointName: string;
+  flowVersion?: string;
+  traceId?: string;
+  cursor?: string;
 }
 
 interface ParsedRunArgs {
@@ -281,6 +344,23 @@ async function parseFlowNodeInvocationArgs(
     flowId,
     nodeId,
     input: await parseJsonInput(inputFlag, io),
+    flowVersion: flags.get("flow-version") ?? flags.get("version"),
+    traceId: flags.get("trace-id"),
+    cursor: flags.get("cursor"),
+  };
+}
+
+function parseResumePointArgs(args: readonly string[]): ParsedResumePointArgs {
+  const flowId = args[0];
+  if (!flowId) throw new Error("Missing flowId");
+  const resumePointName = args[1];
+  if (!resumePointName || resumePointName.startsWith("-")) {
+    throw new Error("Missing resumePointName");
+  }
+  const flags = parseFlags(args.slice(2));
+  return {
+    flowId,
+    resumePointName,
     flowVersion: flags.get("flow-version") ?? flags.get("version"),
     traceId: flags.get("trace-id"),
     cursor: flags.get("cursor"),

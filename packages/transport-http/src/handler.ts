@@ -93,6 +93,15 @@ interface InvokeNodeBody extends InvokeBody {
   nodeInput?: unknown;
 }
 
+interface ResumePointBody {
+  resumePointName?: string;
+  name?: string;
+  flowVersion?: string;
+  traceId?: string;
+  envOverrides?: EnvOverridesBody;
+  nodeOverrides?: NodeOverridesBody;
+}
+
 export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandler {
   const { runtime } = options;
   const base = options.basePath ?? "";
@@ -274,6 +283,41 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
         });
       }
 
+      // POST /flows/:flowId/resume
+      // Resume from a durable `resume_point` marker. The marker provides
+      // the target node and snapshot input, so the body only needs the
+      // marker name plus optional version / environment overrides.
+      const resume = path.match(/^\/flows\/([^/]+)\/resume$/);
+      if (resume && method === "POST") {
+        const flowId = decodeURIComponent(resume[1]!);
+        const body = (await safeJson(request)) as ResumePointBody;
+        const env = buildEnvOverrides(runtime, body.envOverrides);
+        const flowVersion = await materialiseOverrides(
+          runtime,
+          flowId,
+          body.flowVersion,
+          body.nodeOverrides,
+        );
+        const resumePointName = body.resumePointName ?? body.name ?? "";
+        const result = await runtime.invocationRouter.resumeFromPoint({
+          flowId,
+          resumePointName,
+          ...(flowVersion !== undefined ? { flowVersion } : {}),
+          ...(body.traceId !== undefined ? { traceId: body.traceId } : {}),
+          ...env,
+        });
+        const status = result.succeeded ? 200 : result.cancelled ? 499 : 500;
+        return json(status, {
+          runId: result.runRecord.runId,
+          flowId: result.runRecord.flowId,
+          flowVersion: result.runRecord.flowVersion,
+          resumePointName,
+          status: result.runRecord.status,
+          output: result.output ?? null,
+          error: result.error ?? null,
+        });
+      }
+
       // GET /runs/:runId
       const runGet = path.match(/^\/runs\/([^/]+)$/);
       if (runGet && method === "GET") {
@@ -380,6 +424,35 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           ...(cursor !== undefined ? { cursor } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
           onSubscribed: () => started.startExecution(),
+        });
+      }
+
+      // POST /flows/:flowId/resume/stream
+      const resumeStream = path.match(/^\/flows\/([^/]+)\/resume\/stream$/);
+      if (resumeStream && method === "POST") {
+        const flowId = decodeURIComponent(resumeStream[1]!);
+        const body = (await safeJson(request)) as ResumePointBody;
+        const env = buildEnvOverrides(runtime, body.envOverrides);
+        const flowVersion = await materialiseOverrides(
+          runtime,
+          flowId,
+          body.flowVersion,
+          body.nodeOverrides,
+        );
+        const started = await runtime.invocationRouter.startFromPoint({
+          flowId,
+          resumePointName: body.resumePointName ?? body.name ?? "",
+          ...(flowVersion !== undefined ? { flowVersion } : {}),
+          ...(body.traceId !== undefined ? { traceId: body.traceId } : {}),
+          ...env,
+        });
+        void started.completed.catch(() => {
+          /* errors are surfaced as run_failed events on the bus */
+        });
+        const cursor = pickCursor(request, url);
+        return streamRunEvents(runtime.eventBus, started.runRecord.runId, {
+          ...(cursor !== undefined ? { cursor } : {}),
+          ...(request.signal ? { signal: request.signal } : {}),
         });
       }
 

@@ -88,6 +88,30 @@ async function registerSlow(runtime: Runtime): Promise<void> {
   await registerAndPromote(runtime, flow);
 }
 
+async function registerResumeFlow(runtime: Runtime): Promise<void> {
+  const flow = defineFlow({
+    id: "mcp_resume",
+    version: "1.0.0",
+    registry: runtime.nodeTypeRegistry,
+  });
+  const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+  const prep = flow.node("transform", {
+    id: "prep",
+    position: { x: 100, y: 0 },
+    config: { template: "prep:${input.name}" },
+  });
+  const recover = flow.node("transform", {
+    id: "recover",
+    position: { x: 220, y: 0 },
+    config: { template: "recover:${input.orderId}" },
+  });
+  const end = flow.node("end", { id: "e", position: { x: 340, y: 0 } });
+  flow.connect(start.out("out"), prep.in("in"));
+  flow.connect(prep.out("output"), recover.in("input"));
+  flow.connect(recover.out("out"), end.in("in"));
+  await registerAndPromote(runtime, flow);
+}
+
 describe("transport-mcp", () => {
   it("creates MCP tool descriptors from flow metadata", async () => {
     const runtime = newRuntime();
@@ -187,6 +211,81 @@ describe("transport-mcp", () => {
     expect(replayed).toHaveLength(2);
     expect(replayed[0]?.eventId).not.toBe(allEvents[0]!.eventId);
     expect(replayed.every((event) => event.runId === result.runRecord.runId)).toBe(true);
+  });
+
+  it("resumes a flow from a durable resume point", async () => {
+    const variables = new InMemoryVariableStore();
+    const runtime = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+      nodes: [mcpSlowNode],
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-1" },
+      reason: "mcp resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(runtime);
+    const server = createFlowMcpServer({
+      client: createFlowSdkClient({ runtime }),
+      registry: runtime.registry,
+    });
+
+    const result = await server.resumeFromPoint(
+      "mcp_resume",
+      "ORDER_RESUME_POINT",
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("recover:order-1");
+  });
+
+  it("streams resume-point events for MCP bindings", async () => {
+    const variables = new InMemoryVariableStore();
+    const runtime = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+      nodes: [mcpSlowNode],
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-2" },
+      reason: "mcp stream resume",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+    await registerResumeFlow(runtime);
+    const server = createFlowMcpServer({
+      client: createFlowSdkClient({ runtime }),
+      registry: runtime.registry,
+    });
+
+    const events = [];
+    for await (const message of server.streamFromPoint(
+      "mcp_resume",
+      "ORDER_RESUME_POINT",
+    )) {
+      events.push(message.event);
+    }
+
+    expect(events[0]?.kind).toBe("run_started");
+    expect(events[events.length - 1]?.kind).toBe("run_finished");
   });
 
   it("supports static tool descriptors for remote MCP bindings", async () => {

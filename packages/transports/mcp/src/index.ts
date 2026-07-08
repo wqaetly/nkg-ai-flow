@@ -155,6 +155,40 @@ export class FlowMcpServer {
     return this.client.replayRun(runId, options);
   }
 
+  async resumeFromPoint(
+    flowId: string,
+    resumePointName: string,
+    options: { flowVersion?: string } = {},
+  ): Promise<FlowMcpRunResult> {
+    const result = await this.client.resumeFromPoint(
+      flowId,
+      resumePointName,
+      options,
+    );
+    return {
+      runId: result.runRecord.runId,
+      status: result.runRecord.status,
+      succeeded: result.succeeded,
+      cancelled: result.cancelled,
+      output: result.output,
+      error: result.error,
+    };
+  }
+
+  async *streamFromPoint(
+    flowId: string,
+    resumePointName: string,
+    options: { flowVersion?: string } = {},
+  ): AsyncIterable<FlowMcpStreamEvent> {
+    for await (const event of this.client.streamFromPoint(
+      flowId,
+      resumePointName,
+      options,
+    )) {
+      yield { runId: event.runId, event };
+    }
+  }
+
   async cancelRun(runId: string, reason = "mcp cancel requested"): Promise<void> {
     await this.client.cancel(runId, reason);
   }
