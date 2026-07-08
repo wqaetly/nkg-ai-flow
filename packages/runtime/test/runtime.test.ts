@@ -7929,6 +7929,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("winner=fast");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const raceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "race") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(raceOutput).toMatchObject({
+      status: "winner",
+      value: "fast",
+      hasWinner: true,
+      emptyValue: false,
+      winnerIndex: 0,
+      index: 0,
+      count: 1,
+    });
   });
 
   it("races fast branches before slow in-flight siblings finish", async () => {
@@ -8023,6 +8038,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("status=empty");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const raceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "race") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(raceOutput).toMatchObject({
+      status: "empty",
+      value: null,
+      hasWinner: false,
+      emptyValue: true,
+      winnerIndex: -1,
+      index: -1,
+      count: 0,
+    });
   });
 
   it("routes fail_fast on the first reachable branch error", async () => {
