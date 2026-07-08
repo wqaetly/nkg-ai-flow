@@ -8284,6 +8284,63 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes a dynamically named batch_window to waiting", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "batch_window_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const batchName = flow.node("transform", {
+      id: "batchName",
+      position: { x: 120, y: -80 },
+      config: { value: "EMAIL_DYNAMIC_BATCH" },
+    });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 0 },
+      config: { value: "email-2" },
+    });
+    const batch = flow.node("batch_window", {
+      id: "batch",
+      position: { x: 280, y: 0 },
+      config: {
+        maxItems: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "waiting:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), batchName.in("in"));
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(item.out("out"), batch.in("in"));
+    flow.connect(batchName.out("output"), batch.in("name"));
+    flow.connect(item.out("output"), batch.in("item"));
+    flow.connect(batch.out("waiting"), report.in("in"));
+    flow.connect(batch.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_window_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("waiting:EMAIL_DYNAMIC_BATCH");
+    expect(variables.get("EMAIL_DYNAMIC_BATCH")).toMatchObject({
+      items: ["email-2"],
+      flushCount: 0,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes batch_window to ready and clears state when maxItems is reached", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("EMAIL_BATCH", {

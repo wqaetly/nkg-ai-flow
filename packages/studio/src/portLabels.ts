@@ -237,6 +237,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       batch_window: {
         in: "输入",
+        name: "批窗口名",
         item: "当前项",
         ready: "已就绪",
         waiting: "等待更多",

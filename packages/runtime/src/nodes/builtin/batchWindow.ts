@@ -76,6 +76,7 @@ export const batchWindowNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "item", direction: "input", kind: "data", label: "Item" },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
@@ -83,6 +84,7 @@ export const batchWindowNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "items", direction: "output", kind: "data", label: "Items" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     {
       id: "remaining",
@@ -108,11 +110,11 @@ export const batchWindowNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.batch_window.missing_name",
-        "batch_window node requires config.name",
+        "batch_window node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -162,6 +164,7 @@ export const batchWindowNode = defineNode({
         [decision.branch]: null,
         items: decision.items,
         state: decision.state,
+        name,
         count,
         remaining,
         ageMs,
