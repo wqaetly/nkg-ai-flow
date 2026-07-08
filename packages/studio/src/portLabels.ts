@@ -956,6 +956,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         winner: "胜出分支",
         empty: "空结果",
         value: "胜出值",
+        indexedValues: "索引数据",
+        presentIndexes: "有效索引",
         hasWinner: "存在胜出值",
         emptyValue: "是否为空",
         winnerIndex: "胜出索引",

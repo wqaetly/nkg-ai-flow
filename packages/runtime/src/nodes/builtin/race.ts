@@ -34,6 +34,19 @@ export const raceNode = defineNode({
     { id: "value", direction: "output", kind: "data", label: "Winner" },
     { id: "values", direction: "output", kind: "data", label: "Arrived values" },
     {
+      id: "indexedValues",
+      direction: "output",
+      kind: "data",
+      label: "Indexed Values",
+    },
+    {
+      id: "presentIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Present Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
       id: "hasWinner",
       direction: "output",
       kind: "data",
@@ -79,7 +92,15 @@ export const raceNode = defineNode({
   validateInput: false,
   run({ input, ctx }) {
     const values = normalizeValues(input.values);
-    const index = values.findIndex((item) => item !== null && item !== undefined);
+    const indexedValues = values.map((value, index) => ({
+      index,
+      value,
+      present: value !== null && value !== undefined,
+    }));
+    const presentIndexes = indexedValues
+      .filter((entry) => entry.present)
+      .map((entry) => entry.index);
+    const index = presentIndexes[0] ?? -1;
     const found = index >= 0;
     const status = found ? "winner" : "empty";
     const value = found ? values[index] : null;
@@ -96,6 +117,8 @@ export const raceNode = defineNode({
         [status]: null,
         value,
         values,
+        indexedValues,
+        presentIndexes,
         hasWinner: found,
         emptyValue: !found,
         winnerIndex: index,

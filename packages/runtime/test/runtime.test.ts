@@ -14676,6 +14676,8 @@ describe("runtime / hello-flow end-to-end", () => {
       winnerIndex: 0,
       index: 0,
       count: 1,
+      indexedValues: [{ index: 0, value: "fast", present: true }],
+      presentIndexes: [0],
     });
   });
 
@@ -14785,6 +14787,8 @@ describe("runtime / hello-flow end-to-end", () => {
       winnerIndex: -1,
       index: -1,
       count: 0,
+      indexedValues: [],
+      presentIndexes: [],
     });
   });
 
