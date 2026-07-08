@@ -520,6 +520,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       send_event: {
         event: "发送事件",
       },
+      signal_resume: {
+        name: "等待状态名",
+        signal: "恢复信号",
+        expected: "期望信号",
+        createIfMissing: "缺失时创建",
+      },
       state_get: {
         name: "状态名",
         defaultValue: "默认值",

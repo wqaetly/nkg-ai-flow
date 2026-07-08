@@ -103,6 +103,7 @@ import {
   loopContinueNode,
   loopEndNode,
   sendEventNode,
+  signalResumeNode,
   startNode,
   stateGetNode,
   stateSetNode,
@@ -265,6 +266,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, windowItemsNode);
   installNode(target, textInputNode);
   installNode(target, waitSignalNode);
+  installNode(target, signalResumeNode);
   installNode(target, llmNode, { llmProvider });
   installNode(target, agentNode, {
     llmProvider,

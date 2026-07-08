@@ -2390,6 +2390,237 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("resumes a wait_signal checkpoint through signal_resume", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const waitFlow = defineFlow({ id: "signal_resume_wait_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const waitStart = waitFlow.node("start", { id: "wait_start", position: { x: 0, y: 0 } });
+    const wait = waitFlow.node("wait_signal", {
+      id: "wait",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        expected: "approved",
+      },
+    });
+    const waitWaitingReport = waitFlow.node("transform", {
+      id: "wait_waiting_report",
+      position: { x: 260, y: 0 },
+      config: { template: "wait:${input}" },
+    });
+    const waitReceivedReport = waitFlow.node("transform", {
+      id: "wait_received_report",
+      position: { x: 260, y: 120 },
+      config: { template: "wait:${input}" },
+    });
+    const waitWaitingEnd = waitFlow.node("end", { id: "wait_waiting_end", position: { x: 400, y: 0 } });
+    const waitReceivedEnd = waitFlow.node("end", { id: "wait_received_end", position: { x: 400, y: 120 } });
+    waitFlow.connect(waitStart.out("out"), wait.in("in"));
+    waitFlow.connect(wait.out("waiting"), waitWaitingReport.in("in"));
+    waitFlow.connect(wait.out("status"), waitWaitingReport.in("input"));
+    waitFlow.connect(waitWaitingReport.out("out"), waitWaitingEnd.in("in"));
+    waitFlow.connect(wait.out("received"), waitReceivedReport.in("in"));
+    waitFlow.connect(wait.out("status"), waitReceivedReport.in("input"));
+    waitFlow.connect(waitReceivedReport.out("out"), waitReceivedEnd.in("in"));
+
+    const resumeFlow = defineFlow({ id: "signal_resume_write_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const resumeStart = resumeFlow.node("start", { id: "resume_start", position: { x: 0, y: 0 } });
+    const resume = resumeFlow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        signal: "approved",
+      },
+    });
+    const resumeReport = resumeFlow.node("transform", {
+      id: "resume_report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const resumeEnd = resumeFlow.node("end", { id: "resume_end", position: { x: 400, y: 0 } });
+    resumeFlow.connect(resumeStart.out("out"), resume.in("in"));
+    resumeFlow.connect(resume.out("resumed"), resumeReport.in("in"));
+    resumeFlow.connect(resume.out("status"), resumeReport.in("input"));
+    resumeFlow.connect(resumeReport.out("out"), resumeEnd.in("in"));
+
+    await registerAndPromote(rt, waitFlow);
+    await registerAndPromote(rt, resumeFlow);
+
+    const waiting = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_wait_e2e",
+      input: null,
+    });
+    expect(waiting.succeeded).toBe(true);
+    expect(waiting.output).toBe("wait:waiting");
+
+    const resumed = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_write_e2e",
+      input: null,
+    });
+    expect(resumed.succeeded).toBe(true);
+    expect(resumed.output).toBe("resume:resumed");
+    expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+    });
+
+    const received = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_wait_e2e",
+      input: null,
+    });
+    expect(received.succeeded).toBe(true);
+    expect(received.output).toBe("wait:received");
+  });
+
+  it("routes signal_resume to missing when the wait state is absent", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "MISSING_APPROVAL_SIGNAL",
+        signal: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), resume.in("in"));
+    flow.connect(resume.out("missing"), report.in("in"));
+    flow.connect(resume.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:missing");
+    expect(variables.has("MISSING_APPROVAL_SIGNAL")).toBe(false);
+  });
+
+  it("routes signal_resume to ignored when the signal does not match", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_SIGNAL", {
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      requestedAt: Date.now(),
+      expiresAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_ignored_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        signal: "denied",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), resume.in("in"));
+    flow.connect(resume.out("ignored"), report.in("in"));
+    flow.connect(resume.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_ignored_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:ignored");
+    expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
+      status: "waiting",
+      signal: "denied",
+      expected: "approved",
+    });
+  });
+
+  it("routes signal_resume to expired when the wait state has timed out", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_SIGNAL", {
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      requestedAt: Date.now() - 10_000,
+      expiresAt: Date.now() - 1,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        signal: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), resume.in("in"));
+    flow.connect(resume.out("expired"), report.in("in"));
+    flow.connect(resume.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:expired");
+    expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
+      status: "expired",
+      signal: "approved",
+      expected: "approved",
+    });
+  });
+
   it("routes expired wait_signal checkpoints to expired", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {

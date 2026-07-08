@@ -739,6 +739,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         event: "事件",
         triggeredRuns: "触发运行数",
       },
+      signal_resume: {
+        in: "输入",
+        name: "等待状态名",
+        signal: "信号",
+        resumed: "已恢复",
+        ignored: "已忽略",
+        missing: "缺失",
+        expired: "已过期",
+        state: "等待状态",
+        status: "状态",
+        expected: "期望信号",
+      },
       state_get: {
         name: "状态名",
         value: "状态值",

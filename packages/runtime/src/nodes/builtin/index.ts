@@ -79,6 +79,7 @@ export { windowItemsNode } from "./windowItems.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";
 export { waitSignalNode } from "./waitSignal.js";
+export { signalResumeNode } from "./signalResume.js";
 export { agentNode } from "./agent.js";
 export { eventTriggerNode } from "./eventTrigger.js";
 export { featureFlagNode } from "./featureFlag.js";
