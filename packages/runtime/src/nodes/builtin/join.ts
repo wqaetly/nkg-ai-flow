@@ -6,8 +6,20 @@
  * and bundles inbound data values for downstream nodes.
  */
 
+import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
 import { controlOut } from "./_helpers.js";
+
+const joinConfig = z
+  .object({
+    expectedCount: z
+      .number()
+      .int()
+      .min(0)
+      .optional()
+      .describe("Expected number of branch values. When omitted, the arrived value count is treated as complete."),
+  })
+  .passthrough();
 
 export const joinNode = defineNode({
   type: "join",
@@ -15,6 +27,14 @@ export const joinNode = defineNode({
   title: "Join",
   description: "Waits for all inbound branches, then emits collected values.",
   kind: "pseudo",
+  config: joinConfig,
+  fieldMeta: {
+    expectedCount: {
+      label: "Expected count",
+      control: "number",
+      order: 1,
+    },
+  },
   ports: [
     {
       id: "in",
@@ -30,6 +50,13 @@ export const joinNode = defineNode({
       label: "Values",
       multiple: true,
     },
+    {
+      id: "expectedCount",
+      direction: "input",
+      kind: "data",
+      label: "Expected Count",
+      schema: { type: "number" },
+    },
     controlOut,
     {
       id: "values",
@@ -43,6 +70,27 @@ export const joinNode = defineNode({
       kind: "data",
       label: "Count",
       schema: { type: "number" },
+    },
+    {
+      id: "expectedCount",
+      direction: "output",
+      kind: "data",
+      label: "Expected Count",
+      schema: { type: "number" },
+    },
+    {
+      id: "missingCount",
+      direction: "output",
+      kind: "data",
+      label: "Missing Count",
+      schema: { type: "number" },
+    },
+    {
+      id: "complete",
+      direction: "output",
+      kind: "data",
+      label: "Complete",
+      schema: { type: "boolean" },
     },
     {
       id: "empty",
@@ -72,7 +120,7 @@ export const joinNode = defineNode({
     },
   ],
   validateInput: false,
-  run({ input }) {
+  run({ input, config }) {
     const values =
       input.values === undefined
         ? []
@@ -80,6 +128,9 @@ export const joinNode = defineNode({
           ? input.values
           : [input.values];
     const count = values.length;
+    const expectedCount = readExpectedCount(input.expectedCount ?? config.expectedCount, count);
+    const missingCount = Math.max(0, expectedCount - count);
+    const complete = missingCount === 0;
     const empty = count === 0;
     return {
       kind: "success",
@@ -87,11 +138,19 @@ export const joinNode = defineNode({
         out: null,
         values,
         count,
+        expectedCount,
+        missingCount,
+        complete,
         empty,
         firstValue: values[0] ?? null,
         lastValue: values[count - 1] ?? null,
-        status: empty ? "empty" : "joined",
+        status: empty && expectedCount === 0 ? "empty" : complete ? "joined" : "partial",
       },
     };
   },
 });
+
+function readExpectedCount(value: unknown, fallback: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.trunc(value));
+}

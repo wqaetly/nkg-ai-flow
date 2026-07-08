@@ -344,6 +344,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         mode: "模式",
         ttlMs: "TTL（毫秒）",
       },
+      join: {
+        expectedCount: "期望数量",
+      },
       llm: {
         baseUrl: "服务地址",
         apiKey: "API 密钥",

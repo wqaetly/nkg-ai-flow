@@ -598,9 +598,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       join: {
         in: "输入分支",
+        expectedCount: "期望数量",
         out: "继续",
         values: "多路数据",
         count: "数量",
+        missingCount: "缺失数量",
+        complete: "是否完整",
         empty: "是否为空",
         firstValue: "首个值",
         lastValue: "最后值",
