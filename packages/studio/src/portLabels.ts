@@ -442,7 +442,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         reason: "原因",
       },
       delay: {
+        in: "输入",
+        durationMs: "等待毫秒",
+        out: "完成",
         elapsedMs: "实际等待毫秒",
+        startedAt: "开始时间",
+        completedAt: "完成时间",
       },
       distinct_until_changed: {
         in: "输入",

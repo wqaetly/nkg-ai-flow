@@ -351,6 +351,57 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("uses dynamic delay duration input", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delay_dynamic_duration_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const duration = flow.node("transform", {
+      id: "duration",
+      position: { x: 120, y: 160 },
+      config: { value: 1 },
+    });
+    const delay = flow.node("delay", {
+      id: "wait",
+      position: { x: 280, y: 80 },
+      config: { durationMs: 50 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 80 },
+      config: { template: "delay:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 80 } });
+
+    flow.connect(start.out("out"), duration.in("in"));
+    flow.connect(start.out("out"), delay.in("in"));
+    flow.connect(duration.out("output"), delay.in("durationMs"));
+    flow.connect(delay.out("out"), report.in("in"));
+    flow.connect(delay.out("durationMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delay_dynamic_duration_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("delay:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const delayOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(delayOutput).toMatchObject({
+      durationMs: 1,
+      elapsedMs: expect.any(Number),
+      startedAt: expect.any(Number),
+      completedAt: expect.any(Number),
+    });
+  });
+
   it("fails a node when runtimeTimeoutMs is exceeded", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "runtime_timeout_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

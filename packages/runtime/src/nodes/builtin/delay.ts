@@ -35,16 +35,44 @@ export const delayNode = defineNode({
   },
   ports: [
     {
+      id: "durationMs",
+      direction: "input",
+      kind: "data",
+      label: "Duration ms",
+      schema: { type: "number" },
+    },
+    {
       id: "elapsedMs",
       direction: "output",
       kind: "data",
       label: "Elapsed ms",
       schema: { type: "number" },
     },
+    {
+      id: "durationMs",
+      direction: "output",
+      kind: "data",
+      label: "Duration ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "startedAt",
+      direction: "output",
+      kind: "data",
+      label: "Started At",
+      schema: { type: "number" },
+    },
+    {
+      id: "completedAt",
+      direction: "output",
+      kind: "data",
+      label: "Completed At",
+      schema: { type: "number" },
+    },
   ],
   validateInput: false,
-  async run({ config, ctx }) {
-    const durationMs = Math.max(0, Math.trunc(Number(config.durationMs ?? 1000)));
+  async run({ input, config, ctx }) {
+    const durationMs = readDurationMs(input.durationMs) ?? readDurationMs(config.durationMs) ?? 1000;
     const startedAt = Date.now();
     const completed = await wait(durationMs, ctx.signal);
     if (!completed) {
@@ -53,15 +81,25 @@ export const delayNode = defineNode({
         reason: "delay cancelled",
       };
     }
+    const completedAt = Date.now();
     return {
       kind: "success",
       outputs: {
         out: null,
-        elapsedMs: Date.now() - startedAt,
+        elapsedMs: completedAt - startedAt,
+        durationMs,
+        startedAt,
+        completedAt,
       },
     };
   },
 });
+
+function readDurationMs(value: unknown): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  return Math.min(86_400_000, Math.max(0, Math.trunc(number)));
+}
 
 function wait(durationMs: number, signal: AbortSignal): Promise<boolean> {
   if (signal.aborted) return Promise.resolve(false);
