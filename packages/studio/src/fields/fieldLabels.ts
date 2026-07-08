@@ -443,6 +443,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         jitterPercent: "抖动比例",
         retryableOnly: "仅重试可重试错误",
         retryableCodes: "可重试错误码",
+        retryAfterMsPath: "Retry-After 毫秒路径",
+        retryAfterAtPath: "Retry-After 时间路径",
       },
       retry_state: {
         name: "重试状态名",
@@ -455,6 +457,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         jitterPercent: "抖动比例",
         retryableOnly: "仅重试可重试错误",
         retryableCodes: "可重试错误码",
+        retryAfterMsPath: "Retry-After 毫秒路径",
+        retryAfterAtPath: "Retry-After 时间路径",
       },
       resume_point: {
         name: "恢复状态名",

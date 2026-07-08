@@ -1933,6 +1933,49 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe(`retry:${expectedDelay}`);
   });
 
+  it("honors retry-after metadata in retry_policy backoff", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_retry_after_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.rate_limit", retryable: true, retryAfterMs: 5000 } },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        multiplier: 2,
+        maxDelayMs: 1000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_retry_after_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:5000");
+  });
+
   it("routes exhausted retry_policy errors to the exhausted branch", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_exhausted_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
@@ -2163,6 +2206,61 @@ describe("runtime / hello-flow end-to-end", () => {
       attempt: 1,
       retryable: true,
       lastError: { code: "payment.timeout" },
+    });
+  });
+
+  it("honors retry-after metadata in retry_state backoff", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_retry_after_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.rate_limit", retryable: true, retryAfterMs: 5000 } },
+    });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-retry-after",
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        multiplier: 2,
+        maxDelayMs: 1000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), retry.in("in"));
+    flow.connect(source.out("output"), retry.in("error"));
+    flow.connect(retry.out("retry"), report.in("in"));
+    flow.connect(retry.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_retry_after_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:5000");
+    expect(variables.get("PAYMENT_RETRY:order-retry-after")).toMatchObject({
+      status: "waiting",
+      attempt: 1,
+      lastError: { code: "payment.rate_limit", retryable: true, retryAfterMs: 5000 },
     });
   });
 

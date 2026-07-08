@@ -49,6 +49,14 @@ const retryPolicyConfig = z
       .string()
       .default("")
       .describe("Comma-separated exact or wildcard error codes allowed to retry."),
+    retryAfterMsPath: z
+      .string()
+      .default("retryAfterMs")
+      .describe("Dotted path to a retry-after delay in milliseconds."),
+    retryAfterAtPath: z
+      .string()
+      .default("retryAfterAt")
+      .describe("Dotted path to an absolute retry-after timestamp."),
   })
   .passthrough();
 
@@ -67,6 +75,18 @@ export const retryPolicyNode = defineNode({
     jitterPercent: { label: "Jitter Percent", control: "number", order: 5 },
     retryableOnly: { label: "Retryable Only", control: "switch", order: 6 },
     retryableCodes: { label: "Retryable Codes", control: "input", order: 7 },
+    retryAfterMsPath: {
+      label: "Retry After Ms Path",
+      control: "input",
+      order: 8,
+      placeholder: "retryAfterMs",
+    },
+    retryAfterAtPath: {
+      label: "Retry After At Path",
+      control: "input",
+      order: 9,
+      placeholder: "retryAfterAt",
+    },
   },
   ports: [
     { id: "error", direction: "input", kind: "data", label: "Error" },
@@ -195,7 +215,14 @@ function matchesCodePattern(code: string, pattern: string): boolean {
 }
 
 function calculateDelay(
-  config: { baseDelayMs?: unknown; multiplier?: unknown; maxDelayMs?: unknown; jitterPercent?: unknown },
+  config: {
+    baseDelayMs?: unknown;
+    multiplier?: unknown;
+    maxDelayMs?: unknown;
+    jitterPercent?: unknown;
+    retryAfterMsPath?: unknown;
+    retryAfterAtPath?: unknown;
+  },
   error: unknown,
   attempt: number,
 ): number {
@@ -205,11 +232,61 @@ function calculateDelay(
   const jitterPercent = Math.min(100, Math.max(0, Number(config.jitterPercent ?? 0)));
   const exponential = baseDelayMs * multiplier ** Math.max(0, attempt - 1);
   const capped = Math.min(maxDelayMs, Math.trunc(exponential));
-  if (jitterPercent <= 0 || capped <= 0) return capped;
+  const hinted = readRetryAfterDelay(error, {
+    retryAfterMsPath: String(config.retryAfterMsPath ?? "retryAfterMs"),
+    retryAfterAtPath: String(config.retryAfterAtPath ?? "retryAfterAt"),
+    now: Date.now(),
+  });
+  if (jitterPercent <= 0 || capped <= 0) return Math.max(capped, hinted);
   const spread = capped * (jitterPercent / 100);
   const code = readPath(error, ["code"]);
   const unit = stableUnit(`${typeof code === "string" ? code : ""}:${attempt}`);
-  return Math.max(0, Math.trunc(capped - spread + unit * spread * 2));
+  const jittered = Math.max(0, Math.trunc(capped - spread + unit * spread * 2));
+  return Math.max(jittered, hinted);
+}
+
+function readRetryAfterDelay(
+  error: unknown,
+  options: {
+    retryAfterMsPath: string;
+    retryAfterAtPath: string;
+    now: number;
+  },
+): number {
+  const retryAfterMs = readNonNegativeNumber(
+    readDottedPath(error, options.retryAfterMsPath),
+  );
+  if (retryAfterMs !== undefined) return retryAfterMs;
+
+  const retryAfterAt = readTimestamp(readDottedPath(error, options.retryAfterAtPath));
+  return retryAfterAt === undefined ? 0 : Math.max(0, retryAfterAt - options.now);
+}
+
+function readDottedPath(value: unknown, path: string): unknown {
+  const segments = path
+    .trim()
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  return segments.length > 0 ? readPath(value, segments) : undefined;
+}
+
+function readNonNegativeNumber(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : undefined;
+}
+
+function readTimestamp(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed === "") return undefined;
+    const asNumber = Number(trimmed);
+    if (Number.isFinite(asNumber)) return asNumber;
+    const parsed = Date.parse(trimmed);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 }
 
 function stableUnit(value: string): number {
