@@ -19838,6 +19838,79 @@ describe("runtime / hello-flow end-to-end", () => {
     ]);
   });
 
+  it("uses dynamic foreach_begin onError over static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_dynamic_on_error_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const policy = flow.node("transform", {
+      id: "policy",
+      position: { x: 200, y: 0 },
+      config: { value: "continue" },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 300, y: 0 },
+      config: { onError: "terminate" },
+    });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 400, y: 0 },
+      config: {},
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 500, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 600, y: 0 },
+      config: { template: "errors=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 700, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), policy.in("in"));
+    flow.connect(policy.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(policy.out("output"), begin.in("onError"));
+    flow.connect(begin.out("body"), failing.in("in"));
+    flow.connect(failing.out("out"), end.in("body_done"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(end.out("errorCount"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_dynamic_on_error_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("errors=2");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const finished = events.filter(
+      (event) =>
+        event.kind === "node_progress" &&
+        event.nodeId === "begin" &&
+        (event.payload as { phase?: string }).phase === "finished",
+    );
+    expect(finished.map((event) => (event.payload as { status: string }).status)).toEqual([
+      "error_continue",
+      "error_continue",
+    ]);
+  });
+
   it("routes foreach body errors through the loop error branch when onError is route", async () => {
     const rt = newRuntime();
     const flow = defineFlow({

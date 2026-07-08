@@ -126,13 +126,28 @@ export const foreachBeginNode = defineNode({
     controlIn,
     bodyOut,
     { id: "items", direction: "input", kind: "data", label: "数组" },
+    { id: "mode", direction: "input", kind: "data", label: "执行模式", schema: { type: "string" } },
+    { id: "concurrency", direction: "input", kind: "data", label: "并发数", schema: { type: "number" } },
+    { id: "batchSize", direction: "input", kind: "data", label: "批大小", schema: { type: "number" } },
+    { id: "onError", direction: "input", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "input", kind: "data", label: "超时毫秒", schema: { type: "number" } },
     { id: "item", direction: "output", kind: "data", label: "当前项" },
     { id: "index", direction: "output", kind: "data", label: "索引" },
     { id: "count", direction: "output", kind: "data", label: "总数" },
+    { id: "mode", direction: "output", kind: "data", label: "执行模式", schema: { type: "string" } },
+    { id: "concurrency", direction: "output", kind: "data", label: "并发数", schema: { type: "number" } },
+    { id: "batchSize", direction: "output", kind: "data", label: "批大小", schema: { type: "number" } },
+    { id: "onError", direction: "output", kind: "data", label: "错误策略", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "output", kind: "data", label: "超时毫秒", schema: { type: "number" } },
   ],
   validateInput: false,
-  run({ input }) {
+  run({ input, config }) {
     const items = Array.isArray(input.items) ? input.items : [];
+    const mode = readForeachMode(input.mode ?? config.mode);
+    const concurrency = Math.max(1, Math.trunc(readNumber(input.concurrency, Number(config.concurrency ?? 1))));
+    const batchSize = Math.max(1, Math.trunc(readNumber(input.batchSize, Number(config.batchSize ?? 1))));
+    const onError = readLoopErrorPolicyInput(input.onError ?? config.onError);
+    const timeoutMs = Math.max(0, Math.trunc(readNumber(input.timeoutMs, Number(config.timeoutMs ?? 0))));
     return {
       kind: "success",
       outputs: {
@@ -140,6 +155,11 @@ export const foreachBeginNode = defineNode({
         item: items[0] ?? null,
         index: 0,
         count: items.length,
+        mode,
+        concurrency,
+        batchSize,
+        onError,
+        timeoutMs,
       },
     };
   },
@@ -549,6 +569,10 @@ function readLoopErrorPolicyInput(value: unknown): string {
 
 function readCheckMode(value: unknown): "before" | "after" {
   return value === "before" ? "before" : "after";
+}
+
+function readForeachMode(value: unknown): "sequential" | "parallel" {
+  return value === "parallel" ? "parallel" : "sequential";
 }
 
 function forRange(start: number, end: number, step: number): number[] {

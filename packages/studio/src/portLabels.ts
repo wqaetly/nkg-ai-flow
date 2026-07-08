@@ -665,6 +665,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       foreach_begin: {
         body: "循环体",
         items: "数组",
+        mode: "执行模式",
+        concurrency: "并发数",
+        batchSize: "批大小",
+        onError: "错误策略",
+        timeoutMs: "超时毫秒",
         item: "当前项",
         index: "索引",
         count: "总数",
