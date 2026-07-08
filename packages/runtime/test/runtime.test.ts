@@ -759,6 +759,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("window:open");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const windowOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "window") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(windowOutput).toMatchObject({
+      status: "open",
+      startTime: "09:00",
+      endTime: "17:00",
+      days: "1,2,3,4,5",
+      timezoneOffsetMinutes: 0,
+      nextOpenInMs: 0,
+      nextOpenAt: Date.UTC(2026, 6, 6, 10, 0),
+      openValue: true,
+      closedValue: false,
+      overnightValue: false,
+    });
   });
 
   it("routes schedule_window to closed before opening and reports wait time", async () => {
@@ -802,6 +820,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("wait:1800000");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const windowOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "window") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(windowOutput).toMatchObject({
+      status: "closed",
+      startTime: "09:00",
+      endTime: "17:00",
+      days: "1,2,3,4,5",
+      timezoneOffsetMinutes: 0,
+      nextOpenInMs: 1_800_000,
+      nextOpenAt: Date.UTC(2026, 6, 6, 9, 0),
+      openValue: false,
+      closedValue: true,
+      overnightValue: false,
+    });
   });
 
   it("keeps schedule_window open for overnight windows", async () => {

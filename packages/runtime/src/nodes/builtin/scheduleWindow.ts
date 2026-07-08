@@ -70,6 +70,16 @@ export const scheduleWindowNode = defineNode({
     { id: "closed", direction: "output", kind: "control", label: "Closed" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "now", direction: "output", kind: "data", label: "Now", schema: { type: "number" } },
+    { id: "startTime", direction: "output", kind: "data", label: "Start Time", schema: { type: "string" } },
+    { id: "endTime", direction: "output", kind: "data", label: "End Time", schema: { type: "string" } },
+    { id: "days", direction: "output", kind: "data", label: "Days", schema: { type: "string" } },
+    {
+      id: "timezoneOffsetMinutes",
+      direction: "output",
+      kind: "data",
+      label: "Timezone Offset Minutes",
+      schema: { type: "number" },
+    },
     { id: "day", direction: "output", kind: "data", label: "Day", schema: { type: "number" } },
     {
       id: "minuteOfDay",
@@ -86,6 +96,13 @@ export const scheduleWindowNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "nextOpenAt",
+      direction: "output",
+      kind: "data",
+      label: "Next open at",
+      schema: { type: "number" },
+    },
+    {
       id: "startMinute",
       direction: "output",
       kind: "data",
@@ -99,6 +116,9 @@ export const scheduleWindowNode = defineNode({
       label: "End minute",
       schema: { type: "number" },
     },
+    { id: "openValue", direction: "output", kind: "data", label: "Open", schema: { type: "boolean" } },
+    { id: "closedValue", direction: "output", kind: "data", label: "Closed", schema: { type: "boolean" } },
+    { id: "overnightValue", direction: "output", kind: "data", label: "Overnight", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -128,7 +148,11 @@ export const scheduleWindowNode = defineNode({
     const nextOpenInMs = open
       ? 0
       : computeNextOpenInMs(local.absoluteMinute, startMinute, endMinute, days);
+    const nextOpenAt = now + nextOpenInMs;
     const status = open ? "open" : "closed";
+    const startTime = String(config.startTime ?? "09:00");
+    const endTime = String(config.endTime ?? "17:00");
+    const daysValue = String(config.days ?? "1,2,3,4,5");
 
     ctx.log.debug("schedule_window selected branch", {
       status,
@@ -143,11 +167,19 @@ export const scheduleWindowNode = defineNode({
         [status]: null,
         status,
         now,
+        startTime,
+        endTime,
+        days: daysValue,
+        timezoneOffsetMinutes: offsetMinutes,
         day: local.day,
         minuteOfDay: local.minuteOfDay,
         nextOpenInMs,
+        nextOpenAt,
         startMinute,
         endMinute,
+        openValue: open,
+        closedValue: !open,
+        overnightValue: startMinute > endMinute,
       },
     };
   },
