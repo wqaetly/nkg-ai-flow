@@ -12061,6 +12061,49 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("state=ready");
   });
 
+  it("uses dynamic state_get default value ahead of static config", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "state_get_dynamic_default_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const defaultValue = flow.node("transform", {
+      id: "defaultValue",
+      position: { x: 120, y: 0 },
+      config: { value: { status: "dynamic" } },
+    });
+    const getState = flow.node("state_get", {
+      id: "get_state",
+      position: { x: 280, y: 0 },
+      config: { name: "MISSING_STATE_VALUE", defaultValue: { status: "static" } },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "state=${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), defaultValue.in("in"));
+    flow.connect(defaultValue.out("out"), getState.in("in"));
+    flow.connect(defaultValue.out("output"), getState.in("defaultValue"));
+    flow.connect(getState.out("out"), report.in("in"));
+    flow.connect(getState.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "state_get_dynamic_default_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("state=dynamic");
+  });
+
   it("routes batch_window to waiting while the batch is not full", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

@@ -1327,6 +1327,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       state_get: {
         name: "状态名",
+        defaultValue: "默认值",
         value: "状态值",
         found: "是否存在",
         metadata: "元数据",

@@ -48,6 +48,12 @@ export const stateGetNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "defaultValue",
+      direction: "input",
+      kind: "data",
+      label: "Default value",
+    },
+    {
       id: "value",
       direction: "output",
       kind: "data",
@@ -68,6 +74,12 @@ export const stateGetNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "defaultValue",
+      direction: "output",
+      kind: "data",
+      label: "Default value",
+    },
+    {
       id: "metadata",
       direction: "output",
       kind: "data",
@@ -81,7 +93,10 @@ export const stateGetNode = defineNode({
     const entry = name === "" ? undefined : describeVariable(ctx.variables, name);
     const fallbackValue = name === "" ? undefined : ctx.variables.get(name);
     const found = entry !== undefined || fallbackValue !== undefined;
-    const value = found ? entry?.value ?? fallbackValue : config.defaultValue ?? null;
+    const hasInputDefault = Object.prototype.hasOwnProperty.call(input, "defaultValue");
+    const hasConfigDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
+    const defaultValue = hasInputDefault ? input.defaultValue : hasConfigDefault ? config.defaultValue : null;
+    const value = found ? entry?.value ?? fallbackValue : defaultValue;
 
     ctx.log.debug("state_get read variable", { name, found });
 
@@ -92,6 +107,7 @@ export const stateGetNode = defineNode({
         name,
         value,
         found,
+        defaultValue,
         metadata: entry?.metadata ?? null,
       },
     };
