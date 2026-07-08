@@ -19560,6 +19560,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(loopEndOutput).toMatchObject({
       results: ["trace=begin:0", "trace=begin:1"],
+      iterationIds: ["begin:0", "begin:1"],
+      iterationKeys: ["foreach_begin:begin:0", "foreach_begin:begin:1"],
+      iterationSequences: [0, 1],
     });
   });
 
@@ -21025,7 +21028,13 @@ describe("runtime / hello-flow end-to-end", () => {
           | { payload?: { output?: Record<string, unknown> } }
           | undefined
       )?.payload?.output,
-    ).toMatchObject({ status: "maxed", iterationCount: 2 });
+    ).toMatchObject({
+      status: "maxed",
+      iterationCount: 2,
+      iterationIds: ["begin:0", "begin:1"],
+      iterationKeys: ["loop_begin:begin:0", "loop_begin:begin:1"],
+      iterationSequences: [0, 1],
+    });
   });
 
   it("uses dynamic loop_begin max iterations over static config", async () => {

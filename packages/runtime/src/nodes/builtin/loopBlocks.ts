@@ -183,8 +183,14 @@ export const foreachEndNode = defineNode({
     timeoutOut,
     loopErrorOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
+    { id: "iterationIds", direction: "input", kind: "data", label: "迭代 ID 列表", multiple: true },
+    { id: "iterationKeys", direction: "input", kind: "data", label: "迭代定位键列表", multiple: true },
+    { id: "iterationSequences", direction: "input", kind: "data", label: "迭代序号列表", multiple: true },
     { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
+    { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
+    { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
+    { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -197,11 +203,13 @@ export const foreachEndNode = defineNode({
     const raw = input.result;
     const errors = normalizeErrors(input.errors);
     const results = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+    const trace = readLoopTrace(input);
     return {
       kind: "success",
       outputs: {
         done: null,
         results,
+        ...trace,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
@@ -312,8 +320,14 @@ export const forEndNode = defineNode({
     timeoutOut,
     loopErrorOut,
     { id: "result", direction: "input", kind: "data", label: "单次结果", multiple: true },
+    { id: "iterationIds", direction: "input", kind: "data", label: "迭代 ID 列表", multiple: true },
+    { id: "iterationKeys", direction: "input", kind: "data", label: "迭代定位键列表", multiple: true },
+    { id: "iterationSequences", direction: "input", kind: "data", label: "迭代序号列表", multiple: true },
     { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "results", direction: "output", kind: "data", label: "结果数组" },
+    { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
+    { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
+    { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -326,11 +340,13 @@ export const forEndNode = defineNode({
     const raw = input.result;
     const errors = normalizeErrors(input.errors);
     const results = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+    const trace = readLoopTrace(input);
     return {
       kind: "success",
       outputs: {
         done: null,
         results,
+        ...trace,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
@@ -458,9 +474,15 @@ export const loopEndNode = defineNode({
     loopErrorOut,
     { id: "nextState", direction: "input", kind: "data", label: "下一状态" },
     { id: "condition", direction: "input", kind: "data", label: "继续条件", schema: { type: "string" } },
+    { id: "iterationIds", direction: "input", kind: "data", label: "迭代 ID 列表", multiple: true },
+    { id: "iterationKeys", direction: "input", kind: "data", label: "迭代定位键列表", multiple: true },
+    { id: "iterationSequences", direction: "input", kind: "data", label: "迭代序号列表", multiple: true },
     { id: "errors", direction: "input", kind: "data", label: "错误列表", multiple: true },
     { id: "finalState", direction: "output", kind: "data", label: "最终状态" },
     { id: "condition", direction: "output", kind: "data", label: "继续条件", schema: { type: "string" } },
+    { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
+    { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
+    { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -473,6 +495,7 @@ export const loopEndNode = defineNode({
     const nextState = input.nextState ?? input.input ?? null;
     const errors = normalizeErrors(input.errors);
     const condition = String(input.condition ?? config.condition ?? "");
+    const trace = readLoopTrace(input);
     const shouldContinue = evaluateCondition(condition, {
       nextState,
       input: nextState,
@@ -483,6 +506,7 @@ export const loopEndNode = defineNode({
         [shouldContinue ? "maxed" : "done"]: null,
         finalState: nextState,
         condition,
+        ...trace,
         errors,
         errorCount: errors.length,
         firstError: errors[0] ?? null,
@@ -560,6 +584,23 @@ function normalizeErrors(value: unknown): unknown[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) return [value];
   return value.flatMap((item) => (Array.isArray(item) ? item : [item]));
+}
+
+function readLoopTrace(input: Record<string, unknown>): {
+  iterationIds: unknown[];
+  iterationKeys: unknown[];
+  iterationSequences: unknown[];
+} {
+  return {
+    iterationIds: normalizeTraceList(input.iterationIds),
+    iterationKeys: normalizeTraceList(input.iterationKeys),
+    iterationSequences: normalizeTraceList(input.iterationSequences),
+  };
+}
+
+function normalizeTraceList(value: unknown): unknown[] {
+  if (value === undefined || value === null) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 function readLoopStatus(value: unknown, fallback: string): string {
