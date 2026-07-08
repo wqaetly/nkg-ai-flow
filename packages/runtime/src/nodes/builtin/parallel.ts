@@ -21,6 +21,13 @@ const parallelConfig = z
       .max(MAX_BRANCHES)
       .default(2)
       .describe("Number of branch control outputs to fire."),
+    concurrency: z
+      .number()
+      .int()
+      .min(1)
+      .max(MAX_BRANCHES)
+      .default(MAX_BRANCHES)
+      .describe("Maximum number of direct branch entry nodes to start at once."),
   })
   .passthrough();
 
@@ -36,6 +43,11 @@ export const parallelNode = defineNode({
       label: "Branch count",
       control: "number",
       order: 1,
+    },
+    concurrency: {
+      label: "Concurrency",
+      control: "number",
+      order: 2,
     },
   },
   ports: [

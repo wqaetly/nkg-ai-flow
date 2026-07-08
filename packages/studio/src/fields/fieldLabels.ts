@@ -386,6 +386,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       parallel: {
         branchCount: "分支数量",
+        concurrency: "并发上限",
       },
       partial_success: {
         mode: "成功判定模式",

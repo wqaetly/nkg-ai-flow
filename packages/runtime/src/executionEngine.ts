@@ -405,6 +405,8 @@ export class ExecutionEngine {
     if (!this.canRunInReadyBatch(firstNode)) return [firstNode];
 
     const batch = [firstNode];
+    const parallelCounts = new Map<string, { count: number; limit: number }>();
+    this.addParallelBranchCounts(firstNode, parallelCounts);
     for (let index = 0; index < queue.length && batch.length < schedulerConcurrency;) {
       const nodeId = queue[index]!;
       if (this.completedNodeIds.has(nodeId)) {
@@ -420,7 +422,12 @@ export class ExecutionEngine {
         index += 1;
         continue;
       }
+      if (!this.fitsParallelBranchLimits(candidate, parallelCounts)) {
+        index += 1;
+        continue;
+      }
       batch.push(candidate);
+      this.addParallelBranchCounts(candidate, parallelCounts);
       queue.splice(index, 1);
     }
     return batch;
@@ -428,6 +435,44 @@ export class ExecutionEngine {
 
   private canRunInReadyBatch(node: NodeInstance): boolean {
     return loopSpecFor(node.type) === undefined;
+  }
+
+  private fitsParallelBranchLimits(
+    node: NodeInstance,
+    counts: ReadonlyMap<string, { count: number; limit: number }>,
+  ): boolean {
+    for (const parent of this.parallelBranchParents(node)) {
+      const current = counts.get(parent.nodeId)?.count ?? 0;
+      if (current >= parent.limit) return false;
+    }
+    return true;
+  }
+
+  private addParallelBranchCounts(
+    node: NodeInstance,
+    counts: Map<string, { count: number; limit: number }>,
+  ): void {
+    for (const parent of this.parallelBranchParents(node)) {
+      const current = counts.get(parent.nodeId);
+      counts.set(parent.nodeId, {
+        limit: parent.limit,
+        count: (current?.count ?? 0) + 1,
+      });
+    }
+  }
+
+  private parallelBranchParents(
+    node: NodeInstance,
+  ): Array<{ nodeId: string; limit: number }> {
+    const parents: Array<{ nodeId: string; limit: number }> = [];
+    for (const edge of this.inEdges.get(node.id) ?? []) {
+      if (!/^branch[1-4]$/.test(edge.from.portId)) continue;
+      const parent = this.nodesById.get(edge.from.nodeId);
+      if (parent?.type !== "parallel") continue;
+      const limit = readParallelConcurrency(parent);
+      if (limit > 0) parents.push({ nodeId: parent.id, limit });
+    }
+    return parents;
   }
 
   private async finishScheduledNode(
@@ -1745,6 +1790,18 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readParallelConcurrency(node: NodeInstance): number {
+  const config = asRecord(node.config ?? {});
+  const branchCount = Math.min(
+    4,
+    Math.max(1, Math.trunc(numberOr(config.branchCount, 2))),
+  );
+  return Math.min(
+    branchCount,
+    Math.max(1, Math.trunc(numberOr(config.concurrency, branchCount))),
+  );
 }
 
 function readRuntimeTimeoutMs(config: unknown, fallback: number): number {
