@@ -69,6 +69,27 @@ export const windowItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "size",
+      direction: "input",
+      kind: "data",
+      label: "Size",
+      schema: { type: "number" },
+    },
+    {
+      id: "step",
+      direction: "input",
+      kind: "data",
+      label: "Step",
+      schema: { type: "number" },
+    },
+    {
+      id: "includePartial",
+      direction: "input",
+      kind: "data",
+      label: "Include partial",
+      schema: { type: "boolean" },
+    },
+    {
       id: "windows",
       direction: "output",
       kind: "data",
@@ -81,6 +102,27 @@ export const windowItemsNode = defineNode({
       kind: "data",
       label: "Windows",
       schema: { type: "array" },
+    },
+    {
+      id: "size",
+      direction: "output",
+      kind: "data",
+      label: "Size",
+      schema: { type: "number" },
+    },
+    {
+      id: "step",
+      direction: "output",
+      kind: "data",
+      label: "Step",
+      schema: { type: "number" },
+    },
+    {
+      id: "includePartial",
+      direction: "output",
+      kind: "data",
+      label: "Include partial",
+      schema: { type: "boolean" },
     },
     {
       id: "ranges",
@@ -118,9 +160,9 @@ export const windowItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const size = readPositiveInteger(config.size, 2);
-    const step = readPositiveInteger(config.step, 1);
-    const includePartial = config.includePartial === true;
+    const size = readPositiveInteger(input.size, 0) ?? readPositiveInteger(config.size, 2) ?? 2;
+    const step = readPositiveInteger(input.step, 0) ?? readPositiveInteger(config.step, 1) ?? 1;
+    const includePartial = readBoolean(input.includePartial) ?? readBoolean(config.includePartial) ?? false;
     const windows: unknown[][] = [];
     const ranges: WindowRange[] = [];
     let hasPartial = false;
@@ -155,6 +197,9 @@ export const windowItemsNode = defineNode({
         out: null,
         windows,
         items: windows,
+        size,
+        step,
+        includePartial,
         ranges,
         count: windows.length,
         itemCount: source.length,
@@ -164,7 +209,16 @@ export const windowItemsNode = defineNode({
   },
 });
 
-function readPositiveInteger(value: unknown, fallback: number): number {
+function readPositiveInteger(value: unknown, fallback: number): number | undefined {
   const parsed = Math.trunc(Number(value ?? fallback));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback > 0 ? fallback : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }

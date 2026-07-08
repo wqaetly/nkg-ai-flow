@@ -1298,6 +1298,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       window_items: {
         items: "窗口项",
+        size: "窗口大小",
+        step: "步长",
+        includePartial: "包含不足窗口",
         windows: "窗口列表",
         ranges: "窗口范围",
         count: "窗口数量",
