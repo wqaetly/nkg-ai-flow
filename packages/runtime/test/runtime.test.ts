@@ -16786,6 +16786,65 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe('items={"items":["a","c"]}');
   });
 
+  it("uses dynamic delete_path path and array mode ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delete_path_dynamic_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { items: ["a", "b", "c"] } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "items[1]" },
+    });
+    const arrayMode = flow.node("transform", {
+      id: "arrayMode",
+      position: { x: 120, y: 240 },
+      config: { value: "unset" },
+    });
+    const remove = flow.node("delete_path", {
+      id: "delete",
+      position: { x: 300, y: 0 },
+      config: { path: "items[0]", arrayMode: "splice" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 460, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 620, y: 0 },
+      config: { template: "items=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 760, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), arrayMode.in("in"));
+    flow.connect(input.out("out"), remove.in("in"));
+    flow.connect(input.out("output"), remove.in("source"));
+    flow.connect(path.out("output"), remove.in("path"));
+    flow.connect(arrayMode.out("output"), remove.in("arrayMode"));
+    flow.connect(remove.out("deleted"), stringify.in("in"));
+    flow.connect(remove.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delete_path_dynamic_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('items={"items":["a",null,"c"]}');
+  });
+
   it("routes delete_path to missing when the target path is absent", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "delete_path_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

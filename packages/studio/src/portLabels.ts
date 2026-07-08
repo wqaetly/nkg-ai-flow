@@ -466,6 +466,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         exists: "原先存在",
         changed: "是否改变",
         path: "路径",
+        arrayMode: "数组模式",
         reason: "原因",
       },
       delay: {

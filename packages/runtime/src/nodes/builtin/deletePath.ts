@@ -61,6 +61,8 @@ export const deletePathNode = defineNode({
   ports: [
     controlIn,
     { id: "source", direction: "input", kind: "data", label: "Source" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "arrayMode", direction: "input", kind: "data", label: "Array mode", schema: { type: "string" } },
     { id: "deleted", direction: "output", kind: "control", label: "Deleted" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "skipped", direction: "output", kind: "control", label: "Skipped" },
@@ -89,6 +91,13 @@ export const deletePathNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "arrayMode",
+      direction: "output",
+      kind: "data",
+      label: "Array mode",
+      schema: { type: "string" },
+    },
+    {
       id: "reason",
       direction: "output",
       kind: "data",
@@ -99,8 +108,8 @@ export const deletePathNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const source = readSource(input);
-    const path = String(config.path ?? "").trim();
-    const arrayMode = readArrayMode(config.arrayMode);
+    const path = String(input.path ?? config.path ?? "").trim();
+    const arrayMode = readArrayMode(input.arrayMode ?? config.arrayMode);
     const result = deletePath(source, path, arrayMode);
 
     ctx.log.debug("delete_path removed value", {
@@ -122,6 +131,7 @@ export const deletePathNode = defineNode({
         exists: result.exists,
         changed: result.changed,
         path,
+        arrayMode,
         reason: result.reason,
       },
     };
