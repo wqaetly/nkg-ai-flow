@@ -3911,6 +3911,67 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("registers compensation actions with dynamic name and action inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "compensation_dynamic_inputs_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_COMPENSATIONS" },
+    });
+    const action = flow.node("transform", {
+      id: "action",
+      position: { x: 120, y: 80 },
+      config: { value: "release_dynamic_inventory" },
+    });
+    const register = flow.node("compensation", {
+      id: "register",
+      position: { x: 300, y: 0 },
+      config: {
+        mode: "register",
+        payload: { sku: "pen", quantity: 2 },
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "comp:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(start.out("out"), action.in("in"));
+    flow.connect(start.out("out"), register.in("in"));
+    flow.connect(name.out("output"), register.in("name"));
+    flow.connect(action.out("output"), register.in("action"));
+    flow.connect(register.out("out"), report.in("in"));
+    flow.connect(register.out("actionName"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compensation_dynamic_inputs_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("comp:release_dynamic_inventory");
+    expect(variables.get("ORDER_DYNAMIC_COMPENSATIONS")).toMatchObject({
+      actions: [
+        {
+          action: "release_dynamic_inventory",
+          payload: { sku: "pen", quantity: 2 },
+        },
+      ],
+    });
+  });
+
   it("routes drained compensation actions into a rollback branch", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

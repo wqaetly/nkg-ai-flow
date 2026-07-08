@@ -221,6 +221,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         payload: "载荷",
         actions: "补偿动作列表",
         action: "补偿动作",
+        actionName: "补偿动作名",
         name: "补偿栈名",
         mode: "模式",
         status: "状态",

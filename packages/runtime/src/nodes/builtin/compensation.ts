@@ -78,9 +78,12 @@ export const compensationNode = defineNode({
     },
   },
   ports: [
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "action", direction: "input", kind: "data", label: "Action", schema: { type: "string" } },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "actions", direction: "output", kind: "data", label: "Actions" },
     { id: "action", direction: "output", kind: "data", label: "Action" },
+    { id: "actionName", direction: "output", kind: "data", label: "Action Name", schema: { type: "string" } },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
@@ -106,11 +109,11 @@ export const compensationNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.compensation.missing_name",
-        "compensation node requires config.name",
+        "compensation node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -129,7 +132,7 @@ export const compensationNode = defineNode({
     const previous = readCompensationState(store.get(name));
     const result = applyMode(previous, {
       mode,
-      action: String(config.action ?? "").trim(),
+      action: String(input.action ?? config.action ?? "").trim(),
       payload: input.payload ?? config.payload ?? input.input ?? null,
       now,
       nodeId: ctx.nodeId,
@@ -151,6 +154,7 @@ export const compensationNode = defineNode({
         out: null,
         actions: result.actions,
         action: result.actions[0] ?? null,
+        actionName: result.actions[0]?.action ?? "",
         name,
         mode,
         status,
