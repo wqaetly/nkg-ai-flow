@@ -1212,6 +1212,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         requestedAt: "请求时间",
         timeoutAt: "超时时间",
         timeoutMs: "超时毫秒",
+        reset: "是否重置",
         remainingMs: "剩余毫秒",
         overdueByMs: "超时毫秒",
         dueValue: "是否到期",

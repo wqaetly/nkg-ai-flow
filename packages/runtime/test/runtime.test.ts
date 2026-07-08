@@ -6176,6 +6176,87 @@ describe("runtime / hello-flow end-to-end", () => {
     );
   });
 
+  it("resets a wait_timer checkpoint with dynamic reset and timeout inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_RETRY_TIMER_DYNAMIC_RESET", {
+      status: "waiting",
+      requestedAt: Date.now() - 10_000,
+      dueAt: Date.now() - 1,
+      timeoutAt: null,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_timer_dynamic_reset_timeout_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const reset = flow.node("transform", {
+      id: "reset",
+      position: { x: 120, y: 0 },
+      config: { value: true },
+    });
+    const timeout = flow.node("transform", {
+      id: "timeout",
+      position: { x: 260, y: 0 },
+      config: { value: 1234 },
+    });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 400, y: 0 },
+      config: {
+        name: "ORDER_RETRY_TIMER_DYNAMIC_RESET",
+        durationMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), reset.in("in"));
+    flow.connect(reset.out("out"), timeout.in("in"));
+    flow.connect(timeout.out("out"), timer.in("in"));
+    flow.connect(reset.out("output"), timer.in("reset"));
+    flow.connect(timeout.out("output"), timer.in("timeoutMs"));
+    flow.connect(timer.out("waiting"), report.in("in"));
+    flow.connect(timer.out("timeoutMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_dynamic_reset_timeout_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:1234");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timer") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timerOutput).toMatchObject({
+      status: "waiting",
+      timeoutMs: 1234,
+      reset: true,
+      waitingValue: true,
+      dueValue: false,
+    });
+    const state = variables.get("ORDER_RETRY_TIMER_DYNAMIC_RESET") as {
+      status?: string;
+      dueAt?: number;
+      timeoutAt?: number;
+    };
+    expect(state).toMatchObject({ status: "waiting" });
+    expect(state.dueAt).toBeGreaterThan(Date.now());
+    expect(state.timeoutAt).toBe((state.dueAt ?? 0) + 1234);
+  });
+
   it("routes wait_timer to due when a stored timer has reached its due time", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_RETRY_TIMER", {

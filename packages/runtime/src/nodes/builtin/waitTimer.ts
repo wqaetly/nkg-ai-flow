@@ -98,6 +98,20 @@ export const waitTimerNode = defineNode({
       label: "Duration ms",
       schema: { type: "number" },
     },
+    {
+      id: "timeoutMs",
+      direction: "input",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "reset",
+      direction: "input",
+      kind: "data",
+      label: "Reset",
+      schema: { type: "boolean" },
+    },
     { id: "due", direction: "output", kind: "control", label: "Due" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
@@ -114,6 +128,7 @@ export const waitTimerNode = defineNode({
       label: "Timeout ms",
       schema: { type: "number" },
     },
+    { id: "reset", direction: "output", kind: "data", label: "Reset", schema: { type: "boolean" } },
     {
       id: "remainingMs",
       direction: "output",
@@ -153,7 +168,8 @@ export const waitTimerNode = defineNode({
     }
 
     const now = Date.now();
-    const previous = config.reset === true ? null : readWaitTimerState(store.get(name));
+    const reset = readBoolean(input.reset) ?? (config.reset === true);
+    const previous = reset ? null : readWaitTimerState(store.get(name));
     const created = previous ?? createWaitTimerState(input, config, now);
     if (!created) {
       return error(
@@ -180,6 +196,7 @@ export const waitTimerNode = defineNode({
       dueAt: dueAtIso,
       remainingMs,
       overdueByMs,
+      reset,
     });
 
     return {
@@ -193,6 +210,7 @@ export const waitTimerNode = defineNode({
         dueAt: dueAtIso,
         timeoutAt: timeoutAtIso,
         timeoutMs,
+        reset,
         remainingMs,
         overdueByMs,
         dueValue: next.status === "due",
@@ -217,7 +235,7 @@ function createWaitTimerState(
   const computedDueAt = dueAt ?? now + durationMs;
   if (!Number.isFinite(computedDueAt)) return null;
 
-  const timeoutMs = readDuration(config.timeoutMs) ?? 0;
+  const timeoutMs = readDuration(input.timeoutMs) ?? readDuration(config.timeoutMs) ?? 0;
   return {
     status: "waiting",
     requestedAt: now,
@@ -285,6 +303,15 @@ function readDueTime(value: unknown): number | null {
 function readDuration(value: unknown): number | null {
   if (typeof value !== "number" || !Number.isFinite(value)) return null;
   return Math.max(0, Math.trunc(value));
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function readTimestamp(value: unknown): number | null {
