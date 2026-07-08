@@ -652,6 +652,15 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         case4: "分支 4",
         default: "默认分支",
       },
+      stringify_json: {
+        value: "数据",
+        stringified: "已生成",
+        failed: "失败",
+        text: "JSON 文本",
+        status: "状态",
+        length: "长度",
+        errorMessage: "错误信息",
+      },
       skill_parser: {
         skill_def: "Skill 定义",
       },

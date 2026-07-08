@@ -4855,6 +4855,95 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toContain("bad=");
   });
 
+  it("stringifies structured data with stable sorted keys using stringify_json", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "stringify_json_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { b: 2, a: { d: 4, c: 3 } } },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 260, y: 0 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "json=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), stringify.in("in"));
+    flow.connect(input.out("output"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "stringify_json_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('json={"a":{"c":3,"d":4},"b":2}');
+  });
+
+  it("routes stringify_json failures without failing the run", async () => {
+    const emitBigIntNode = defineNode({
+      type: "emit_bigint",
+      typeVersion: "1.0.0",
+      title: "Emit BigInt",
+      ports: [
+        { id: "value", direction: "output", kind: "data", label: "Value" },
+      ],
+      validateInput: false,
+      run() {
+        return {
+          kind: "success",
+          outputs: { out: null, value: 1n },
+        };
+      },
+    });
+    const rt = newRuntime({ nodes: [emitBigIntNode] });
+    const flow = defineFlow({ id: "stringify_json_failed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("emit_bigint", { id: "input", position: { x: 120, y: 0 } });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 260, y: 0 },
+      config: { bigintMode: "error" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "failed=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), stringify.in("in"));
+    flow.connect(input.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("failed"), report.in("in"));
+    flow.connect(stringify.out("errorMessage"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "stringify_json_failed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toContain("BigInt values cannot be represented");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

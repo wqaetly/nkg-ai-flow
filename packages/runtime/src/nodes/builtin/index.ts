@@ -60,6 +60,7 @@ export { sortItemsNode } from "./sortItems.js";
 export { splitTextNode } from "./splitText.js";
 export { subflowNode } from "./subflow.js";
 export { switchCaseNode } from "./switchCase.js";
+export { stringifyJsonNode } from "./stringifyJson.js";
 export { toolNode } from "./tool.js";
 export { uniqueItemsNode } from "./uniqueItems.js";
 export { llmNode } from "./llm.js";

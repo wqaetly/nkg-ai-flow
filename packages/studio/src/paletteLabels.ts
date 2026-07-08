@@ -265,6 +265,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "多路分支",
         description: "根据输入值路由到 case 或 default 分支。",
       },
+      stringify_json: {
+        title: "生成 JSON",
+        description: "把结构化数据序列化为 JSON 文本，并把失败路由到错误分支。",
+      },
       skill_parser: {
         title: "Skill 解析器",
         description: "解析 SKILL.md 的 frontmatter 和正文，输出结构化定义。",

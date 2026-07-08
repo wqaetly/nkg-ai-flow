@@ -434,6 +434,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         case3: "匹配值 3",
         case4: "匹配值 4",
       },
+      stringify_json: {
+        path: "读取路径",
+        indent: "缩进空格",
+        sortKeys: "排序对象键",
+        bigintMode: "BigInt 处理",
+      },
       skill_parser: {
         default_name: "默认 Skill 名称",
         max_body_length: "正文长度上限（字节）",

@@ -60,6 +60,7 @@ const BUILTIN_TYPES = [
   "split_text",
   "subflow",
   "switch_case",
+  "stringify_json",
   "tool",
   "unique_items",
   "text_input",
