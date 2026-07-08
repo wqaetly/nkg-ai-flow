@@ -25,6 +25,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "智能体",
         description: "通过大模型循环调用文件、搜索、编辑和命令工具。",
       },
+      any_success: {
+        title: "任一成功",
+        description: "多分支结果中任一成功即继续，用于显式 any 汇聚。",
+      },
       approval: {
         title: "人工审批",
         description: "创建、检查、批准、拒绝、取消或清理人工审批任务。",
