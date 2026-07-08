@@ -53,6 +53,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "截止时间",
         description: "检查 SLA 或截止时间，并路由到准时或已超时分支。",
       },
+      dead_letter: {
+        title: "死信队列",
+        description: "记录或取出失败载荷，供重放、告警或人工处理。",
+      },
       delay: {
         title: "延迟等待",
         description: "等待指定毫秒数后继续流程。",

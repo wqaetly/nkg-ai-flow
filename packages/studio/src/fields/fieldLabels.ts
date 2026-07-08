@@ -150,6 +150,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         durationMs: "相对时长（毫秒）",
         graceMs: "宽限时间（毫秒）",
       },
+      dead_letter: {
+        name: "死信队列名",
+        mode: "模式",
+        reason: "原因",
+        maxItems: "最大保留条目",
+      },
       circuit_breaker: {
         name: "熔断状态名",
         failureThreshold: "失败阈值",

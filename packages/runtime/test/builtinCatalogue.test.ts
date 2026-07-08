@@ -21,6 +21,7 @@ const BUILTIN_TYPES = [
   "compensation",
   "condition",
   "deadline",
+  "dead_letter",
   "delay",
   "filter_items",
   "http",

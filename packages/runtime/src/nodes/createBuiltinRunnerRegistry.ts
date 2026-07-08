@@ -37,6 +37,7 @@ import {
   compensationNode,
   conditionNode,
   deadlineNode,
+  deadLetterNode,
   delayNode,
   filterItemsNode,
   agentNode,
@@ -168,6 +169,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, compensationNode);
   installNode(target, conditionNode);
   installNode(target, deadlineNode);
+  installNode(target, deadLetterNode);
   installNode(target, delayNode);
   installNode(target, filterItemsNode);
   installNode(target, httpNode);

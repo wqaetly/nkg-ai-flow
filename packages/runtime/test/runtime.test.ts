@@ -1498,6 +1498,160 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("EMAIL_BATCH")).toBe(false);
   });
 
+  it("records node errors into dead_letter", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_enqueue_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_DEAD_LETTERS",
+        reason: "payment http failed",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "dead:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), failing.in("in"));
+    flow.connect(failing.out("error"), deadLetter.in("error"));
+    flow.connect(deadLetter.out("recorded"), report.in("in"));
+    flow.connect(deadLetter.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_enqueue_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dead:1");
+    expect(variables.get("ORDER_DEAD_LETTERS")).toMatchObject({
+      entries: [
+        {
+          error: {
+            code: "node.http.missing_url",
+          },
+          reason: "payment http failed",
+        },
+      ],
+    });
+  });
+
+  it("drains existing dead_letter entries", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_DEAD_LETTERS", {
+      entries: [
+        {
+          id: "entry-1",
+          payload: { orderId: "order-1" },
+          error: { code: "payment.declined" },
+          reason: "card declined",
+          recordedAt: Date.now(),
+        },
+        {
+          id: "entry-2",
+          payload: { orderId: "order-2" },
+          error: { code: "inventory.timeout" },
+          reason: "inventory service timeout",
+          recordedAt: Date.now(),
+        },
+      ],
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_drain_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_DEAD_LETTERS",
+        mode: "drain",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "drained:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), deadLetter.in("in"));
+    flow.connect(deadLetter.out("drained"), report.in("in"));
+    flow.connect(deadLetter.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_drain_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("drained:2");
+    expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
+  });
+
+  it("routes empty dead_letter drains to empty", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_DEAD_LETTERS",
+        mode: "drain",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "empty:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), deadLetter.in("in"));
+    flow.connect(deadLetter.out("empty"), report.in("in"));
+    flow.connect(deadLetter.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("empty:0");
+    expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
+  });
+
   it("saves a checkpoint snapshot for later recovery", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
