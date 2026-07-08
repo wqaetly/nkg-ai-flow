@@ -1881,6 +1881,118 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("missing=1");
   });
 
+  it("uses dynamic schema_transform policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schema_transform_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          id: "u1",
+          profile: { name: "Ada" },
+          status: "active",
+        },
+      },
+    });
+    const mappings = flow.node("transform", {
+      id: "mappings",
+      position: { x: 120, y: 100 },
+      config: {
+        value: [
+          "user.id = id",
+          "user.name = profile.name",
+          "user.email = email",
+          "state = status",
+        ].join("\n"),
+      },
+    });
+    const includeSource = flow.node("transform", {
+      id: "includeSource",
+      position: { x: 120, y: 180 },
+      config: { value: true },
+    });
+    const requireAll = flow.node("transform", {
+      id: "requireAll",
+      position: { x: 120, y: 260 },
+      config: { value: false },
+    });
+    const defaultValue = flow.node("transform", {
+      id: "defaultValue",
+      position: { x: 120, y: 340 },
+      config: { value: "unknown" },
+    });
+    const mapper = flow.node("schema_transform", {
+      id: "mapper",
+      position: { x: 340, y: 0 },
+      config: {
+        mappings: [
+          "user.id = id",
+          "user.email = email",
+        ].join("\n"),
+        includeSource: false,
+        requireAll: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "mapped=${input.user.email}:${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), mappings.in("in"));
+    flow.connect(start.out("out"), includeSource.in("in"));
+    flow.connect(start.out("out"), requireAll.in("in"));
+    flow.connect(start.out("out"), defaultValue.in("in"));
+    flow.connect(input.out("out"), mapper.in("in"));
+    flow.connect(input.out("output"), mapper.in("input"));
+    flow.connect(mappings.out("output"), mapper.in("mappings"));
+    flow.connect(includeSource.out("output"), mapper.in("includeSource"));
+    flow.connect(requireAll.out("output"), mapper.in("requireAll"));
+    flow.connect(defaultValue.out("output"), mapper.in("defaultValue"));
+    flow.connect(mapper.out("transformed"), report.in("in"));
+    flow.connect(mapper.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schema_transform_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("mapped=unknown:active");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mapperOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "mapper") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mapperOutput).toMatchObject({
+      includeSource: true,
+      requireAll: false,
+      defaultValue: "unknown",
+      hasDefaultValue: true,
+      ruleCount: 4,
+      mappedCount: 4,
+      missingCount: 0,
+      status: "transformed",
+      value: {
+        id: "u1",
+        status: "active",
+        user: {
+          id: "u1",
+          name: "Ada",
+          email: "unknown",
+        },
+      },
+    });
+  });
+
   it("maps schema_transform templates, expressions, and array target paths", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schema_transform_template_array_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -1084,6 +1084,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       schema_transform: {
         in: "输入",
         input: "来源数据",
+        mappings: "映射规则",
+        includeSource: "包含来源",
+        requireAll: "要求全部",
+        defaultValue: "默认值",
+        hasDefaultValue: "有默认值",
+        ruleCount: "规则数量",
         transformed: "已转换",
         missing: "缺失映射",
         value: "转换结果",

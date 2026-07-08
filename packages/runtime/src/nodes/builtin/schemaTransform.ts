@@ -75,9 +75,25 @@ export const schemaTransformNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "input", direction: "input", kind: "data", label: "Input" },
+    { id: "mappings", direction: "input", kind: "data", label: "Mappings", schema: { type: "string" } },
+    { id: "includeSource", direction: "input", kind: "data", label: "Include source", schema: { type: "boolean" } },
+    { id: "requireAll", direction: "input", kind: "data", label: "Require all", schema: { type: "boolean" } },
+    { id: "defaultValue", direction: "input", kind: "data", label: "Default value" },
     { id: "transformed", direction: "output", kind: "control", label: "Transformed" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
+    { id: "mappings", direction: "output", kind: "data", label: "Mappings", schema: { type: "string" } },
+    { id: "includeSource", direction: "output", kind: "data", label: "Include source", schema: { type: "boolean" } },
+    { id: "requireAll", direction: "output", kind: "data", label: "Require all", schema: { type: "boolean" } },
+    { id: "defaultValue", direction: "output", kind: "data", label: "Default value" },
+    {
+      id: "hasDefaultValue",
+      direction: "output",
+      kind: "data",
+      label: "Has default value",
+      schema: { type: "boolean" },
+    },
+    { id: "ruleCount", direction: "output", kind: "data", label: "Rule count", schema: { type: "number" } },
     { id: "missingMappings", direction: "output", kind: "data", label: "Missing mappings" },
     { id: "mappedCount", direction: "output", kind: "data", label: "Mapped count", schema: { type: "number" } },
     { id: "missingCount", direction: "output", kind: "data", label: "Missing count", schema: { type: "number" } },
@@ -86,17 +102,23 @@ export const schemaTransformNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const source = input.input ?? input.in ?? input.__runInput__ ?? {};
-    const rules = parseMappings(String(config.mappings ?? ""));
-    const output = config.includeSource === true && isPlainObject(source)
+    const mappings = String(input.mappings ?? config.mappings ?? "");
+    const rules = parseMappings(mappings);
+    const includeSource = readBoolean(input.includeSource) ?? readBoolean(config.includeSource) ?? false;
+    const requireAll = readBoolean(input.requireAll) ?? readBoolean(config.requireAll) ?? false;
+    const hasInputDefault = Object.prototype.hasOwnProperty.call(input, "defaultValue");
+    const hasConfigDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
+    const hasDefaultValue = hasInputDefault || hasConfigDefault;
+    const defaultValue = hasInputDefault ? input.defaultValue : config.defaultValue;
+    const output = includeSource && isPlainObject(source)
       ? { ...(source as Record<string, unknown>) }
       : {};
     const missingMappings: MissingMapping[] = [];
     let mappedCount = 0;
-    const hasDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
 
     for (const rule of rules) {
       const resolved = resolveSource(rule.sourceExpr, source);
-      if (!resolved.exists && !hasDefault) {
+      if (!resolved.exists && !hasDefaultValue) {
         missingMappings.push({
           targetPath: rule.targetPath,
           sourceExpr: rule.sourceExpr,
@@ -104,12 +126,12 @@ export const schemaTransformNode = defineNode({
         });
         continue;
       }
-      setPath(output, rule.targetPath, resolved.exists ? resolved.value : config.defaultValue);
+      setPath(output, rule.targetPath, resolved.exists ? resolved.value : defaultValue);
       mappedCount += 1;
     }
 
     const missingCount = missingMappings.length;
-    const status = config.requireAll === true && missingCount > 0 ? "missing" : "transformed";
+    const status = requireAll && missingCount > 0 ? "missing" : "transformed";
 
     ctx.log.debug("schema_transform mapped payload", {
       status,
@@ -122,6 +144,12 @@ export const schemaTransformNode = defineNode({
       outputs: {
         [status]: null,
         value: output,
+        mappings,
+        includeSource,
+        requireAll,
+        defaultValue: hasDefaultValue ? defaultValue : null,
+        hasDefaultValue,
+        ruleCount: rules.length,
         missingMappings,
         mappedCount,
         missingCount,
@@ -130,6 +158,15 @@ export const schemaTransformNode = defineNode({
     };
   },
 });
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+}
 
 function parseMappings(value: string): MappingRule[] {
   return value
