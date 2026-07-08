@@ -54,6 +54,7 @@ import type {
 } from "./nodeContext.js";
 import { NodeEventChannel } from "./nodeEventChannel.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
+import { evaluateCondition } from "./nodes/builtin/_helpers.js";
 
 export interface ExecutionEngineOptions {
   graph: FlowGraph;
@@ -782,9 +783,22 @@ export class ExecutionEngine {
     const inputs = this.assembleInputs(beginNode);
     const config = asRecord(inputs.__config__);
     const maxIterations = Math.max(1, Math.trunc(numberOr(config.maxIterations, 10)));
+    const checkMode = config.checkMode === "before" ? "before" : "after";
+    const endConfig = asRecord(block.endNode.config ?? {});
+    const condition = String(endConfig.condition ?? "nextState.continue == \"true\"");
     let state = inputs.initialState ?? inputs.input ?? null;
 
     for (let iteration = 0; iteration < maxIterations; iteration++) {
+      if (
+        checkMode === "before" &&
+        !evaluateCondition(condition, { nextState: state, input: state })
+      ) {
+        const outputs = { done: null, finalState: state };
+        this.recordOutputs(block.endNode, outputs);
+        this.enqueueReadyDownstream(block.endNode, outputs, queue);
+        return true;
+      }
+
       const outputs = {
         body: null,
         state,
@@ -827,6 +841,26 @@ export class ExecutionEngine {
         );
         return true;
       }
+
+      if (checkMode === "before") {
+        const nextState = lastAggregatedValue(aggregated, "nextState");
+        if (nextState !== undefined) state = nextState;
+        const hitLimit = iteration === maxIterations - 1;
+        await this.publishLoopIterationProgress(beginNode, block, {
+          phase: "finished",
+          iteration,
+          status: hitLimit ? "maxed" : "continue",
+          context: loopIterationContext(outputs),
+        });
+        if (hitLimit) {
+          const maxedOutputs = { done: null, maxed: null, finalState: state };
+          this.recordOutputs(block.endNode, maxedOutputs);
+          this.enqueueReadyDownstream(block.endNode, maxedOutputs, queue);
+          return true;
+        }
+        continue;
+      }
+
       this.applyLoopEndOverrides(block.endNode, aggregated);
       const endResult = await this.executeNode(block.endNode);
       this.clearLoopEndOverrides(block.endNode, aggregated);

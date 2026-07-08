@@ -6427,6 +6427,128 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("nested=inner=1,inner=2,inner=1,inner=2");
   });
 
+  it("skips a loop body when before-check condition is false", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "loop_before_check_skip_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 0 },
+      config: { value: { continue: false, label: "initial" } },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 260, y: 0 },
+      config: { checkMode: "before", maxIterations: 3 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 400, y: 0 },
+      config: { value: { continue: true, label: "body" } },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 540, y: 0 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 680, y: 0 },
+      config: { template: "final=${input.label}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("finalState"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_before_check_skip_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("final=initial");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.some((event) => event.kind === "node_started" && event.nodeId === "body"),
+    ).toBe(false);
+  });
+
+  it("evaluates loop before-check again after each next state", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "loop_before_check_once_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 0 },
+      config: { value: { continue: true, label: "initial" } },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 260, y: 0 },
+      config: { checkMode: "before", maxIterations: 3 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 400, y: 0 },
+      config: { value: { continue: false, label: "body" } },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 540, y: 0 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 680, y: 0 },
+      config: { template: "final=${input.label}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("finalState"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_before_check_once_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("final=body");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.filter((event) => event.kind === "node_started" && event.nodeId === "body"),
+    ).toHaveLength(1);
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",
