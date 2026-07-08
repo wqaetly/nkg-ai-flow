@@ -24,6 +24,7 @@ export { httpNode } from "./http.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";
+export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";

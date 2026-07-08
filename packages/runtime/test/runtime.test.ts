@@ -306,6 +306,154 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(state.updatedAt).toBeGreaterThan(0);
   });
 
+  it("routes mutex to acquired and records the lock owner", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_acquired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mutex = flow.node("mutex", {
+      id: "lock",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_LOCK",
+        owner: "worker-1",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "acquired:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(mutex.out("acquired"), report.in("in"));
+    flow.connect(mutex.out("owner"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_acquired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("acquired:worker-1");
+    expect(variables.get("ORDER_LOCK")).toMatchObject({
+      locked: true,
+      owner: "worker-1",
+    });
+  });
+
+  it("routes mutex to locked when another owner holds an active lock", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_LOCK", {
+      locked: true,
+      owner: "worker-1",
+      acquiredAt: now,
+      expiresAt: now + 60_000,
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_locked_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mutex = flow.node("mutex", {
+      id: "lock",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_LOCK",
+        owner: "worker-2",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "locked:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(mutex.out("locked"), report.in("in"));
+    flow.connect(mutex.out("owner"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_locked_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("locked:worker-1");
+    expect(variables.get("ORDER_LOCK")).toMatchObject({
+      locked: true,
+      owner: "worker-1",
+    });
+  });
+
+  it("routes mutex release to released when the owner matches", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_LOCK", {
+      locked: true,
+      owner: "worker-1",
+      acquiredAt: now,
+      expiresAt: now + 60_000,
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_release_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mutex = flow.node("mutex", {
+      id: "unlock",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_LOCK",
+        owner: "worker-1",
+        mode: "release",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "released:${input.locked}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(mutex.out("released"), report.in("in"));
+    flow.connect(mutex.out("state"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_release_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("released:false");
+    expect(variables.get("ORDER_LOCK")).toMatchObject({
+      locked: false,
+      owner: null,
+    });
+  });
+
   it("opens a circuit_breaker after recorded failures and routes checks to open", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

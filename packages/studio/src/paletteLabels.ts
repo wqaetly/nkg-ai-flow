@@ -97,6 +97,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "合流",
         description: "任一输入分支到达后继续流程。",
       },
+      mutex: {
+        title: "互斥锁",
+        description: "对命名资源加锁、续租或释放，并路由到已获得、被占用或已释放分支。",
+      },
       loop_begin: {
         title: "Loop 开始",
         description: "While / Until 循环块入口，输出状态和轮次。",

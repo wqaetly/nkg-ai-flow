@@ -24,6 +24,7 @@ const BUILTIN_TYPES = [
   "join",
   "map_items",
   "merge",
+  "mutex",
   "parallel",
   "rate_limit",
   "reduce_items",

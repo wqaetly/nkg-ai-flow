@@ -81,6 +81,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       mode: "模式",
       model: "模型",
       multiplier: "倍率",
+      owner: "持有者",
       package_scope: "包作用域",
       payload: "载荷",
       path: "字段路径",
@@ -96,6 +97,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       template: "模板",
       tool: "工具名称",
       timeoutMs: "超时时间",
+      ttlMs: "TTL（毫秒）",
       url: "请求地址",
       value: "值",
       windowMs: "窗口时长（毫秒）",
@@ -201,6 +203,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       parallel: {
         branchCount: "分支数量",
+      },
+      mutex: {
+        name: "锁状态名",
+        owner: "持有者",
+        ttlMs: "TTL（毫秒）",
+        mode: "模式",
       },
       rate_limit: {
         name: "限流状态名",
