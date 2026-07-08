@@ -112,6 +112,7 @@ export const approvalNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "decision", direction: "input", kind: "data", label: "Decision" },
     { id: "comment", direction: "input", kind: "data", label: "Comment" },
@@ -124,6 +125,7 @@ export const approvalNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "title", direction: "output", kind: "data", label: "Title", schema: { type: "string" } },
@@ -160,9 +162,9 @@ export const approvalNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
-      return error("node.approval.missing_name", "approval node requires config.name", ctx.nodeId);
+      return error("node.approval.missing_name", "approval node requires config.name or name input", ctx.nodeId);
     }
 
     const store = asMutableVariableStore(ctx.variables);
@@ -221,6 +223,7 @@ export const approvalNode = defineNode({
       outputs: {
         [decision.branch]: null,
         state,
+        name: state?.name ?? name,
         branch: decision.branch,
         status,
         title: state?.title ?? "",

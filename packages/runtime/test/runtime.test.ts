@@ -6021,6 +6021,69 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("requests a dynamically named human approval", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const approvalName = flow.node("transform", {
+      id: "approvalName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_APPROVAL" },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-2", amount: 2400 } },
+    });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 280, y: 0 },
+      config: {
+        title: "Approve dynamic order",
+        assignee: "finance",
+        timeoutMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 440, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), approvalName.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), approval.in("in"));
+    flow.connect(approvalName.out("output"), approval.in("name"));
+    flow.connect(payload.out("output"), approval.in("payload"));
+    flow.connect(approval.out("requested"), report.in("in"));
+    flow.connect(approval.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:ORDER_DYNAMIC_APPROVAL");
+    expect(variables.get("ORDER_DYNAMIC_APPROVAL")).toMatchObject({
+      name: "ORDER_DYNAMIC_APPROVAL",
+      status: "pending",
+      title: "Approve dynamic order",
+      assignee: "finance",
+      payload: { orderId: "order-2", amount: 2400 },
+      decision: null,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("checks approved approval state", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {
