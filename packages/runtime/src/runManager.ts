@@ -24,6 +24,7 @@ import {
   type VariableStore,
 } from "@ai-native-flow/variable-store";
 import { ExecutionEngine } from "./executionEngine.js";
+import type { NodeInvokeFlow } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
 import type { RunStore } from "./storage/runStore.js";
 import {
@@ -39,6 +40,8 @@ export interface RunManagerOptions {
   secrets: SecretStore;
   /** Dispatcher used by `send_event` nodes. */
   triggerEvent?: (event: string) => Promise<unknown>;
+  /** Dispatcher used by `subflow` nodes. */
+  invokeFlow?: NodeInvokeFlow;
   /**
    * Optional id generator. Defaults to a 26-char `run_<crypto>` string
    * generated via `crypto.randomUUID()`.
@@ -195,6 +198,7 @@ export class RunManager {
         eventBus: this.options.eventBus,
         signal: controller.signal,
         triggerEvent: this.options.triggerEvent,
+        invokeFlow: this.options.invokeFlow,
         ...(options.sinkNodeId !== undefined
           ? { sinkNodeId: options.sinkNodeId }
           : {}),

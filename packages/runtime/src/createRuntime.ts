@@ -159,6 +159,9 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     triggerEvent: async (event) => {
       return invocationRouter.triggerEvent({ event });
     },
+    invokeFlow: async (args) => {
+      return invocationRouter.invoke(args);
+    },
   });
   invocationRouter = new InvocationRouter({ registry, runManager });
 

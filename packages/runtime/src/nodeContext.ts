@@ -25,6 +25,7 @@
 import type { RuntimeError } from "@ai-native-flow/flow-ir";
 import type { NodeEvent } from "@ai-native-flow/event-bus";
 import type { SecretStore, VariableStore } from "@ai-native-flow/variable-store";
+import type { RunRecord } from "./types.js";
 import type {
   NodeEmitInput,
   NodeOutputStream,
@@ -37,6 +38,27 @@ export interface NodeLogger {
   warn(message: string, data?: Record<string, unknown>): void;
   error(message: string, data?: Record<string, unknown>): void;
 }
+
+export interface NodeInvokeFlowArgs {
+  flowId: string;
+  flowVersion?: string;
+  input: unknown;
+  traceId?: string;
+  variables?: VariableStore;
+  secrets?: SecretStore;
+}
+
+export interface NodeInvokeFlowResult {
+  runRecord: RunRecord;
+  succeeded: boolean;
+  cancelled: boolean;
+  output?: unknown;
+  error?: RuntimeError;
+}
+
+export type NodeInvokeFlow = (
+  args: NodeInvokeFlowArgs,
+) => Promise<NodeInvokeFlowResult>;
 
 /**
  * Minimal context object handed to every node and shared with logic helpers.
@@ -73,6 +95,9 @@ export interface NodeContext {
    * router; the event string itself becomes the triggered run input.
    */
   triggerEvent(event: string): Promise<unknown>;
+
+  /** Invoke another registered Flow as a child run from within a node. */
+  invokeFlow(args: NodeInvokeFlowArgs): Promise<NodeInvokeFlowResult>;
 
   /** Publish an arbitrary `NodeEvent` (the channel fills in identity + seq). */
   emit(event: NodeEmitInput): Promise<NodeEvent>;

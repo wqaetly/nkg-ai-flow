@@ -522,6 +522,100 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("invokes a registered child flow with subflow and returns its output", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const childTransform = child.node("transform", {
+      id: "child_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child:${input.name}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), childTransform.in("in"));
+    child.connect(childTransform.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_calls_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: { flowId: "child_echo" },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_calls_child",
+      input: { name: "Ada" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:child:Ada");
+    const childRuns = await rt.runStore.listByFlow("child_echo");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.status).toBe("succeeded");
+    expect(childRuns[0]?.output).toBe("child:Ada");
+  });
+
+  it("routes failed subflow child runs when failOnError is false", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "child_fails", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const broken = child.node("http", {
+      id: "broken_http",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), broken.in("in"));
+    child.connect(broken.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_routes_failed_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: { flowId: "child_fails", failOnError: false },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "child-error:${input.code}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("failed"), report.in("in"));
+    parent.connect(call.out("error"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_routes_failed_child",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("child-error:node.http.missing_url");
+    const childRuns = await rt.runStore.listByFlow("child_fails");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.status).toBe("failed");
+    expect(childRuns[0]?.error?.code).toBe("node.http.missing_url");
+  });
+
   it("writes state for downstream variable resolution with state_set", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

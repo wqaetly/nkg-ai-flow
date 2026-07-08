@@ -46,6 +46,7 @@ import {
   parallelNode,
   reduceItemsNode,
   retryPolicyNode,
+  subflowNode,
   switchCaseNode,
   foreachBeginNode,
   foreachEndNode,
@@ -166,6 +167,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, parallelNode);
   installNode(target, reduceItemsNode);
   installNode(target, retryPolicyNode);
+  installNode(target, subflowNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);
   installNode(target, textInputNode);

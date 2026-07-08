@@ -47,6 +47,7 @@ import {
 import type {
   NodeContext,
   NodeInputs,
+  NodeInvokeFlow,
   NodeLogger,
   NodeOutputs,
   NodeResult,
@@ -71,6 +72,8 @@ export interface ExecutionEngineOptions {
   signal?: AbortSignal;
   /** Runtime event trigger dispatcher exposed to `send_event` nodes. */
   triggerEvent?: (event: string) => Promise<unknown>;
+  /** Registered-flow invocation dispatcher exposed to `subflow` nodes. */
+  invokeFlow?: NodeInvokeFlow;
   /**
    * Sub-graph execution mode. When set, the engine restricts itself to
    * `sinkNodeId` plus its transitive upstream closure (computed from the
@@ -456,6 +459,11 @@ export class ExecutionEngine {
         this.options.triggerEvent ??
         (async () => {
           throw new Error("runtime event triggers are not configured");
+        }),
+      invokeFlow:
+        this.options.invokeFlow ??
+        (async () => {
+          throw new Error("runtime flow invocation is not configured");
         }),
       emit: (event) => channel.emit(event),
       stream: (portId, options) => channel.stream(portId, options),
