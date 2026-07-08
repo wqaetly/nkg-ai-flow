@@ -8251,6 +8251,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("partial=2/3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const partialOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "partial") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(partialOutput).toMatchObject({
+      status: "partial",
+      successCount: 2,
+      failureCount: 1,
+      total: 3,
+      minSuccess: 2,
+      remainingSuccess: 0,
+      firstSuccess: { status: "ok", label: "a" },
+      firstFailure: { status: "failed", error: "branch failed", label: "b" },
+    });
+    expect(partialOutput?.successRate).toBeCloseTo(2 / 3);
   });
 
   it("routes partial_success to failed when too few branches pass", async () => {
@@ -8296,6 +8313,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("failed=1/2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const partialOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "partial") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(partialOutput).toMatchObject({
+      status: "failed",
+      successCount: 1,
+      failureCount: 1,
+      total: 2,
+      minSuccess: 2,
+      remainingSuccess: 1,
+      firstSuccess: { ok: true, label: "a" },
+      firstFailure: { ok: false, error: "bad", label: "b" },
+      successRate: 0.5,
+    });
   });
 
   it("routes all_success when every branch result succeeds", async () => {

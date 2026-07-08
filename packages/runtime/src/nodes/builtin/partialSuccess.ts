@@ -101,11 +101,16 @@ export const partialSuccessNode = defineNode({
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
     { id: "successes", direction: "output", kind: "data", label: "Successes" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
+    { id: "firstSuccess", direction: "output", kind: "data", label: "First Success" },
+    { id: "firstFailure", direction: "output", kind: "data", label: "First Failure" },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
     { id: "summary", direction: "output", kind: "data", label: "Summary" },
     { id: "successCount", direction: "output", kind: "data", label: "Success count", schema: { type: "number" } },
     { id: "failureCount", direction: "output", kind: "data", label: "Failure count", schema: { type: "number" } },
     { id: "total", direction: "output", kind: "data", label: "Total", schema: { type: "number" } },
+    { id: "minSuccess", direction: "output", kind: "data", label: "Minimum Success", schema: { type: "number" } },
+    { id: "remainingSuccess", direction: "output", kind: "data", label: "Remaining Success", schema: { type: "number" } },
+    { id: "successRate", direction: "output", kind: "data", label: "Success Rate", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
   ],
   validateInput: false,
@@ -131,6 +136,8 @@ export const partialSuccessNode = defineNode({
     const successCount = successes.length;
     const failureCount = failures.length;
     const total = results.length;
+    const remainingSuccess = Math.max(0, minSuccess - successCount);
+    const successRate = total === 0 ? 0 : successCount / total;
     const status =
       total > 0 && failureCount === 0
         ? "all_success"
@@ -143,6 +150,8 @@ export const partialSuccessNode = defineNode({
       failureCount,
       total,
       minSuccess,
+      remainingSuccess,
+      successRate,
     };
 
     ctx.log.debug("partial_success classified branch results", summary);
@@ -153,11 +162,16 @@ export const partialSuccessNode = defineNode({
         [status]: null,
         successes,
         failures,
+        firstSuccess: successes[0] ?? null,
+        firstFailure: failures[0] ?? null,
         evaluations,
         summary,
         successCount,
         failureCount,
         total,
+        minSuccess,
+        remainingSuccess,
+        successRate,
         status,
       },
     };
