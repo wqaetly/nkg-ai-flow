@@ -11644,6 +11644,118 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic dead_letter policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_DEAD_LETTERS", {
+      entries: [
+        {
+          id: "entry-1",
+          payload: { orderId: "order-1" },
+          error: null,
+          reason: "old failure",
+          recordedAt: Date.now(),
+        },
+        {
+          id: "entry-2",
+          payload: { orderId: "order-2" },
+          error: null,
+          reason: "recent failure",
+          recordedAt: Date.now(),
+        },
+      ],
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -160 },
+      config: { value: "enqueue" },
+    });
+    const maxItems = flow.node("transform", {
+      id: "maxItems",
+      position: { x: 120, y: -80 },
+      config: { value: 2 },
+    });
+    const reason = flow.node("transform", {
+      id: "reason",
+      position: { x: 120, y: 80 },
+      config: { value: "dynamic worker failure" },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 160 },
+      config: { value: { orderId: "order-3", retryable: false } },
+    });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "ORDER_DEAD_LETTERS",
+        mode: "clear",
+        reason: "static failure",
+        maxItems: 100,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "dead:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), maxItems.in("in"));
+    flow.connect(start.out("out"), reason.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), deadLetter.in("in"));
+    flow.connect(mode.out("output"), deadLetter.in("mode"));
+    flow.connect(maxItems.out("output"), deadLetter.in("maxItems"));
+    flow.connect(reason.out("output"), deadLetter.in("reason"));
+    flow.connect(payload.out("output"), deadLetter.in("payload"));
+    flow.connect(deadLetter.out("recorded"), report.in("in"));
+    flow.connect(deadLetter.out("maxItems"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dead:2");
+    expect(variables.get("ORDER_DEAD_LETTERS")).toMatchObject({
+      entries: [
+        {
+          payload: { orderId: "order-2" },
+          reason: "recent failure",
+        },
+        {
+          payload: { orderId: "order-3", retryable: false },
+          reason: "dynamic worker failure",
+        },
+      ],
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadLetterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "dead_letter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadLetterOutput).toMatchObject({
+      mode: "enqueue",
+      reason: "dynamic worker failure",
+      maxItems: 2,
+      count: 1,
+    });
+  });
+
   it("drains existing dead_letter entries", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_DEAD_LETTERS", {

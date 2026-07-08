@@ -427,6 +427,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       dead_letter: {
         in: "输入",
         name: "死信队列名",
+        mode: "模式",
+        reason: "原因",
+        maxItems: "最大项数",
         payload: "载荷",
         error: "错误",
         recorded: "已记录",

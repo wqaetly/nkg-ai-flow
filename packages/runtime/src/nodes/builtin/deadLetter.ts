@@ -78,6 +78,9 @@ export const deadLetterNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "maxItems", direction: "input", kind: "data", label: "Max items", schema: { type: "number" } },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
     { id: "recorded", direction: "output", kind: "control", label: "Recorded" },
@@ -87,6 +90,9 @@ export const deadLetterNode = defineNode({
     { id: "entries", direction: "output", kind: "data", label: "Entries" },
     { id: "entry", direction: "output", kind: "data", label: "Entry" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "maxItems", direction: "output", kind: "data", label: "Max items", schema: { type: "number" } },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -117,12 +123,13 @@ export const deadLetterNode = defineNode({
     }
 
     const now = Date.now();
-    const mode = config.mode ?? "enqueue";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "enqueue";
     const previous = readDeadLetterState(store.get(name));
-    const maxItems = Math.max(1, Math.trunc(Number(config.maxItems ?? 1000)));
+    const maxItems = readPositiveInteger(input.maxItems) ?? readPositiveInteger(config.maxItems) ?? 1000;
+    const reason = String(input.reason ?? config.reason ?? "").trim();
     const decision = applyMode(previous, {
       mode,
-      reason: String(config.reason ?? ""),
+      reason,
       payload: input.payload ?? input.input ?? input.in ?? null,
       error: input.error ?? null,
       maxItems,
@@ -149,6 +156,9 @@ export const deadLetterNode = defineNode({
         entries: decision.entries,
         entry: decision.entries[0] ?? null,
         name,
+        mode,
+        reason,
+        maxItems,
         count: decision.entries.length,
         state: decision.state,
       },
@@ -201,6 +211,17 @@ function applyMode(
     state: { entries, updatedAt: now },
     persist: true,
   };
+}
+
+function readMode(value: unknown): DeadLetterMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "enqueue" || normalized === "drain" || normalized === "clear" ? normalized : undefined;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 ? Math.trunc(number) : undefined;
 }
 
 function readDeadLetterState(value: unknown): DeadLetterState {
