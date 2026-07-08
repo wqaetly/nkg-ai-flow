@@ -151,6 +151,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         items: "映射项",
         count: "数量",
       },
+      merge: {
+        in: "输入分支",
+        out: "继续",
+        value: "到达数据",
+        values: "到达数据列表",
+        count: "到达数量",
+      },
       llm: {
         result: "结果",
       },

@@ -21,6 +21,7 @@ export { filterItemsNode } from "./filterItems.js";
 export { httpNode } from "./http.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
+export { mergeNode } from "./merge.js";
 export { parallelNode } from "./parallel.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { switchCaseNode } from "./switchCase.js";

@@ -21,6 +21,7 @@ const BUILTIN_TYPES = [
   "http",
   "join",
   "map_items",
+  "merge",
   "parallel",
   "reduce_items",
   "switch_case",

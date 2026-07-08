@@ -40,6 +40,7 @@ import {
   httpNode,
   joinNode,
   mapItemsNode,
+  mergeNode,
   parallelNode,
   reduceItemsNode,
   switchCaseNode,
@@ -153,6 +154,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, httpNode);
   installNode(target, joinNode);
   installNode(target, mapItemsNode);
+  installNode(target, mergeNode);
   installNode(target, parallelNode);
   installNode(target, reduceItemsNode);
   installNode(target, switchCaseNode);

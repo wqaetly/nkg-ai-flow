@@ -111,6 +111,8 @@ export class ExecutionEngine {
   private readonly portValues = new Map<string, unknown>();
   /** Per-node count of remaining required inbound edges. */
   private readonly remainingDeps = new Map<string, number>();
+  /** Nodes already executed by the main DAG scheduler. */
+  private readonly completedNodeIds = new Set<string>();
   /** Per-node input overrides used by block runners when aggregating loop results. */
   private readonly inputOverrides = new Map<string, unknown>();
   /** Node lookup by id. */
@@ -205,7 +207,11 @@ export class ExecutionEngine {
       pushEdge(this.inEdges, edge.to.nodeId, edge);
     }
     for (const nodeId of this.activeNodeIds) {
-      this.remainingDeps.set(nodeId, this.inEdges.get(nodeId)?.length ?? 0);
+      const node = this.nodesById.get(nodeId);
+      this.remainingDeps.set(
+        nodeId,
+        requiredInboundCount(node, this.inEdges.get(nodeId)?.length ?? 0),
+      );
     }
   }
 
@@ -269,10 +275,12 @@ export class ExecutionEngine {
           break;
         }
         const nodeId = queue.shift()!;
+        if (this.completedNodeIds.has(nodeId)) continue;
         const node = this.nodesById.get(nodeId);
         if (!node) continue;
 
         const result = await this.executeNode(node);
+        this.completedNodeIds.add(nodeId);
         if (result.kind === "skip") continue;
         if (result.kind === "error") {
           const handled = await this.routeErrorOrFail(node, result.error, queue);
@@ -643,7 +651,11 @@ export class ExecutionEngine {
       if (!(edge.from.portId in outputs)) continue;
       const remaining = (this.remainingDeps.get(edge.to.nodeId) ?? 1) - 1;
       this.remainingDeps.set(edge.to.nodeId, remaining);
-      if (remaining <= 0 && !queue.includes(edge.to.nodeId)) {
+      if (
+        remaining <= 0 &&
+        !queue.includes(edge.to.nodeId) &&
+        !this.completedNodeIds.has(edge.to.nodeId)
+      ) {
         queue.push(edge.to.nodeId);
       }
     }
@@ -949,6 +961,14 @@ function pushEdge(
     bucket.set(key, list);
   }
   list.push(edge);
+}
+
+function requiredInboundCount(
+  node: NodeInstance | undefined,
+  inboundCount: number,
+): number {
+  if (node?.type === "merge" && inboundCount > 0) return 1;
+  return inboundCount;
 }
 
 interface LoopBlock {
