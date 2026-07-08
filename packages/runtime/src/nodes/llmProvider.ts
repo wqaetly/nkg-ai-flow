@@ -21,6 +21,7 @@ import {
 } from "@ai-native-flow/flow-ir";
 import type { AiStreamAsyncIterable } from "@ai-native-flow/ai-stream";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import type { ProviderOptions } from "@ai-sdk/provider-utils";
 import { generateText, streamText } from "ai";
 import type { VariableStore } from "@ai-native-flow/variable-store";
 import type { NodeContext } from "../nodeContext.js";
@@ -64,7 +65,7 @@ export interface LlmCompletionRequest {
    * straight into the request body, so this is the supported escape hatch for
    * fields the SDK does not model (thinking toggles, reasoning effort, etc.).
    */
-  providerOptions?: Record<string, Record<string, unknown>>;
+  providerOptions?: ProviderOptions;
 }
 
 export interface LlmCompletionResponse {
@@ -146,7 +147,7 @@ export interface GenerateCompletionParams {
   /** When true, request strict JSON via `response_format: { type: "json_object" }`. */
   jsonOutput?: boolean;
   /** Vendor-specific body fields, keyed by provider name (spread verbatim by the adapter). */
-  providerOptions?: Record<string, Record<string, unknown>>;
+  providerOptions?: ProviderOptions;
   /**
    * Retry budget handed to the AI SDK. Defaults to the SDK default (2).
    *
@@ -180,9 +181,9 @@ function buildProviderOptions(
     GenerateCompletionParams,
     "providerName" | "providerOptions" | "jsonOutput"
   >,
-): { providerName: string; providerOptions: Record<string, Record<string, unknown>> } {
+): { providerName: string; providerOptions: ProviderOptions } {
   const providerName = params.providerName ?? "openai-compatible";
-  const providerOptions: Record<string, Record<string, unknown>> = {};
+  const providerOptions: ProviderOptions = {};
   for (const [key, value] of Object.entries(params.providerOptions ?? {})) {
     if (key !== providerName) {
       throw new RuntimeErrorException(
