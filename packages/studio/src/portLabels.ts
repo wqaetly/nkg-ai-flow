@@ -941,6 +941,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         values: "到达值",
         met: "达到阈值",
         unmet: "未达阈值",
+        indexedValues: "索引数据",
+        presentIndexes: "有效索引",
         firstValue: "首个值",
         lastValue: "最后值",
         metValue: "是否达到",

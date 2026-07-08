@@ -14404,6 +14404,11 @@ describe("runtime / hello-flow end-to-end", () => {
       firstValue: "upper:Flow",
       lastValue: "lower:Flow",
       quorumRate: 1,
+      indexedValues: [
+        { index: 0, value: "upper:Flow", present: true },
+        { index: 1, value: "lower:Flow", present: true },
+      ],
+      presentIndexes: [0, 1],
     });
   });
 
@@ -14464,6 +14469,11 @@ describe("runtime / hello-flow end-to-end", () => {
       remaining: 1,
       firstValue: "upper:Flow",
       lastValue: "lower:Flow",
+      indexedValues: [
+        { index: 0, value: "upper:Flow", present: true },
+        { index: 1, value: "lower:Flow", present: true },
+      ],
+      presentIndexes: [0, 1],
     });
     expect(quorumOutput?.quorumRate).toBeCloseTo(2 / 3);
   });
@@ -14537,6 +14547,11 @@ describe("runtime / hello-flow end-to-end", () => {
       firstValue: "first:Flow",
       lastValue: "second:Flow",
       quorumRate: 1,
+      indexedValues: [
+        { index: 0, value: "first:Flow", present: true },
+        { index: 1, value: "second:Flow", present: true },
+      ],
+      presentIndexes: [0, 1],
     });
   });
 
