@@ -1743,6 +1743,218 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_AUDIT_LOG")).toBe(false);
   });
 
+  it("increments a persisted metric", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVED_COUNT", {
+      name: "ORDER_APPROVED_COUNT",
+      value: 4,
+      count: 4,
+      sum: 4,
+      min: 1,
+      max: 1,
+      last: 1,
+      samples: [1, 1, 1, 1],
+      createdAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_increment_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVED_COUNT",
+        mode: "increment",
+        value: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "metric:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), metric.in("in"));
+    flow.connect(metric.out("updated"), report.in("in"));
+    flow.connect(metric.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_increment_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("metric:6");
+    expect(variables.get("ORDER_APPROVED_COUNT")).toMatchObject({
+      value: 6,
+      count: 5,
+      sum: 6,
+      max: 2,
+      last: 2,
+    });
+  });
+
+  it("observes metric samples and computes aggregates", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_LATENCY_MS", {
+      name: "ORDER_LATENCY_MS",
+      value: 120,
+      count: 1,
+      sum: 120,
+      min: 120,
+      max: 120,
+      last: 120,
+      samples: [120],
+      createdAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_observe_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_LATENCY_MS",
+        mode: "observe",
+        value: 80,
+        maxSamples: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "avg:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), metric.in("in"));
+    flow.connect(metric.out("updated"), report.in("in"));
+    flow.connect(metric.out("average"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_observe_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("avg:100");
+    expect(variables.get("ORDER_LATENCY_MS")).toMatchObject({
+      value: 80,
+      count: 2,
+      sum: 200,
+      min: 80,
+      max: 120,
+      samples: [120, 80],
+    });
+  });
+
+  it("routes missing metric reads to missing", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVED_COUNT",
+        mode: "read",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "metric:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), metric.in("in"));
+    flow.connect(metric.out("missing"), report.in("in"));
+    flow.connect(metric.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("metric:0");
+    expect(variables.has("ORDER_APPROVED_COUNT")).toBe(false);
+  });
+
+  it("resets a metric", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVED_COUNT", {
+      name: "ORDER_APPROVED_COUNT",
+      value: 10,
+      count: 10,
+      sum: 10,
+      min: 1,
+      max: 1,
+      last: 1,
+      samples: [1, 1],
+      createdAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "metric_reset_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const metric = flow.node("metric", {
+      id: "metric",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVED_COUNT",
+        mode: "reset",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "metric:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), metric.in("in"));
+    flow.connect(metric.out("reset"), report.in("in"));
+    flow.connect(metric.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "metric_reset_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("metric:0");
+    expect(variables.has("ORDER_APPROVED_COUNT")).toBe(false);
+  });
+
   it("invokes a registered child flow with subflow and returns its output", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });

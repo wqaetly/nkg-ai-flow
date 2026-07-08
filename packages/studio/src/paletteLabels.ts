@@ -129,6 +129,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "合流",
         description: "任一输入分支到达后继续流程。",
       },
+      metric: {
+        title: "指标",
+        description: "更新、读取或重置流程中的业务数值指标。",
+      },
       mutex: {
         title: "互斥锁",
         description: "对命名资源加锁、续租或释放，并路由到已获得、被占用或已释放分支。",

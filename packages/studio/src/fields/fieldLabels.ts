@@ -247,6 +247,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       map_items: {
         template: "映射模板",
       },
+      metric: {
+        name: "指标名",
+        mode: "模式",
+        value: "指标值",
+        maxSamples: "最大样本数",
+      },
       loop_begin: {
         maxIterations: "最大循环次数",
         checkMode: "检查时机",

@@ -51,6 +51,7 @@ import {
   joinNode,
   mapItemsNode,
   mergeNode,
+  metricNode,
   mutexNode,
   parallelNode,
   queueNode,
@@ -184,6 +185,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, joinNode);
   installNode(target, mapItemsNode);
   installNode(target, mergeNode);
+  installNode(target, metricNode);
   installNode(target, mutexNode);
   installNode(target, parallelNode);
   installNode(target, queueNode);
