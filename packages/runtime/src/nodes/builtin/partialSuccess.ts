@@ -137,6 +137,20 @@ export const partialSuccessNode = defineNode({
     { id: "values", direction: "output", kind: "data", label: "Values" },
     { id: "successes", direction: "output", kind: "data", label: "Successes" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
+    {
+      id: "successIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Success Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
+      id: "failureIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Failure Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
     { id: "firstSuccess", direction: "output", kind: "data", label: "First Success" },
     { id: "firstFailure", direction: "output", kind: "data", label: "First Failure" },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
@@ -175,6 +189,12 @@ export const partialSuccessNode = defineNode({
     const failures = evaluations
       .filter((evaluation) => !evaluation.passed)
       .map((evaluation) => evaluation.result);
+    const successIndexes = evaluations
+      .filter((evaluation) => evaluation.passed)
+      .map((evaluation) => evaluation.index);
+    const failureIndexes = evaluations
+      .filter((evaluation) => !evaluation.passed)
+      .map((evaluation) => evaluation.index);
     const minSuccess = readIntegerAtLeast(input.minSuccess, 1) ?? readIntegerAtLeast(config.minSuccess, 1) ?? 1;
     const successCount = successes.length;
     const failureCount = failures.length;
@@ -199,6 +219,8 @@ export const partialSuccessNode = defineNode({
       errorPath,
       remainingSuccess,
       successRate,
+      successIndexes,
+      failureIndexes,
     };
 
     ctx.log.debug("partial_success classified branch results", summary);
@@ -210,6 +232,8 @@ export const partialSuccessNode = defineNode({
         values: results,
         successes,
         failures,
+        successIndexes,
+        failureIndexes,
         firstSuccess: successes[0] ?? null,
         firstFailure: failures[0] ?? null,
         evaluations,
