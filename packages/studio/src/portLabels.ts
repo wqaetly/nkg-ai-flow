@@ -649,6 +649,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       tool: {
         result: "结果",
       },
+      unique_items: {
+        items: "唯一项",
+        duplicates: "重复项",
+        keys: "唯一键",
+        count: "唯一数量",
+        duplicateCount: "重复数量",
+      },
       transform: {
         input: "输入",
         output: "输出",

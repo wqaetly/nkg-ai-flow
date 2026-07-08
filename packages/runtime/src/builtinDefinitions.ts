@@ -80,6 +80,7 @@ import {
   textInputNode,
   toolNode,
   transformNode,
+  uniqueItemsNode,
   waitSignalNode,
 } from "./nodes/builtin/index.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
@@ -151,6 +152,7 @@ export function getBuiltinNodeDefinitions(
     subflowNode.definition,
     switchCaseNode.definition,
     toolNode.definition,
+    uniqueItemsNode.definition,
     textInputNode.definition,
     waitSignalNode.definition,
     llmDefined.definition,

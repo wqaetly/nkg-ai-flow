@@ -4818,6 +4818,61 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("slice=0:b,1:c,2:d");
   });
 
+  it("deduplicates array items with unique_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "unique_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "A", label: "first" },
+          { id: "b", label: "second" },
+          { id: "a", label: "duplicate" },
+        ],
+      },
+    });
+    const unique = flow.node("unique_items", {
+      id: "unique",
+      position: { x: 260, y: 0 },
+      config: {
+        path: "id",
+        caseSensitive: false,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${item.label}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "unique=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), unique.in("in"));
+    flow.connect(input.out("output"), unique.in("items"));
+    flow.connect(unique.out("out"), map.in("in"));
+    flow.connect(unique.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "unique_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("unique=first,second");
+  });
+
   it("reduces array items with reduce_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

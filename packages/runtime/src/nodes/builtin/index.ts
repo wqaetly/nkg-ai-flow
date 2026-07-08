@@ -56,6 +56,7 @@ export { sortItemsNode } from "./sortItems.js";
 export { subflowNode } from "./subflow.js";
 export { switchCaseNode } from "./switchCase.js";
 export { toolNode } from "./tool.js";
+export { uniqueItemsNode } from "./uniqueItems.js";
 export { llmNode } from "./llm.js";
 export { textInputNode } from "./textInput.js";
 export { waitSignalNode } from "./waitSignal.js";

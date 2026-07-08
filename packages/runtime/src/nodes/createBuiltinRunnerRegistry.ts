@@ -91,6 +91,7 @@ import {
   textInputNode,
   toolNode,
   transformNode,
+  uniqueItemsNode,
   waitSignalNode,
 } from "./builtin/index.js";
 import { createNodeAgentToolHost } from "./builtin/agentTools.node.js";
@@ -223,6 +224,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, subflowNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);
+  installNode(target, uniqueItemsNode);
   installNode(target, textInputNode);
   installNode(target, waitSignalNode);
   installNode(target, llmNode, { llmProvider });

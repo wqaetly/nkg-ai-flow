@@ -440,6 +440,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       tool: {
         tool: "工具名称",
       },
+      unique_items: {
+        path: "去重字段路径",
+        keep: "保留策略",
+        caseSensitive: "区分大小写",
+      },
       transform: {
         template: "模板",
         expression: "表达式",

@@ -277,6 +277,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "工具调用",
         description: "调用内置工具、MCP 工具或外部工具。",
       },
+      unique_items: {
+        title: "数组去重",
+        description: "按字段或完整值去除重复项，并输出重复项列表。",
+      },
       transform: {
         title: "数据转换",
         description: "使用模板、表达式或静态值进行数据转换。",

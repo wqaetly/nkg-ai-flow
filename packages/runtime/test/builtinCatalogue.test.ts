@@ -56,6 +56,7 @@ const BUILTIN_TYPES = [
   "subflow",
   "switch_case",
   "tool",
+  "unique_items",
   "text_input",
   "wait_signal",
   "llm",
