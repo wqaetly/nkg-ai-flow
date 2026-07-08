@@ -30,6 +30,7 @@ const BUILTIN_TYPES = [
   "dead_letter",
   "delay",
   "distinct_until_changed",
+  "empty_gate",
   "filter_items",
   "first_success",
   "http",

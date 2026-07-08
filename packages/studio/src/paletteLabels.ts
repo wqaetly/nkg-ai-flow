@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "变化门控",
         description: "仅当指定值相对上次观测发生变化时继续变化分支。",
       },
+      empty_gate: {
+        title: "空值门控",
+        description: "按数组、对象、字符串或存在性判断空/非空分支。",
+      },
       end: {
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",

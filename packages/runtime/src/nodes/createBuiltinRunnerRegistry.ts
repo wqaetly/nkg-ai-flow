@@ -44,6 +44,7 @@ import {
   deadLetterNode,
   delayNode,
   distinctUntilChangedNode,
+  emptyGateNode,
   errorClassifierNode,
   fallbackNode,
   filterItemsNode,
@@ -193,6 +194,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, deadLetterNode);
   installNode(target, delayNode);
   installNode(target, distinctUntilChangedNode);
+  installNode(target, emptyGateNode);
   installNode(target, filterItemsNode);
   installNode(target, firstSuccessNode);
   installNode(target, httpNode);

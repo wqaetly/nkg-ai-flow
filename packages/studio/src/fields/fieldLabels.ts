@@ -215,6 +215,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         emitInitial: "首次是否触发",
         value: "静态比较值",
       },
+      empty_gate: {
+        mode: "判定模式",
+        path: "取值路径",
+        trimStrings: "裁剪字符串空白",
+      },
       error_classifier: {
         codes: "错误码匹配",
         kinds: "错误类型匹配",

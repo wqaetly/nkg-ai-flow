@@ -760,6 +760,84 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("selected:cached");
   });
 
+  it("routes empty_gate to non_empty for populated arrays", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "empty_gate_non_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { items: ["order-1", "order-2"] } },
+    });
+    const gate = flow.node("empty_gate", {
+      id: "gate",
+      position: { x: 300, y: 0 },
+      config: { path: "items" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "count:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 640, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), gate.in("in"));
+    flow.connect(source.out("output"), gate.in("value"));
+    flow.connect(gate.out("non_empty"), report.in("in"));
+    flow.connect(gate.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "empty_gate_non_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("count:2");
+  });
+
+  it("routes empty_gate to empty for empty arrays", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "empty_gate_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { items: [] } },
+    });
+    const gate = flow.node("empty_gate", {
+      id: "gate",
+      position: { x: 300, y: 0 },
+      config: { path: "items" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "empty:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 640, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), gate.in("in"));
+    flow.connect(source.out("output"), gate.in("value"));
+    flow.connect(gate.out("empty"), report.in("in"));
+    flow.connect(gate.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "empty_gate_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("empty:array_empty");
+  });
+
   it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

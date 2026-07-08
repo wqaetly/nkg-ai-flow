@@ -30,6 +30,7 @@ export { deadlineNode } from "./deadline.js";
 export { deadLetterNode } from "./deadLetter.js";
 export { delayNode } from "./delay.js";
 export { distinctUntilChangedNode } from "./distinctUntilChanged.js";
+export { emptyGateNode } from "./emptyGate.js";
 export { filterItemsNode } from "./filterItems.js";
 export { firstSuccessNode } from "./firstSuccess.js";
 export { httpNode } from "./http.js";

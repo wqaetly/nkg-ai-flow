@@ -281,6 +281,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         evaluations: "评估次数",
         changes: "变化次数",
       },
+      empty_gate: {
+        in: "输入",
+        value: "原始值",
+        empty: "为空",
+        non_empty: "非空",
+        selected: "选中值",
+        items: "项目列表",
+        keys: "键列表",
+        count: "数量",
+        isEmpty: "是否为空",
+        reason: "原因",
+      },
       error_classifier: {
         error: "错误",
         matched: "已匹配",
