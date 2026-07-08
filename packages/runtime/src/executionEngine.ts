@@ -275,6 +275,12 @@ export class ExecutionEngine {
 
     const queue: string[] = seeds;
     let cancelled = false;
+    const schedulerConcurrency = Math.max(
+      1,
+      Math.trunc(
+        this.options.variables.getNumber("FLOW_SCHEDULER_CONCURRENCY") ?? 16,
+      ),
+    );
 
     try {
       while (queue.length > 0) {
@@ -287,50 +293,30 @@ export class ExecutionEngine {
         const node = this.nodesById.get(nodeId);
         if (!node) continue;
 
-        const result = await this.executeNode(node);
-        this.completedNodeIds.add(nodeId);
-        if (result.kind === "skip") continue;
-        if (result.kind === "error") {
-          const handled = await this.routeErrorOrFail(node, result.error, queue);
-          if (!handled) {
-            return { succeeded: false, cancelled: false, error: result.error };
-          }
-          continue;
-        }
-        if (await this.executeLoopBlock(node, queue)) {
-          continue;
-        }
-        // success: propagate outputs along outgoing edges
-        this.recordOutputs(node, result.outputs);
-        this.enqueueReadyDownstream(node, result.outputs, queue);
+        const batch = this.dequeueReadyBatch(node, queue, schedulerConcurrency);
+        const results = await Promise.all(
+          batch.map(async (batchNode) => ({
+            node: batchNode,
+            result: await this.executeNode(batchNode),
+          })),
+        );
 
-        if (this.sinkNodeId !== undefined) {
-          // Sub-graph mode: the sink node's completion is the Run
-          // terminator. We pick the first non-control / non-error data
-          // output port on the sink as the final output (matching the
-          // "primary data output" convention used by `findUpstreamData`).
-          if (node.id === this.sinkNodeId) {
-            this.finalOutput = pickPrimaryDataOutput(node, result.outputs);
-            this.endReached = true;
+        let reachedSink = false;
+        for (const { node: executedNode, result } of results) {
+          const handled = await this.finishScheduledNode(
+            executedNode,
+            result,
+            queue,
+          );
+          if (handled.kind === "failed") {
+            return { succeeded: false, cancelled: false, error: handled.error };
+          }
+          if (handled.kind === "sink_reached") {
+            reachedSink = true;
             break;
           }
-        } else if (node.type === "end") {
-          // Full-graph mode: `end` runner stores final result in
-          // outputs.result; capture it and mark the run as complete.
-          // We do NOT break here — per docs/specs/runtime-execution.md
-          // §5.6, `run_finished` must be published only after every
-          // reachable branch reaches a terminal state. In a fan-out
-          // graph with multiple `end` nodes the BFS queue may still
-          // hold sibling branches (e.g. `end_lower` while `end_upper`
-          // just finished); breaking here drops them silently.
-          //
-          // The `??` keeps the *first* end node's `result` as the Run
-          // output, matching single-end flow behavior. Phase 2 will
-          // introduce an explicit join / merge node to make the
-          // multi-end output policy authorable.
-          this.finalOutput = result.outputs.result ?? this.finalOutput;
-          this.endReached = true;
         }
+        if (reachedSink) break;
       }
     } catch (cause) {
       const error = normalizeError(cause, {
@@ -399,6 +385,86 @@ export class ExecutionEngine {
       payload: { output: this.finalOutput },
     });
     return { succeeded: true, cancelled: false, output: this.finalOutput };
+  }
+
+  private dequeueReadyBatch(
+    firstNode: NodeInstance,
+    queue: string[],
+    schedulerConcurrency: number,
+  ): NodeInstance[] {
+    if (!this.canRunInReadyBatch(firstNode)) return [firstNode];
+
+    const batch = [firstNode];
+    for (let index = 0; index < queue.length && batch.length < schedulerConcurrency;) {
+      const nodeId = queue[index]!;
+      if (this.completedNodeIds.has(nodeId)) {
+        queue.splice(index, 1);
+        continue;
+      }
+      const candidate = this.nodesById.get(nodeId);
+      if (!candidate) {
+        queue.splice(index, 1);
+        continue;
+      }
+      if (!this.canRunInReadyBatch(candidate)) {
+        index += 1;
+        continue;
+      }
+      batch.push(candidate);
+      queue.splice(index, 1);
+    }
+    return batch;
+  }
+
+  private canRunInReadyBatch(node: NodeInstance): boolean {
+    return loopSpecFor(node.type) === undefined;
+  }
+
+  private async finishScheduledNode(
+    node: NodeInstance,
+    result: NodeResult,
+    queue: string[],
+  ): Promise<ScheduledFinish> {
+    this.completedNodeIds.add(node.id);
+    if (result.kind === "skip") return { kind: "completed" };
+    if (result.kind === "error") {
+      const handled = await this.routeErrorOrFail(node, result.error, queue);
+      return handled ? { kind: "completed" } : { kind: "failed", error: result.error };
+    }
+    if (await this.executeLoopBlock(node, queue)) {
+      return { kind: "completed" };
+    }
+
+    // success: propagate outputs along outgoing edges
+    this.recordOutputs(node, result.outputs);
+    this.enqueueReadyDownstream(node, result.outputs, queue);
+
+    if (this.sinkNodeId !== undefined) {
+      // Sub-graph mode: the sink node's completion is the Run
+      // terminator. We pick the first non-control / non-error data
+      // output port on the sink as the final output (matching the
+      // "primary data output" convention used by `findUpstreamData`).
+      if (node.id === this.sinkNodeId) {
+        this.finalOutput = pickPrimaryDataOutput(node, result.outputs);
+        this.endReached = true;
+        return { kind: "sink_reached" };
+      }
+    } else if (node.type === "end") {
+      // Full-graph mode: `end` runner stores final result in
+      // outputs.result; capture it and mark the run as complete.
+      // We do NOT stop the run here — per docs/specs/runtime-execution.md
+      // §5.6, `run_finished` must be published only after every reachable
+      // branch reaches a terminal state.
+      //
+      // The `??` keeps the *first* end node's `result` as the Run output,
+      // matching single-end flow behavior. Phase 2 will introduce an
+      // explicit join / merge node to make the multi-end output policy
+      // authorable.
+      this.finalOutput = result.outputs.result ?? this.finalOutput;
+      this.endReached = true;
+    }
+
+    return { kind: "completed" };
   }
 
   /* ---------------------------------------------------------------------- */
@@ -1499,6 +1565,11 @@ interface LoopIterationResult {
   aggregated: Map<string, unknown[]>;
   timedOut: boolean;
 }
+
+type ScheduledFinish =
+  | { kind: "completed" }
+  | { kind: "sink_reached" }
+  | { kind: "failed"; error: RuntimeError };
 
 function loopSpecFor(type: string): { endType: string } | undefined {
   switch (type) {
