@@ -878,6 +878,8 @@ export class ExecutionEngine {
       appliedOverrides.add(portId);
     }
 
+    this.injectParallelBranchInputs(node, inbound, inputs, state);
+
     if (node.id === this.entryNodeId) {
       for (const edge of inbound) {
         const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
@@ -927,6 +929,29 @@ export class ExecutionEngine {
     }
 
     return inputs;
+  }
+
+  private injectParallelBranchInputs(
+    node: NodeInstance,
+    inbound: EdgeDefinition[],
+    inputs: NodeInputs,
+    state: ExecutionState,
+  ): void {
+    for (const edge of inbound) {
+      const match = edge.from.portId.match(/^branch([1-4])$/);
+      if (!match) continue;
+      const parent = this.nodesById.get(edge.from.nodeId);
+      if (parent?.type !== "parallel") continue;
+
+      const branchNumber = Number(match[1]);
+      const branchCount = readParallelBranchCount(parent, state.portValues);
+      if (inputs.parallelNodeId === undefined) inputs.parallelNodeId = parent.id;
+      if (inputs.branchId === undefined) inputs.branchId = edge.from.portId;
+      if (inputs.branchIndex === undefined) inputs.branchIndex = branchNumber - 1;
+      if (inputs.branchNumber === undefined) inputs.branchNumber = branchNumber;
+      if (inputs.branchCount === undefined) inputs.branchCount = branchCount;
+      return;
+    }
   }
 
   /**
@@ -2055,16 +2080,24 @@ function readParallelConcurrency(
   node: NodeInstance,
   portValues?: ReadonlyMap<string, unknown>,
 ): number {
+  const branchCount = readParallelBranchCount(node, portValues);
   const config = asRecord(node.config ?? {});
-  const outputBranchCount = portValues?.get(`${node.id}.branchCount`);
   const outputConcurrency = portValues?.get(`${node.id}.concurrency`);
-  const branchCount = Math.min(
-    4,
-    Math.max(1, Math.trunc(numberOr(outputBranchCount ?? config.branchCount, 2))),
-  );
   return Math.min(
     branchCount,
     Math.max(1, Math.trunc(numberOr(outputConcurrency ?? config.concurrency, branchCount))),
+  );
+}
+
+function readParallelBranchCount(
+  node: NodeInstance,
+  portValues?: ReadonlyMap<string, unknown>,
+): number {
+  const config = asRecord(node.config ?? {});
+  const outputBranchCount = portValues?.get(`${node.id}.branchCount`);
+  return Math.min(
+    4,
+    Math.max(1, Math.trunc(numberOr(outputBranchCount ?? config.branchCount, 2))),
   );
 }
 
