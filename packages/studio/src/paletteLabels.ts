@@ -29,6 +29,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",
       },
+      batch_window: {
+        title: "批窗口",
+        description: "累积输入项，并在达到数量或时间窗口后输出批次。",
+      },
       checkpoint: {
         title: "检查点",
         description: "保存、读取、续期或清除流程断点快照。",

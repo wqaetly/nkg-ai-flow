@@ -1349,6 +1349,155 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("state=ready");
   });
 
+  it("routes batch_window to waiting while the batch is not full", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "batch_window_waiting_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 0 },
+      config: { value: "email-1" },
+    });
+    const batch = flow.node("batch_window", {
+      id: "batch",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "EMAIL_BATCH",
+        maxItems: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "waiting:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(item.out("out"), batch.in("in"));
+    flow.connect(item.out("output"), batch.in("item"));
+    flow.connect(batch.out("waiting"), report.in("in"));
+    flow.connect(batch.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_window_waiting_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("waiting:1");
+    expect(variables.get("EMAIL_BATCH")).toMatchObject({
+      items: ["email-1"],
+      flushCount: 0,
+    });
+  });
+
+  it("routes batch_window to ready and clears state when maxItems is reached", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("EMAIL_BATCH", {
+      items: ["email-1"],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      flushCount: 0,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "batch_window_ready_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const item = flow.node("transform", {
+      id: "item",
+      position: { x: 120, y: 0 },
+      config: { value: "email-2" },
+    });
+    const batch = flow.node("batch_window", {
+      id: "batch",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "EMAIL_BATCH",
+        maxItems: 2,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "ready:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), item.in("in"));
+    flow.connect(item.out("out"), batch.in("in"));
+    flow.connect(item.out("output"), batch.in("item"));
+    flow.connect(batch.out("ready"), report.in("in"));
+    flow.connect(batch.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_window_ready_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("ready:email-1,email-2");
+    expect(variables.has("EMAIL_BATCH")).toBe(false);
+  });
+
+  it("flushes an existing batch_window explicitly", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("EMAIL_BATCH", {
+      items: ["email-1", "email-2"],
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      flushCount: 1,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "batch_window_flush_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const batch = flow.node("batch_window", {
+      id: "batch",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "EMAIL_BATCH",
+        mode: "flush",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "flushed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), batch.in("in"));
+    flow.connect(batch.out("ready"), report.in("in"));
+    flow.connect(batch.out("flushCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "batch_window_flush_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flushed:2");
+    expect(variables.has("EMAIL_BATCH")).toBe(false);
+  });
+
   it("saves a checkpoint snapshot for later recovery", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

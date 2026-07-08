@@ -75,6 +75,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       maxOutputChars: "最大输出字符数",
       maxAttempts: "最大尝试次数",
       maxDelayMs: "最大等待毫秒",
+      maxItems: "最大项数",
+      maxAgeMs: "最大窗口时长（毫秒）",
       maxIterations: "最大循环次数",
       maxSteps: "最大步骤数",
       maxTokens: "最大输出 Token",
@@ -133,6 +135,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         max_retries: "JSON 重试次数",
         package_scope: "生成包作用域",
         flow_version: "流程版本",
+      },
+      batch_window: {
+        name: "批窗口状态名",
+        maxItems: "最大项数",
+        maxAgeMs: "最大窗口时长（毫秒）",
+        mode: "模式",
       },
       condition: {
         expression: "条件表达式",
