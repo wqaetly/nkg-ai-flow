@@ -647,6 +647,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         timeoutMs: "超时毫秒",
         index: "索引",
         count: "总数",
+        iterationId: "迭代 ID",
+        iterationKey: "迭代定位键",
+        iterationSequence: "迭代序号",
       },
       for_end: {
         body_done: "循环体完成",
@@ -673,6 +676,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         item: "当前项",
         index: "索引",
         count: "总数",
+        iterationId: "迭代 ID",
+        iterationKey: "迭代定位键",
+        iterationSequence: "迭代序号",
       },
       foreach_end: {
         body_done: "循环体完成",
@@ -798,6 +804,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         timeoutMs: "超时毫秒",
         state: "当前状态",
         iteration: "轮次",
+        iterationId: "迭代 ID",
+        iterationKey: "迭代定位键",
+        iterationSequence: "迭代序号",
       },
       loop_break: {
         in: "输入",

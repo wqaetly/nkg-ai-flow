@@ -126,6 +126,8 @@ export class ExecutionEngine {
   private readonly inputOverrides = new Map<string, unknown>();
   /** Per-node progress event sequence, kept away from node lifecycle seq 1/2. */
   private readonly progressSeq = new Map<string, number>();
+  /** Per-loop begin sequence used to give each iteration a stable run-local id. */
+  private readonly loopIterationSeq = new Map<string, number>();
   /** Node lookup by id. */
   private readonly nodesById = new Map<string, NodeInstance>();
   /** Outbound edges per node id. */
@@ -1046,7 +1048,10 @@ export class ExecutionEngine {
     let finalControlReason = "";
 
     for (let iteration = 0; iteration < iterations.length; iteration += 1) {
-      const outputs = iterations[iteration]!;
+      const outputs = {
+        ...iterations[iteration]!,
+        ...this.nextLoopIterationTrace(beginNode, iteration),
+      };
       iterationCount += 1;
       const iterationState: ExecutionState = {
         portValues: new Map(state.portValues),
@@ -1220,7 +1225,10 @@ export class ExecutionEngine {
         .slice(batchStart, batchStart + batchSize)
         .map((outputs, offset) => ({
           iteration: batchStart + offset,
-          outputs,
+          outputs: {
+            ...outputs,
+            ...this.nextLoopIterationTrace(beginNode, batchStart + offset),
+          },
         }));
       const results = await runLimited(batch, concurrency, ({ iteration, outputs }) =>
         this.executeParallelForeachIteration(
@@ -1394,6 +1402,7 @@ export class ExecutionEngine {
         body: null,
         state,
         iteration,
+        ...this.nextLoopIterationTrace(beginNode, iteration),
       };
       const iterationState: ExecutionState = {
         portValues: new Map(executionState.portValues),
@@ -1596,6 +1605,18 @@ export class ExecutionEngine {
     },
   ): Promise<void> {
     const seq = this.nextProgressSeq(beginNode.id);
+    const iterationId =
+      typeof event.context.iterationId === "string"
+        ? event.context.iterationId
+        : `${beginNode.id}:${event.iteration}`;
+    const iterationKey =
+      typeof event.context.iterationKey === "string"
+        ? event.context.iterationKey
+        : `${beginNode.type}:${beginNode.id}:${event.iteration}`;
+    const iterationSequence =
+      typeof event.context.iterationSequence === "number"
+        ? event.context.iterationSequence
+        : event.iteration;
     await this.options.eventBus.publish({
       runId: this.options.runId,
       flowId: this.options.flowId,
@@ -1613,6 +1634,9 @@ export class ExecutionEngine {
         endNodeId: block.endNode.id,
         phase: event.phase,
         iteration: event.iteration,
+        iterationId,
+        iterationKey,
+        iterationSequence,
         status: event.status,
         context: redactInputs(event.context),
         ...(event.controlReason !== undefined && event.controlReason !== ""
@@ -1626,6 +1650,23 @@ export class ExecutionEngine {
     const seq = this.progressSeq.get(nodeId) ?? 10_000;
     this.progressSeq.set(nodeId, seq + 1);
     return seq;
+  }
+
+  private nextLoopIterationTrace(
+    beginNode: NodeInstance,
+    iteration: number,
+  ): {
+    iterationId: string;
+    iterationKey: string;
+    iterationSequence: number;
+  } {
+    const sequence = this.loopIterationSeq.get(beginNode.id) ?? 0;
+    this.loopIterationSeq.set(beginNode.id, sequence + 1);
+    return {
+      iterationId: `${beginNode.id}:${sequence}`,
+      iterationKey: `${beginNode.type}:${beginNode.id}:${iteration}`,
+      iterationSequence: sequence,
+    };
   }
 
   private async executeLoopBody(

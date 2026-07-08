@@ -19459,7 +19459,7 @@ describe("runtime / hello-flow end-to-end", () => {
     const body = flow.node("transform", {
       id: "body",
       position: { x: 300, y: 0 },
-      config: { template: "item=${input}" },
+      config: { template: "trace=${input}" },
     });
     const end = flow.node("foreach_end", {
       id: "loop_end",
@@ -19471,7 +19471,7 @@ describe("runtime / hello-flow end-to-end", () => {
     flow.connect(items.out("out"), begin.in("in"));
     flow.connect(items.out("output"), begin.in("items"));
     flow.connect(begin.out("body"), body.in("in"));
-    flow.connect(begin.out("item"), body.in("input"));
+    flow.connect(begin.out("iterationId"), body.in("input"));
     flow.connect(body.out("out"), end.in("body_done"));
     flow.connect(body.out("output"), end.in("result"));
     flow.connect(end.out("done"), exit.in("in"));
@@ -19502,6 +19502,21 @@ describe("runtime / hello-flow end-to-end", () => {
       1,
       1,
     ]);
+    expect(progress.map((event) => (event.payload as { iterationId: string }).iterationId)).toEqual([
+      "begin:0",
+      "begin:0",
+      "begin:1",
+      "begin:1",
+    ]);
+    expect(progress.map((event) => (event.payload as { iterationKey: string }).iterationKey)).toEqual([
+      "foreach_begin:begin:0",
+      "foreach_begin:begin:0",
+      "foreach_begin:begin:1",
+      "foreach_begin:begin:1",
+    ]);
+    expect(
+      progress.map((event) => (event.payload as { iterationSequence: number }).iterationSequence),
+    ).toEqual([0, 0, 1, 1]);
     expect(progress[0]?.payload).toMatchObject({
       type: "loop_iteration",
       loopType: "foreach_begin",
@@ -19509,22 +19524,42 @@ describe("runtime / hello-flow end-to-end", () => {
       endNodeId: "loop_end",
       phase: "started",
       iteration: 0,
+      iterationId: "begin:0",
+      iterationKey: "foreach_begin:begin:0",
+      iterationSequence: 0,
       status: "running",
       context: {
         item: "alpha",
         index: 0,
         count: 2,
+        iterationId: "begin:0",
+        iterationKey: "foreach_begin:begin:0",
+        iterationSequence: 0,
       },
     });
     expect(progress[3]?.payload).toMatchObject({
       phase: "finished",
       iteration: 1,
+      iterationId: "begin:1",
+      iterationKey: "foreach_begin:begin:1",
+      iterationSequence: 1,
       status: "completed",
       context: {
         item: "beta",
         index: 1,
         count: 2,
+        iterationId: "begin:1",
+        iterationKey: "foreach_begin:begin:1",
+        iterationSequence: 1,
       },
+    });
+    const loopEndOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "loop_end") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(loopEndOutput).toMatchObject({
+      results: ["trace=begin:0", "trace=begin:1"],
     });
   });
 
