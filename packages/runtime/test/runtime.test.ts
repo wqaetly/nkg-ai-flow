@@ -4378,6 +4378,27 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(resumed.succeeded).toBe(true);
     expect(resumed.output).toBe("resume:resumed");
+    const resumeEvents = await rt.eventBus.store.read(resumed.runRecord.runId);
+    const resumeOutput = (
+      resumeEvents.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "resumed",
+      stateStatus: "received",
+      signal: "approved",
+      expected: "approved",
+      stateExists: true,
+      matched: true,
+      requestedAt: expect.any(String),
+      expiresAt: "",
+      remainingMs: 0,
+      resumedValue: true,
+      ignoredValue: false,
+      missingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "received",
       signal: "approved",
@@ -4429,6 +4450,27 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("resume:missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resumeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "missing",
+      stateStatus: "",
+      signal: "approved",
+      expected: "approved",
+      stateExists: false,
+      matched: true,
+      requestedAt: "",
+      expiresAt: "",
+      remainingMs: 0,
+      resumedValue: false,
+      ignoredValue: false,
+      missingValue: true,
+      expiredValue: false,
+    });
     expect(variables.has("MISSING_APPROVAL_SIGNAL")).toBe(false);
   });
 
@@ -4477,6 +4519,27 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("resume:ignored");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resumeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "ignored",
+      stateStatus: "waiting",
+      signal: "denied",
+      expected: "approved",
+      stateExists: true,
+      matched: false,
+      requestedAt: expect.any(String),
+      expiresAt: "",
+      remainingMs: 0,
+      resumedValue: false,
+      ignoredValue: true,
+      missingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "waiting",
       signal: "denied",

@@ -83,6 +83,22 @@ export const signalResumeNode = defineNode({
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "signal", direction: "output", kind: "data", label: "Signal" },
     { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
+    { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
+    { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
+    { id: "matched", direction: "output", kind: "data", label: "Matched", schema: { type: "boolean" } },
+    { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
+    { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
+    {
+      id: "remainingMs",
+      direction: "output",
+      kind: "data",
+      label: "Remaining ms",
+      schema: { type: "number" },
+    },
+    { id: "resumedValue", direction: "output", kind: "data", label: "Resumed", schema: { type: "boolean" } },
+    { id: "ignoredValue", direction: "output", kind: "data", label: "Ignored", schema: { type: "boolean" } },
+    { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -128,11 +144,24 @@ export const signalResumeNode = defineNode({
     if (decision.state) {
       store.set(name, toVariableValue(decision.state), metadata(ctx.flowId));
     }
+    const requestedAt =
+      decision.state === null ? "" : new Date(decision.state.requestedAt).toISOString();
+    const expiresAt =
+      decision.state?.expiresAt === null || decision.state === null
+        ? ""
+        : new Date(decision.state.expiresAt).toISOString();
+    const remainingMs =
+      decision.state?.expiresAt === null || decision.state === null
+        ? 0
+        : Math.max(0, decision.state.expiresAt - now);
+    const stateStatus = decision.state?.status ?? "";
+    const matched = String(signal) === expected;
 
     ctx.log.debug("signal_resume selected branch", {
       name,
       status: decision.status,
       expected,
+      matched,
     });
 
     return {
@@ -143,6 +172,16 @@ export const signalResumeNode = defineNode({
         status: decision.status,
         signal,
         expected,
+        stateStatus,
+        stateExists: decision.state !== null,
+        matched,
+        requestedAt,
+        expiresAt,
+        remainingMs,
+        resumedValue: decision.status === "resumed",
+        ignoredValue: decision.status === "ignored",
+        missingValue: decision.status === "missing",
+        expiredValue: decision.status === "expired",
       },
     };
   },
