@@ -21,6 +21,7 @@ const BUILTIN_TYPES = [
   "delay",
   "filter_items",
   "http",
+  "idempotency_key",
   "join",
   "map_items",
   "merge",

@@ -81,6 +81,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       mode: "模式",
       model: "模型",
       multiplier: "倍率",
+      namespace: "命名空间",
       owner: "持有者",
       package_scope: "包作用域",
       payload: "载荷",
@@ -172,6 +173,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         method: "请求方法",
         headers: "请求头",
         body: "请求体",
+      },
+      idempotency_key: {
+        namespace: "命名空间",
+        key: "幂等键",
+        mode: "模式",
+        ttlMs: "TTL（毫秒）",
       },
       llm: {
         baseUrl: "服务地址",

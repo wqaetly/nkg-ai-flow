@@ -21,6 +21,7 @@ export { conditionNode } from "./condition.js";
 export { delayNode } from "./delay.js";
 export { filterItemsNode } from "./filterItems.js";
 export { httpNode } from "./http.js";
+export { idempotencyKeyNode } from "./idempotencyKey.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";
 export { mergeNode } from "./merge.js";

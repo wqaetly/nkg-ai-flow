@@ -40,6 +40,7 @@ import {
   endNode,
   eventTriggerNode,
   httpNode,
+  idempotencyKeyNode,
   joinNode,
   mapItemsNode,
   mergeNode,
@@ -163,6 +164,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, delayNode);
   installNode(target, filterItemsNode);
   installNode(target, httpNode);
+  installNode(target, idempotencyKeyNode);
   installNode(target, joinNode);
   installNode(target, mapItemsNode);
   installNode(target, mergeNode);

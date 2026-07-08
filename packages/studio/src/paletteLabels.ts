@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "HTTP 请求",
         description: "调用外部 HTTP API。",
       },
+      idempotency_key: {
+        title: "幂等键",
+        description: "按业务键去重副作用流程，并复用已完成的结果。",
+      },
       join: {
         title: "汇合",
         description: "等待所有输入分支到达，并聚合多路数据。",

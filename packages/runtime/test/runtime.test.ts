@@ -454,6 +454,161 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes idempotency_key to started for a new business key", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_started_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "payments",
+        key: "order-1",
+        mode: "start",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "idem:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), idem.in("in"));
+    flow.connect(idem.out("started"), report.in("in"));
+    flow.connect(idem.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_started_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("idem:started");
+    expect(variables.get("IDEMPOTENCY:payments:order-1")).toMatchObject({
+      key: "order-1",
+      status: "started",
+    });
+  });
+
+  it("routes idempotency_key to replayed for a completed key", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("IDEMPOTENCY:payments:order-1", {
+      key: "order-1",
+      status: "completed",
+      owner: "previous-run",
+      value: "receipt-1",
+      error: null,
+      startedAt: now - 1000,
+      completedAt: now - 500,
+      failedAt: null,
+      expiresAt: now + 60_000,
+      updatedAt: now - 500,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_replayed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 120, y: 0 },
+      config: {
+        namespace: "payments",
+        key: "order-1",
+        mode: "start",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "replay:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), idem.in("in"));
+    flow.connect(idem.out("replayed"), report.in("in"));
+    flow.connect(idem.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_replayed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("replay:receipt-1");
+    expect(variables.get("IDEMPOTENCY:payments:order-1")).toMatchObject({
+      status: "completed",
+      value: "receipt-1",
+    });
+  });
+
+  it("records idempotency_key completion with a downstream value", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_completed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: "receipt-2" },
+    });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 260, y: 0 },
+      config: {
+        namespace: "payments",
+        key: "order-2",
+        mode: "complete",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "completed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), idem.in("in"));
+    flow.connect(payload.out("output"), idem.in("value"));
+    flow.connect(idem.out("completed"), report.in("in"));
+    flow.connect(idem.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_completed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("completed:receipt-2");
+    expect(variables.get("IDEMPOTENCY:payments:order-2")).toMatchObject({
+      key: "order-2",
+      status: "completed",
+      value: "receipt-2",
+      error: null,
+    });
+  });
+
   it("opens a circuit_breaker after recorded failures and routes checks to open", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
