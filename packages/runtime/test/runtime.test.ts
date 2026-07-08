@@ -10006,6 +10006,61 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("groups=open:2,closed:1");
   });
 
+  it("sorts group_items entries by count", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "group_items_sort_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { status: "pending" },
+          { status: "closed" },
+          { status: "open" },
+          { status: "closed" },
+          { status: "open" },
+          { status: "open" },
+        ],
+      },
+    });
+    const group = flow.node("group_items", {
+      id: "group",
+      position: { x: 260, y: 0 },
+      config: { path: "status", sortBy: "count", sortDirection: "desc" },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${item.key}:${item.count}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "sorted=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), group.in("in"));
+    flow.connect(input.out("output"), group.in("items"));
+    flow.connect(group.out("out"), map.in("in"));
+    flow.connect(group.out("entries"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "group_items_sort_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sorted=open:3,closed:2,pending:1");
+  });
+
   it("reduces array items with reduce_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "reduce_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

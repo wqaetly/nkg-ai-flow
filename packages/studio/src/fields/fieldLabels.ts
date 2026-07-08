@@ -311,6 +311,8 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         path: "分组字段路径",
         missingKey: "缺失分组键",
         caseSensitive: "区分大小写",
+        sortBy: "排序依据",
+        sortDirection: "排序方向",
       },
       for_begin: {
         start: "起始值",

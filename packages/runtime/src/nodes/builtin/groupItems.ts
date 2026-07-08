@@ -16,6 +16,9 @@ interface GroupEntry {
   count: number;
 }
 
+type GroupSortBy = "first" | "key" | "count";
+type SortDirection = "asc" | "desc";
+
 const groupItemsConfig = z
   .object({
     path: z.string().default("").describe("Optional dotted path used as the group key."),
@@ -27,6 +30,14 @@ const groupItemsConfig = z
       .boolean()
       .default(true)
       .describe("Whether string group keys are case-sensitive."),
+    sortBy: z
+      .enum(["first", "key", "count"])
+      .default("first")
+      .describe("How group entries are ordered."),
+    sortDirection: z
+      .enum(["asc", "desc"])
+      .default("asc")
+      .describe("Sort direction used when sortBy is key or count."),
   })
   .passthrough();
 
@@ -53,6 +64,25 @@ export const groupItemsNode = defineNode({
       label: "Case Sensitive",
       control: "switch",
       order: 3,
+    },
+    sortBy: {
+      label: "Sort By",
+      control: "select",
+      enumOptions: [
+        { label: "First Seen", value: "first" },
+        { label: "Key", value: "key" },
+        { label: "Count", value: "count" },
+      ],
+      order: 4,
+    },
+    sortDirection: {
+      label: "Sort Direction",
+      control: "select",
+      enumOptions: [
+        { label: "Ascending", value: "asc" },
+        { label: "Descending", value: "desc" },
+      ],
+      order: 5,
     },
   },
   ports: [
@@ -112,6 +142,8 @@ export const groupItemsNode = defineNode({
       path,
       missingKey,
       caseSensitive: config.caseSensitive !== false,
+      sortBy: config.sortBy ?? "first",
+      sortDirection: config.sortDirection ?? "asc",
     });
     const groups = Object.fromEntries(entries.map((entry) => [entry.key, entry.items]));
 
@@ -141,6 +173,8 @@ function groupItems(
     path: string;
     missingKey: string;
     caseSensitive: boolean;
+    sortBy: GroupSortBy;
+    sortDirection: SortDirection;
   },
 ): GroupEntry[] {
   const groups = new Map<string, GroupEntry>();
@@ -160,7 +194,7 @@ function groupItems(
       });
     }
   }
-  return [...groups.values()];
+  return sortGroups([...groups.values()], options.sortBy, options.sortDirection);
 }
 
 function valueAtPath(item: unknown, path: string): unknown {
@@ -193,4 +227,20 @@ function stableStringify(value: unknown): string {
     .sort()
     .map((key) => `${key}:${stableStringify(record[key])}`)
     .join(",")}}`;
+}
+
+function sortGroups(
+  entries: GroupEntry[],
+  sortBy: GroupSortBy,
+  direction: SortDirection,
+): GroupEntry[] {
+  if (sortBy === "first") return entries;
+  const multiplier = direction === "desc" ? -1 : 1;
+  return [...entries].sort((left, right) => {
+    const compared =
+      sortBy === "count"
+        ? left.count - right.count
+        : left.key.localeCompare(right.key, undefined, { numeric: true });
+    return compared === 0 ? 0 : compared * multiplier;
+  });
 }
