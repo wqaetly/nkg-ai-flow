@@ -217,6 +217,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       audit_log: {
         in: "输入",
         name: "日志名",
+        mode: "模式",
+        type: "事件类型",
+        actor: "操作者",
+        message: "消息",
+        maxEntries: "最大条数",
+        limit: "读取上限",
         payload: "事件载荷",
         appended: "已记录",
         read: "已读取",

@@ -94,6 +94,12 @@ export const auditLogNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "type", direction: "input", kind: "data", label: "Type", schema: { type: "string" } },
+    { id: "actor", direction: "input", kind: "data", label: "Actor", schema: { type: "string" } },
+    { id: "message", direction: "input", kind: "data", label: "Message", schema: { type: "string" } },
+    { id: "maxEntries", direction: "input", kind: "data", label: "Max entries", schema: { type: "number" } },
+    { id: "limit", direction: "input", kind: "data", label: "Limit", schema: { type: "number" } },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "appended", direction: "output", kind: "control", label: "Appended" },
     { id: "read", direction: "output", kind: "control", label: "Read" },
@@ -102,6 +108,12 @@ export const auditLogNode = defineNode({
     { id: "entries", direction: "output", kind: "data", label: "Entries" },
     { id: "entry", direction: "output", kind: "data", label: "Entry" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "type", direction: "output", kind: "data", label: "Type", schema: { type: "string" } },
+    { id: "actor", direction: "output", kind: "data", label: "Actor", schema: { type: "string" } },
+    { id: "message", direction: "output", kind: "data", label: "Message", schema: { type: "string" } },
+    { id: "maxEntries", direction: "output", kind: "data", label: "Max entries", schema: { type: "number" } },
+    { id: "limit", direction: "output", kind: "data", label: "Limit", schema: { type: "number" } },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -140,17 +152,20 @@ export const auditLogNode = defineNode({
 
     const now = Date.now();
     const previous = readAuditLogState(store.get(name), now);
-    const mode = config.mode ?? "append";
-    const maxEntries = Math.max(1, Math.trunc(Number(config.maxEntries ?? 1000)));
-    const limit = Math.max(1, Math.trunc(Number(config.limit ?? 100)));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "append";
+    const maxEntries = readPositiveInteger(input.maxEntries) ?? readPositiveInteger(config.maxEntries) ?? 1000;
+    const limit = readPositiveInteger(input.limit) ?? readPositiveInteger(config.limit) ?? 100;
+    const eventType = String(input.type ?? config.type ?? "event").trim() || "event";
+    const actor = String(input.actor ?? config.actor ?? "").trim();
+    const message = String(input.message ?? config.message ?? "").trim();
     const decision = applyMode(previous, {
       mode,
       maxEntries,
       limit,
       now,
-      eventType: String(config.type ?? "event").trim() || "event",
-      actor: String(config.actor ?? "").trim(),
-      message: String(config.message ?? "").trim(),
+      eventType,
+      actor,
+      message,
       payload: input.payload ?? input.input ?? input.in ?? null,
       runId: ctx.runId,
       nodeId: ctx.nodeId,
@@ -177,6 +192,12 @@ export const auditLogNode = defineNode({
         entries: decision.entries,
         entry: decision.entries[0] ?? null,
         name,
+        mode,
+        type: eventType,
+        actor,
+        message,
+        maxEntries,
+        limit,
         state: decision.state,
         count: decision.entries.length,
         sequence: decision.state.sequence,
@@ -255,6 +276,12 @@ function applyMode(
   };
 }
 
+function readMode(value: unknown): AuditLogMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "append" || normalized === "read" || normalized === "clear" ? normalized : undefined;
+}
+
 function readAuditLogState(value: unknown, now: number): AuditLogState {
   if (!value || typeof value !== "object") return emptyState(now, 0);
   const record = value as Record<string, unknown>;
@@ -302,6 +329,11 @@ function readTimestamp(value: unknown): number | undefined {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 1 ? Math.trunc(number) : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {

@@ -8787,6 +8787,156 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic audit_log policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_AUDIT_LOG", {
+      sequence: 2,
+      updatedAt: Date.now(),
+      entries: [
+        {
+          id: "entry-1",
+          sequence: 1,
+          type: "created",
+          actor: "system",
+          message: "Order created",
+          payload: { orderId: "order-1" },
+          recordedAt: Date.now() - 2000,
+          runId: "run-1",
+          nodeId: "audit",
+        },
+        {
+          id: "entry-2",
+          sequence: 2,
+          type: "reserved",
+          actor: "inventory",
+          message: "Inventory reserved",
+          payload: { orderId: "order-2" },
+          recordedAt: Date.now() - 1000,
+          runId: "run-2",
+          nodeId: "audit",
+        },
+      ],
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -240 },
+      config: { value: "append" },
+    });
+    const eventType = flow.node("transform", {
+      id: "eventType",
+      position: { x: 120, y: -160 },
+      config: { value: "payment" },
+    });
+    const actor = flow.node("transform", {
+      id: "actor",
+      position: { x: 120, y: -80 },
+      config: { value: "payment-service" },
+    });
+    const message = flow.node("transform", {
+      id: "message",
+      position: { x: 120, y: 80 },
+      config: { value: "Payment captured" },
+    });
+    const maxEntries = flow.node("transform", {
+      id: "maxEntries",
+      position: { x: 120, y: 160 },
+      config: { value: 2 },
+    });
+    const limit = flow.node("transform", {
+      id: "limit",
+      position: { x: 120, y: 240 },
+      config: { value: 1 },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 320 },
+      config: { value: { orderId: "order-3", amount: 42 } },
+    });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 340, y: 0 },
+      config: {
+        name: "ORDER_AUDIT_LOG",
+        mode: "clear",
+        type: "static",
+        actor: "static-actor",
+        message: "Static message",
+        maxEntries: 100,
+        limit: 100,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), eventType.in("in"));
+    flow.connect(start.out("out"), actor.in("in"));
+    flow.connect(start.out("out"), message.in("in"));
+    flow.connect(start.out("out"), maxEntries.in("in"));
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), audit.in("in"));
+    flow.connect(mode.out("output"), audit.in("mode"));
+    flow.connect(eventType.out("output"), audit.in("type"));
+    flow.connect(actor.out("output"), audit.in("actor"));
+    flow.connect(message.out("output"), audit.in("message"));
+    flow.connect(maxEntries.out("output"), audit.in("maxEntries"));
+    flow.connect(limit.out("output"), audit.in("limit"));
+    flow.connect(payload.out("output"), audit.in("payload"));
+    flow.connect(audit.out("appended"), report.in("in"));
+    flow.connect(audit.out("maxEntries"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:2");
+    expect(variables.get("ORDER_AUDIT_LOG")).toMatchObject({
+      sequence: 3,
+      entries: [
+        { sequence: 2, type: "reserved" },
+        {
+          sequence: 3,
+          type: "payment",
+          actor: "payment-service",
+          message: "Payment captured",
+          payload: { orderId: "order-3", amount: 42 },
+          nodeId: "audit",
+        },
+      ],
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const auditOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "audit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(auditOutput).toMatchObject({
+      mode: "append",
+      type: "payment",
+      actor: "payment-service",
+      message: "Payment captured",
+      maxEntries: 2,
+      limit: 1,
+      sequence: 3,
+    });
+  });
+
   it("reads recent audit_log entries with a limit", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_AUDIT_LOG", {
