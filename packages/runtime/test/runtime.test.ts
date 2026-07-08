@@ -3468,6 +3468,58 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes a dynamically named semaphore to acquired", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const poolName = flow.node("transform", {
+      id: "poolName",
+      position: { x: 120, y: -80 },
+      config: { value: "FILE_DYNAMIC_WORKER_POOL" },
+    });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 260, y: 0 },
+      config: {
+        owner: "worker-3",
+        capacity: 2,
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "acquired:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), poolName.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(poolName.out("output"), gate.in("name"));
+    flow.connect(gate.out("acquired"), report.in("in"));
+    flow.connect(gate.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("acquired:FILE_DYNAMIC_WORKER_POOL");
+    expect(variables.get("FILE_DYNAMIC_WORKER_POOL")).toMatchObject({
+      capacity: 2,
+      holders: [{ owner: "worker-3" }],
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes semaphore to saturated when capacity is full", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();

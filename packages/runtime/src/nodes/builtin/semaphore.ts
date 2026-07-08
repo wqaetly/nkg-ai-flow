@@ -92,11 +92,13 @@ export const semaphoreNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "owner", direction: "input", kind: "data", label: "Owner" },
     { id: "acquired", direction: "output", kind: "control", label: "Acquired" },
     { id: "saturated", direction: "output", kind: "control", label: "Saturated" },
     { id: "released", direction: "output", kind: "control", label: "Released" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "owner", direction: "output", kind: "data", label: "Owner" },
     {
       id: "available",
@@ -129,11 +131,11 @@ export const semaphoreNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.semaphore.missing_name",
-        "semaphore node requires config.name",
+        "semaphore node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -174,6 +176,7 @@ export const semaphoreNode = defineNode({
       outputs: {
         [decision.branch]: null,
         state: decision.state,
+        name,
         owner,
         available,
         used,

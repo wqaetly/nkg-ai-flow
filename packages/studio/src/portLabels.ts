@@ -980,6 +980,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       semaphore: {
         in: "输入",
+        name: "信号量名",
         owner: "持有者",
         acquired: "已获得",
         saturated: "已满",
