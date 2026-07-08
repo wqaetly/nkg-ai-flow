@@ -203,6 +203,8 @@ export const subflowTemplateNode = defineNode({
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
     { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
+    { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
+    { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
     { id: "localScope", direction: "output", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
     errorOut,
@@ -217,6 +219,11 @@ export const subflowTemplateNode = defineNode({
         ctx.nodeId,
       );
     }
+
+    const subflowDepth = Math.max(
+      0,
+      Math.trunc(Number((ctx as { subflowDepth?: number }).subflowDepth ?? 0)),
+    );
 
     const templates = readTemplates(config.templates);
     if (templates instanceof Error) {
@@ -239,6 +246,8 @@ export const subflowTemplateNode = defineNode({
           templateId,
           flowId: "",
           flowVersion: "",
+          subflowDepth,
+          childDepth: subflowDepth,
         },
       };
     }
@@ -263,10 +272,6 @@ export const subflowTemplateNode = defineNode({
       );
     }
 
-    const subflowDepth = Math.max(
-      0,
-      Math.trunc(Number((ctx as { subflowDepth?: number }).subflowDepth ?? 0)),
-    );
     const maxDepth = Math.max(0, Math.trunc(Number(config.maxDepth ?? 10)));
     if (subflowDepth >= maxDepth) {
       return error(
@@ -275,6 +280,7 @@ export const subflowTemplateNode = defineNode({
         ctx.nodeId,
       );
     }
+    const childDepth = subflowDepth + 1;
 
     const configLocalVariables = readLocalVariables(config.localVariables, "subflow_template localVariables");
     if (configLocalVariables instanceof Error) {
@@ -312,6 +318,8 @@ export const subflowTemplateNode = defineNode({
         templateId,
         flowId: template.flowId,
         flowVersion: template.flowVersion,
+        subflowDepth,
+        childDepth,
         localScope,
         localVariableCount: localVariables.length,
       });
@@ -324,7 +332,7 @@ export const subflowTemplateNode = defineNode({
         ...(template.flowVersion === "" ? {} : { flowVersion: template.flowVersion }),
         input: payload,
         traceId: `${ctx.runId}:${ctx.nodeId}:${templateId}`,
-        subflowDepth: subflowDepth + 1,
+        subflowDepth: childDepth,
         variables: childVariables,
         secrets: childVariables,
       });
@@ -350,6 +358,8 @@ export const subflowTemplateNode = defineNode({
       templateId,
       flowId: template.flowId,
       flowVersion: result.runRecord.flowVersion,
+      subflowDepth,
+      childDepth,
       localScope,
       localVariableCount: localVariables.length,
     };
@@ -375,6 +385,8 @@ export const subflowTemplateNode = defineNode({
             templateId,
             flowId: template.flowId,
             flowVersion: result.runRecord.flowVersion,
+            subflowDepth,
+            childDepth,
             localScope,
             localVariableCount: localVariables.length,
           });
@@ -499,6 +511,8 @@ function contractFailure(args: {
   templateId: string;
   flowId: string;
   flowVersion: string;
+  subflowDepth: number;
+  childDepth: number;
   localScope: boolean;
   localVariableCount: number;
 }): {
@@ -521,6 +535,8 @@ function contractFailure(args: {
         templateId: args.templateId,
         flowId: args.flowId,
         flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
+        subflowDepth: args.subflowDepth,
+        childDepth: args.childDepth,
         contractStage: args.stage,
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,

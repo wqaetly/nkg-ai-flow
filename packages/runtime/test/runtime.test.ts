@@ -5815,10 +5815,17 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("parent:child:Ada");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     const childRuns = await rt.runStore.listByFlow("template_child_echo");
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.flowVersion).toBe("1.0.0");
     expect(childRuns[0]?.subflowDepth).toBe(1);
+    expect(callOutput).toMatchObject({ subflowDepth: 0, childDepth: 1 });
   });
 
   it("routes subflow_template to missing when the template id is absent", async () => {
@@ -5858,6 +5865,13 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("template:missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({ status: "missing", subflowDepth: 0, childDepth: 0 });
     expect(await rt.runStore.listByFlow("template_child_echo")).toEqual([]);
   });
 
@@ -5962,6 +5976,18 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("template-input-contract:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      status: "contract_failed",
+      contractStage: "input",
+      subflowDepth: 0,
+      childDepth: 1,
+    });
     expect(await rt.runStore.listByFlow("template_input_contract_child")).toEqual([]);
   });
 
@@ -6022,9 +6048,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("template-output-contract:output");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_template") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     const childRuns = await rt.runStore.listByFlow("template_output_contract_child");
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.status).toBe("succeeded");
+    expect(callOutput).toMatchObject({
+      status: "contract_failed",
+      contractStage: "output",
+      subflowDepth: 0,
+      childDepth: 1,
+    });
   });
 
   it("keeps subflow_template local variables and state writes isolated", async () => {

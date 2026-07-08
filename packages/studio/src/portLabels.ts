@@ -837,6 +837,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         contractIssues: "契约问题",
         contractIssueCount: "契约问题数量",
         firstContractIssue: "首个契约问题",
+        subflowDepth: "当前子流程深度",
+        childDepth: "子流程调用深度",
         localVariableCount: "局部变量数量",
         localScope: "局部变量作用域",
       },
