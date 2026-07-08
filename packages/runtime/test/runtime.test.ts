@@ -581,7 +581,7 @@ describe("runtime / hello-flow end-to-end", () => {
     const timeout = flow.node("branch_timeout", {
       id: "timeout",
       position: { x: 260, y: 0 },
-      config: { timeoutMs: 1000 },
+      config: { timeoutMs: 1000, graceMs: 100 },
     });
     const report = flow.node("transform", {
       id: "report",
@@ -606,6 +606,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("timeout:timed_out");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timeoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timeout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timeoutOutput).toMatchObject({
+      status: "timed_out",
+      elapsedMs: 1250,
+      timeoutMs: 1000,
+      graceMs: 100,
+      effectiveTimeoutMs: 1100,
+      timedOut: true,
+      remainingMs: 0,
+      overdueByMs: 150,
+    });
   });
 
   it("routes branch_timeout to on_time from started and finished timestamps", async () => {
@@ -650,6 +666,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("timeout:250");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timeoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timeout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timeoutOutput).toMatchObject({
+      status: "on_time",
+      elapsedMs: 250,
+      timeoutMs: 500,
+      graceMs: 0,
+      effectiveTimeoutMs: 500,
+      timedOut: false,
+      remainingMs: 250,
+      overdueByMs: 0,
+    });
   });
 
   it("routes schedule_window to open inside the configured window", async () => {
