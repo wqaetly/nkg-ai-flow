@@ -20,13 +20,13 @@ type JsonSchemaType =
   | "boolean"
   | "null";
 
-interface SchemaIssue {
+export interface SchemaIssue {
   path: string;
   code: string;
   message: string;
 }
 
-type JsonSchemaObject = Record<string, unknown>;
+export type JsonSchemaObject = Record<string, unknown>;
 
 const schemaGuardConfig = z
   .object({
@@ -111,7 +111,7 @@ export const schemaGuardNode = defineNode({
   },
 });
 
-function readSchema(value: unknown): JsonSchemaObject | Error {
+export function readSchema(value: unknown): JsonSchemaObject | Error {
   if (typeof value === "string") {
     const trimmed = value.trim();
     if (trimmed === "") return {};
@@ -132,7 +132,7 @@ function assertSchemaObject(value: unknown): JsonSchemaObject | Error {
   return value as JsonSchemaObject;
 }
 
-function validateValue(
+export function validateValue(
   value: unknown,
   schema: JsonSchemaObject,
   path: string,

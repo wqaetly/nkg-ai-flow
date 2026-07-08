@@ -3539,6 +3539,103 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.error?.code).toBe("node.http.missing_url");
   });
 
+  it("routes subflow input contract failures without invoking the child flow", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_input_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: {
+        flowId: "child_input_contract",
+        contractMode: "route",
+        inputSchema: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: { type: "string", minLength: 1 },
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "input-contract:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("contract_failed"), report.in("in"));
+    parent.connect(call.out("contractIssueCount"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_input_contract",
+      input: { id: "missing-name" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("input-contract:1");
+    expect(await rt.runStore.listByFlow("child_input_contract")).toEqual([]);
+  });
+
+  it("routes subflow output contract failures after a successful child run", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "child_output_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const childTransform = child.node("transform", {
+      id: "child_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child:${input.name}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), childTransform.in("in"));
+    child.connect(childTransform.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_output_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 140, y: 0 },
+      config: {
+        flowId: "child_output_contract",
+        contractMode: "route",
+        outputSchema: {
+          type: "object",
+          required: ["ok"],
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "output-contract:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("contract_failed"), report.in("in"));
+    parent.connect(call.out("contractStage"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_output_contract",
+      input: { name: "Ada" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("output-contract:output");
+    const childRuns = await rt.runStore.listByFlow("child_output_contract");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.status).toBe("succeeded");
+  });
+
   it("writes state for downstream variable resolution with state_set", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

@@ -482,6 +482,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         flowVersion: "流程版本",
         inputMode: "输入模式",
         inputValue: "静态输入",
+        inputSchema: "输入契约 Schema",
+        outputSchema: "输出契约 Schema",
+        contractMode: "契约失败模式",
         failOnError: "失败时中断",
       },
       switch_case: {

@@ -10,6 +10,7 @@ import { z } from "zod";
 import { createRuntimeError } from "@ai-native-flow/flow-ir";
 import { defineNode } from "@ai-native-flow/node-sdk";
 import { controlIn, errorOut } from "./_helpers.js";
+import { readSchema, validateValue, type SchemaIssue } from "./schemaGuard.js";
 
 interface SubflowInvokeResult {
   runRecord: {
@@ -48,6 +49,18 @@ const subflowConfig = z
       .unknown()
       .optional()
       .describe("Static child input when inputMode is literal."),
+    inputSchema: z
+      .unknown()
+      .optional()
+      .describe("Optional JSON Schema subset contract for child input."),
+    outputSchema: z
+      .unknown()
+      .optional()
+      .describe("Optional JSON Schema subset contract for successful child output."),
+    contractMode: z
+      .enum(["fail", "route"])
+      .default("fail")
+      .describe("Whether contract violations fail this node or route to contract_failed."),
     failOnError: z
       .boolean()
       .default(true)
@@ -82,7 +95,28 @@ export const subflowNode = defineNode({
       order: 4,
       placeholder: "Static JSON-compatible input for the child flow.",
     },
-    failOnError: { label: "Fail On Error", control: "switch", order: 5 },
+    inputSchema: {
+      label: "Input Schema",
+      control: "textarea",
+      order: 5,
+      placeholder: '{ "type": "object", "required": ["id"] }',
+    },
+    outputSchema: {
+      label: "Output Schema",
+      control: "textarea",
+      order: 6,
+      placeholder: '{ "type": "object", "required": ["ok"] }',
+    },
+    contractMode: {
+      label: "Contract Mode",
+      control: "select",
+      order: 7,
+      enumOptions: [
+        { label: "Fail Node", value: "fail" },
+        { label: "Route Branch", value: "route" },
+      ],
+    },
+    failOnError: { label: "Fail On Error", control: "switch", order: 8 },
   },
   ports: [
     controlIn,
@@ -96,6 +130,12 @@ export const subflowNode = defineNode({
     },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
     {
+      id: "contract_failed",
+      direction: "output",
+      kind: "control",
+      label: "Contract Failed",
+    },
+    {
       id: "cancelled",
       direction: "output",
       kind: "control",
@@ -105,6 +145,10 @@ export const subflowNode = defineNode({
     { id: "runId", direction: "output", kind: "data", label: "Run Id" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     { id: "runRecord", direction: "output", kind: "data", label: "Run Record" },
+    { id: "contractStage", direction: "output", kind: "data", label: "Contract Stage" },
+    { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
+    { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
+    { id: "firstContractIssue", direction: "output", kind: "data", label: "First Contract Issue" },
     errorOut,
   ],
   validateInput: false,
@@ -139,12 +183,32 @@ export const subflowNode = defineNode({
       );
     }
 
+    const payload = childInput(input, config);
+    const inputContract = validateContract(config.inputSchema, payload, "input");
+    if (inputContract instanceof Error) {
+      return error(
+        "node.subflow.invalid_input_schema",
+        inputContract.message,
+        ctx.nodeId,
+      );
+    }
+    if (inputContract.issues.length > 0) {
+      return contractFailure({
+        config,
+        ctxNodeId: ctx.nodeId,
+        stage: "input",
+        issues: inputContract.issues,
+        output: null,
+        runRecord: null,
+      });
+    }
+
     let result: SubflowInvokeResult;
     try {
       result = await invokeFlow({
         flowId,
         ...(flowVersion === "" ? {} : { flowVersion }),
-        input: childInput(input, config),
+        input: payload,
         traceId: `${ctx.runId}:${ctx.nodeId}`,
         variables: ctx.variables,
         secrets: ctx.secrets,
@@ -177,6 +241,26 @@ export const subflowNode = defineNode({
         flowVersion: result.runRecord.flowVersion,
         childRunId: result.runRecord.runId,
       });
+
+      const outputContract = validateContract(config.outputSchema, result.output ?? null, "output");
+      if (outputContract instanceof Error) {
+        return error(
+          "node.subflow.invalid_output_schema",
+          outputContract.message,
+          ctx.nodeId,
+        );
+      }
+      if (outputContract.issues.length > 0) {
+        return contractFailure({
+          config,
+          ctxNodeId: ctx.nodeId,
+          stage: "output",
+          issues: outputContract.issues,
+          output: result.output ?? null,
+          runRecord: result.runRecord,
+        });
+      }
+
       return { kind: "success", outputs };
     }
 
@@ -232,10 +316,69 @@ function childInput(
   }
 }
 
+function validateContract(
+  schemaConfig: unknown,
+  value: unknown,
+  stage: "input" | "output",
+): { issues: SchemaIssue[] } | Error {
+  if (schemaConfig === undefined || schemaConfig === null || schemaConfig === "") {
+    return { issues: [] };
+  }
+  const schema = readSchema(schemaConfig);
+  if (schema instanceof Error) {
+    return new Error(`subflow ${stage} schema is invalid: ${schema.message}`);
+  }
+  return { issues: validateValue(value, schema, "$") };
+}
+
+function contractFailure(args: {
+  config: { contractMode?: string };
+  ctxNodeId: string;
+  stage: "input" | "output";
+  issues: SchemaIssue[];
+  output: unknown;
+  runRecord: SubflowInvokeResult["runRecord"] | null;
+}): {
+  kind: "success";
+  outputs: Record<string, unknown>;
+} | {
+  kind: "error";
+  error: { code: string; message: string; [key: string]: unknown };
+} {
+  const firstIssue = args.issues[0]?.message ?? "";
+  if (args.config.contractMode === "route") {
+    return {
+      kind: "success",
+      outputs: {
+        contract_failed: null,
+        output: args.output,
+        runId: args.runRecord?.runId ?? null,
+        status: "contract_failed",
+        runRecord: args.runRecord,
+        contractStage: args.stage,
+        contractIssues: args.issues,
+        contractIssueCount: args.issues.length,
+        firstContractIssue: firstIssue,
+      },
+    };
+  }
+  return error(
+    `node.subflow.${args.stage}_contract_failed`,
+    `subflow ${args.stage} contract failed: ${firstIssue}`,
+    args.ctxNodeId,
+    {
+      contractStage: args.stage,
+      contractIssues: args.issues,
+      contractIssueCount: args.issues.length,
+    },
+  );
+}
+
 function error(
   code: string,
   message: string,
   nodeId: string,
+  context?: Record<string, unknown>,
 ): {
   kind: "error";
   error: {
@@ -252,6 +395,7 @@ function error(
       category: "author",
       message,
       source: { module: "node_logic", nodeId },
+      context,
     }) as unknown as {
       code: string;
       message: string;
