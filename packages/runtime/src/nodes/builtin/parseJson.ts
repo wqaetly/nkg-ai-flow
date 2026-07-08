@@ -65,10 +65,42 @@ export const parseJsonNode = defineNode({
       kind: "data",
       label: "Text",
     },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "trim", direction: "input", kind: "data", label: "Trim", schema: { type: "boolean" } },
+    {
+      id: "unwrapCodeFence",
+      direction: "input",
+      kind: "data",
+      label: "Unwrap code fence",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "acceptNonString",
+      direction: "input",
+      kind: "data",
+      label: "Accept non-string",
+      schema: { type: "boolean" },
+    },
     { id: "parsed", direction: "output", kind: "control", label: "Parsed" },
     { id: "invalid", direction: "output", kind: "control", label: "Invalid" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "raw", direction: "output", kind: "data", label: "Raw" },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "trim", direction: "output", kind: "data", label: "Trim", schema: { type: "boolean" } },
+    {
+      id: "unwrapCodeFence",
+      direction: "output",
+      kind: "data",
+      label: "Unwrap code fence",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "acceptNonString",
+      direction: "output",
+      kind: "data",
+      label: "Accept non-string",
+      schema: { type: "boolean" },
+    },
     {
       id: "status",
       direction: "output",
@@ -93,20 +125,24 @@ export const parseJsonNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const raw = readRawValue(input, String(config.path ?? ""));
-    const acceptNonString = config.acceptNonString !== false;
+    const path = String(input.path ?? config.path ?? "").trim();
+    const trim = readBoolean(input.trim) ?? readBoolean(config.trim) ?? true;
+    const unwrapCodeFence = readBoolean(input.unwrapCodeFence) ?? readBoolean(config.unwrapCodeFence) ?? true;
+    const acceptNonString = readBoolean(input.acceptNonString) ?? readBoolean(config.acceptNonString) ?? true;
+    const raw = readRawValue(input, path);
+    const metadata = { path, trim, unwrapCodeFence, acceptNonString };
 
     if (typeof raw !== "string") {
       if (acceptNonString) {
         const value = raw ?? null;
-        return success("parsed", value, raw, "already_structured");
+        return success("parsed", value, raw, "already_structured", "", metadata);
       }
-      return success("invalid", null, raw, "input_is_not_string", "Input is not a string.");
+      return success("invalid", null, raw, "input_is_not_string", "Input is not a string.", metadata);
     }
 
     const normalized = normalizeText(raw, {
-      trim: config.trim !== false,
-      unwrapCodeFence: config.unwrapCodeFence !== false,
+      trim,
+      unwrapCodeFence,
     });
 
     try {
@@ -115,11 +151,11 @@ export const parseJsonNode = defineNode({
         type: jsonType(value),
         reason: normalized.reason,
       });
-      return success("parsed", value, raw, normalized.reason);
+      return success("parsed", value, raw, normalized.reason, "", metadata);
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Invalid JSON.";
       ctx.log.debug("parse_json rejected text", { errorMessage: message });
-      return success("invalid", null, raw, "invalid_json", message);
+      return success("invalid", null, raw, "invalid_json", message, metadata);
     }
   },
 });
@@ -128,6 +164,17 @@ function readRawValue(input: Record<string, unknown>, path: string): unknown {
   const trimmed = path.trim();
   if (trimmed !== "") return readPath(input, trimmed);
   return input.text ?? input.input ?? input.in ?? input.__runInput__ ?? "";
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function normalizeText(
@@ -156,7 +203,13 @@ function success(
   value: unknown,
   raw: unknown,
   status: string,
-  errorMessage = "",
+  errorMessage: string,
+  metadata: {
+    path: string;
+    trim: boolean;
+    unwrapCodeFence: boolean;
+    acceptNonString: boolean;
+  },
 ) {
   return {
     kind: "success" as const,
@@ -164,6 +217,10 @@ function success(
       [branch]: null,
       value,
       raw,
+      path: metadata.path,
+      trim: metadata.trim,
+      unwrapCodeFence: metadata.unwrapCodeFence,
+      acceptNonString: metadata.acceptNonString,
       status,
       type: jsonType(value),
       errorMessage,

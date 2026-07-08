@@ -16342,6 +16342,126 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toContain("bad=");
   });
 
+  it("uses dynamic parse_json path trim and code fence policy ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parse_json_dynamic_text_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { payload: '  ```json\n{"kind":"order","items":["x","y"]}\n```  ' } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "text.payload" },
+    });
+    const trim = flow.node("transform", {
+      id: "trim",
+      position: { x: 120, y: 240 },
+      config: { value: true },
+    });
+    const unwrap = flow.node("transform", {
+      id: "unwrap",
+      position: { x: 120, y: 360 },
+      config: { value: true },
+    });
+    const parse = flow.node("parse_json", {
+      id: "parse",
+      position: { x: 320, y: 0 },
+      config: { path: "text.missing", trim: false, unwrapCodeFence: false },
+    });
+    const route = flow.node("switch_case", {
+      id: "route",
+      position: { x: 480, y: 0 },
+      config: { path: "value.kind", case1: "order" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 640, y: 0 },
+      config: { template: "order=${input.items}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 780, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), trim.in("in"));
+    flow.connect(start.out("out"), unwrap.in("in"));
+    flow.connect(input.out("out"), parse.in("in"));
+    flow.connect(input.out("output"), parse.in("text"));
+    flow.connect(path.out("output"), parse.in("path"));
+    flow.connect(trim.out("output"), parse.in("trim"));
+    flow.connect(unwrap.out("output"), parse.in("unwrapCodeFence"));
+    flow.connect(parse.out("parsed"), route.in("in"));
+    flow.connect(parse.out("value"), route.in("value"));
+    flow.connect(route.out("case1"), report.in("in"));
+    flow.connect(route.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parse_json_dynamic_text_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("order=x,y");
+  });
+
+  it("uses dynamic parse_json acceptNonString ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parse_json_dynamic_structured_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { payload: { kind: "order", id: "ord_dynamic" } } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "text.payload" },
+    });
+    const accept = flow.node("transform", {
+      id: "accept",
+      position: { x: 120, y: 240 },
+      config: { value: true },
+    });
+    const parse = flow.node("parse_json", {
+      id: "parse",
+      position: { x: 320, y: 0 },
+      config: { path: "text.payload", acceptNonString: false },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "id=${input.id}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), accept.in("in"));
+    flow.connect(input.out("out"), parse.in("in"));
+    flow.connect(input.out("output"), parse.in("text"));
+    flow.connect(path.out("output"), parse.in("path"));
+    flow.connect(accept.out("output"), parse.in("acceptNonString"));
+    flow.connect(parse.out("parsed"), report.in("in"));
+    flow.connect(parse.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parse_json_dynamic_structured_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("id=ord_dynamic");
+  });
+
   it("stringifies structured data with stable sorted keys using stringify_json", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "stringify_json_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
