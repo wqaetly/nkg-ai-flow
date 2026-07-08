@@ -34,6 +34,7 @@ import {
   circuitBreakerNode,
   compensationNode,
   conditionNode,
+  deadlineNode,
   delayNode,
   filterItemsNode,
   agentNode,
@@ -161,6 +162,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, circuitBreakerNode);
   installNode(target, compensationNode);
   installNode(target, conditionNode);
+  installNode(target, deadlineNode);
   installNode(target, delayNode);
   installNode(target, filterItemsNode);
   installNode(target, httpNode);

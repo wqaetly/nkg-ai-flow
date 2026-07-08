@@ -120,6 +120,70 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("routes deadline to on_time before the deadline", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "deadline_on_time_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const deadline = flow.node("deadline", {
+      id: "deadline",
+      position: { x: 120, y: 0 },
+      config: { deadlineAt: String(Date.now() + 60_000) },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "deadline:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), deadline.in("in"));
+    flow.connect(deadline.out("on_time"), report.in("in"));
+    flow.connect(deadline.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "deadline_on_time_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("deadline:on_time");
+  });
+
+  it("routes deadline to overdue after the deadline", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "deadline_overdue_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const deadline = flow.node("deadline", {
+      id: "deadline",
+      position: { x: 120, y: 0 },
+      config: { deadlineAt: String(Date.now() - 1000) },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "deadline:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), deadline.in("in"));
+    flow.connect(deadline.out("overdue"), report.in("in"));
+    flow.connect(deadline.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "deadline_overdue_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("deadline:overdue");
+  });
+
   it("routes node errors through retry_policy with backoff metadata", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

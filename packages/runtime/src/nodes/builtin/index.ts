@@ -18,6 +18,7 @@ export { transformNode } from "./transform.js";
 export { circuitBreakerNode } from "./circuitBreaker.js";
 export { compensationNode } from "./compensation.js";
 export { conditionNode } from "./condition.js";
+export { deadlineNode } from "./deadline.js";
 export { delayNode } from "./delay.js";
 export { filterItemsNode } from "./filterItems.js";
 export { httpNode } from "./http.js";

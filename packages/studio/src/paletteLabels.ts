@@ -41,6 +41,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "条件分支",
         description: "根据布尔表达式把流程路由到 true / false 分支。",
       },
+      deadline: {
+        title: "截止时间",
+        description: "检查 SLA 或截止时间，并路由到准时或已超时分支。",
+      },
       delay: {
         title: "延迟等待",
         description: "等待指定毫秒数后继续流程。",

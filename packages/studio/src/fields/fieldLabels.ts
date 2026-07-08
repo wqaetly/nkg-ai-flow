@@ -48,6 +48,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       condition: "继续条件",
       default_name: "默认名称",
       defaultValue: "默认值",
+      deadlineAt: "截止时间",
       description: "描述",
       durationMs: "等待时长（毫秒）",
       end: "结束值",
@@ -59,6 +60,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       flowId: "流程 ID",
       flowVersion: "流程版本",
       failOnError: "失败时中断",
+      graceMs: "宽限时间（毫秒）",
       headers: "请求头",
       inputMode: "输入模式",
       inputValue: "静态输入",
@@ -132,6 +134,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       condition: {
         expression: "条件表达式",
+      },
+      deadline: {
+        deadlineAt: "截止时间",
+        durationMs: "相对时长（毫秒）",
+        graceMs: "宽限时间（毫秒）",
       },
       circuit_breaker: {
         name: "熔断状态名",

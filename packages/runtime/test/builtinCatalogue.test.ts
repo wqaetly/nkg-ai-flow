@@ -18,6 +18,7 @@ const BUILTIN_TYPES = [
   "circuit_breaker",
   "compensation",
   "condition",
+  "deadline",
   "delay",
   "filter_items",
   "http",
