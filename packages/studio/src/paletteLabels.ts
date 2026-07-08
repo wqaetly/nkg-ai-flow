@@ -81,6 +81,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "死信队列",
         description: "记录或取出失败载荷，供重放、告警或人工处理。",
       },
+      delete_path: {
+        title: "路径删除",
+        description: "从结构化数据中删除字段或数组项，并按删除、缺失或跳过继续流程。",
+      },
       delay: {
         title: "延迟等待",
         description: "等待指定毫秒数后继续流程。",

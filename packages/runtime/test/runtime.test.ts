@@ -5155,6 +5155,175 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("previous=new");
   });
 
+  it("deletes nested object fields by path with delete_path", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delete_path_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1", status: "paid", temp: true } } },
+    });
+    const remove = flow.node("delete_path", {
+      id: "delete",
+      position: { x: 260, y: 0 },
+      config: { path: "order.temp" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 400, y: 0 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "deleted=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), remove.in("in"));
+    flow.connect(input.out("output"), remove.in("source"));
+    flow.connect(remove.out("deleted"), stringify.in("in"));
+    flow.connect(remove.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delete_path_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('deleted={"order":{"id":"ord_1","status":"paid"}}');
+  });
+
+  it("deletes array entries by path with delete_path splice mode", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delete_path_array_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { items: ["a", "b", "c"] } },
+    });
+    const remove = flow.node("delete_path", {
+      id: "delete",
+      position: { x: 260, y: 0 },
+      config: { path: "items[1]", arrayMode: "splice" },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "items=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), remove.in("in"));
+    flow.connect(input.out("output"), remove.in("source"));
+    flow.connect(remove.out("deleted"), stringify.in("in"));
+    flow.connect(remove.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delete_path_array_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('items={"items":["a","c"]}');
+  });
+
+  it("routes delete_path to missing when the target path is absent", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delete_path_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const remove = flow.node("delete_path", {
+      id: "delete",
+      position: { x: 260, y: 0 },
+      config: { path: "order.temp" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "missing=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), remove.in("in"));
+    flow.connect(input.out("output"), remove.in("source"));
+    flow.connect(remove.out("missing"), report.in("in"));
+    flow.connect(remove.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delete_path_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("missing=path_missing");
+  });
+
+  it("routes delete_path to skipped when the path is empty", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delete_path_skipped_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const remove = flow.node("delete_path", {
+      id: "delete",
+      position: { x: 260, y: 0 },
+      config: { path: "" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "skipped=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), remove.in("in"));
+    flow.connect(input.out("output"), remove.in("source"));
+    flow.connect(remove.out("skipped"), report.in("in"));
+    flow.connect(remove.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "delete_path_skipped_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("skipped=empty_path");
+  });
+
   it("flattens nested arrays with flatten_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -30,6 +30,7 @@ const BUILTIN_TYPES = [
   "cooldown_gate",
   "deadline",
   "dead_letter",
+  "delete_path",
   "delay",
   "distinct_until_changed",
   "empty_gate",

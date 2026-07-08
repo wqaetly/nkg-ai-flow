@@ -282,6 +282,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         state: "死信状态",
         count: "数量",
       },
+      delete_path: {
+        source: "来源数据",
+        deleted: "已删除",
+        missing: "缺失",
+        skipped: "已跳过",
+        value: "更新值",
+        removed: "删除值",
+        exists: "原先存在",
+        changed: "是否改变",
+        path: "路径",
+        reason: "原因",
+      },
       delay: {
         elapsedMs: "实际等待毫秒",
       },

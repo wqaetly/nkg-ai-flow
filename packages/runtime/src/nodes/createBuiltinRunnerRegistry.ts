@@ -44,6 +44,7 @@ import {
   cooldownGateNode,
   deadlineNode,
   deadLetterNode,
+  deletePathNode,
   delayNode,
   distinctUntilChangedNode,
   emptyGateNode,
@@ -206,6 +207,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, cooldownGateNode);
   installNode(target, deadlineNode);
   installNode(target, deadLetterNode);
+  installNode(target, deletePathNode);
   installNode(target, delayNode);
   installNode(target, distinctUntilChangedNode);
   installNode(target, emptyGateNode);

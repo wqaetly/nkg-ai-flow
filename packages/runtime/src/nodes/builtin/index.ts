@@ -30,6 +30,7 @@ export { conditionNode } from "./condition.js";
 export { cooldownGateNode } from "./cooldownGate.js";
 export { deadlineNode } from "./deadline.js";
 export { deadLetterNode } from "./deadLetter.js";
+export { deletePathNode } from "./deletePath.js";
 export { delayNode } from "./delay.js";
 export { distinctUntilChangedNode } from "./distinctUntilChanged.js";
 export { emptyGateNode } from "./emptyGate.js";

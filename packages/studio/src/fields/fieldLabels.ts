@@ -186,6 +186,10 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         reason: "原因",
         maxItems: "最大保留条目",
       },
+      delete_path: {
+        path: "删除路径",
+        arrayMode: "数组删除模式",
+      },
       circuit_breaker: {
         name: "熔断状态名",
         failureThreshold: "失败阈值",
