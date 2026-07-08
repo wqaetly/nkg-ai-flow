@@ -2453,6 +2453,176 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("partial:1");
   });
 
+  it("marks and loads a resume_point recovery target", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const markFlow = defineFlow({ id: "resume_point_mark_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const markStart = markFlow.node("start", { id: "mark_start", position: { x: 0, y: 0 } });
+    const mark = markFlow.node("resume_point", {
+      id: "mark",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RESUME_POINT",
+        mode: "mark",
+        targetNodeId: "charge_payment",
+        snapshot: { orderId: "order-1", step: "charge_payment" },
+        reason: "payment timeout",
+      },
+    });
+    const markReport = markFlow.node("transform", {
+      id: "mark_report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const markEnd = markFlow.node("end", { id: "mark_end", position: { x: 400, y: 0 } });
+    markFlow.connect(markStart.out("out"), mark.in("in"));
+    markFlow.connect(mark.out("marked"), markReport.in("in"));
+    markFlow.connect(mark.out("status"), markReport.in("input"));
+    markFlow.connect(markReport.out("out"), markEnd.in("in"));
+
+    const loadFlow = defineFlow({ id: "resume_point_load_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const loadStart = loadFlow.node("start", { id: "load_start", position: { x: 0, y: 0 } });
+    const load = loadFlow.node("resume_point", {
+      id: "load",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RESUME_POINT",
+        mode: "load",
+      },
+    });
+    const loadReport = loadFlow.node("transform", {
+      id: "load_report",
+      position: { x: 260, y: 0 },
+      config: { template: "target:${input}" },
+    });
+    const loadEnd = loadFlow.node("end", { id: "load_end", position: { x: 400, y: 0 } });
+    loadFlow.connect(loadStart.out("out"), load.in("in"));
+    loadFlow.connect(load.out("ready"), loadReport.in("in"));
+    loadFlow.connect(load.out("targetNodeId"), loadReport.in("input"));
+    loadFlow.connect(loadReport.out("out"), loadEnd.in("in"));
+
+    await registerAndPromote(rt, markFlow);
+    await registerAndPromote(rt, loadFlow);
+
+    const marked = await rt.invocationRouter.invoke({
+      flowId: "resume_point_mark_e2e",
+      input: null,
+    });
+    expect(marked.succeeded).toBe(true);
+    expect(marked.output).toBe("resume:marked");
+    expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
+      status: "ready",
+      targetNodeId: "charge_payment",
+      reason: "payment timeout",
+      snapshot: { orderId: "order-1", step: "charge_payment" },
+    });
+
+    const loaded = await rt.invocationRouter.invoke({
+      flowId: "resume_point_load_e2e",
+      input: null,
+    });
+    expect(loaded.succeeded).toBe(true);
+    expect(loaded.output).toBe("target:charge_payment");
+  });
+
+  it("routes resume_point load to missing when no recovery target exists", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const load = flow.node("resume_point", {
+      id: "load",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "MISSING_RESUME_POINT",
+        mode: "load",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), load.in("in"));
+    flow.connect(load.out("missing"), report.in("in"));
+    flow.connect(load.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:missing");
+  });
+
+  it("routes resume_point load to expired after its TTL window", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "charge_payment",
+      snapshot: { orderId: "order-1" },
+      reason: "payment timeout",
+      sourceRunId: "run_1",
+      version: 1,
+      markedAt: Date.now() - 10_000,
+      loadedAt: null,
+      expiresAt: Date.now() - 1,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const load = flow.node("resume_point", {
+      id: "load",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RESUME_POINT",
+        mode: "load",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), load.in("in"));
+    flow.connect(load.out("expired"), report.in("in"));
+    flow.connect(load.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:expired");
+    expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
+      status: "expired",
+      targetNodeId: "charge_payment",
+    });
+  });
+
   it("routes wait_signal to received when an external signal is present", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {

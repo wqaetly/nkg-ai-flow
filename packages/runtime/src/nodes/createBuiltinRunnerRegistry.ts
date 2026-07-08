@@ -81,6 +81,7 @@ import {
   rateLimitNode,
   reduceItemsNode,
   retryPolicyNode,
+  resumePointNode,
   rollbackNode,
   scheduleWindowNode,
   schemaGuardNode,
@@ -251,6 +252,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, rateLimitNode);
   installNode(target, reduceItemsNode);
   installNode(target, retryPolicyNode);
+  installNode(target, resumePointNode);
   installNode(target, rollbackNode);
   installNode(target, scheduleWindowNode);
   installNode(target, schemaGuardNode);

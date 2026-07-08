@@ -425,6 +425,14 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxDelayMs: "最大等待毫秒",
         retryableOnly: "仅重试可重试错误",
       },
+      resume_point: {
+        name: "恢复状态名",
+        mode: "模式",
+        targetNodeId: "目标节点 ID",
+        snapshot: "快照",
+        reason: "恢复原因",
+        ttlMs: "TTL（毫秒）",
+      },
       rollback: {
         mode: "模式",
         successPath: "成功字段路径",
