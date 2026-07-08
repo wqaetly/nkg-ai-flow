@@ -75,11 +75,13 @@ export const signalResumeNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "signal", direction: "input", kind: "data", label: "Signal" },
+    { id: "expected", direction: "input", kind: "data", label: "Expected", schema: { type: "string" } },
     { id: "resumed", direction: "output", kind: "control", label: "Resumed" },
     { id: "ignored", direction: "output", kind: "control", label: "Ignored" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "signal", direction: "output", kind: "data", label: "Signal" },
     { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
@@ -132,7 +134,7 @@ export const signalResumeNode = defineNode({
     }
 
     const previous = readWaitSignalState(store.get(name));
-    const expectedOverride = String(config.expected ?? "").trim();
+    const expectedOverride = String(input.expected ?? config.expected ?? "").trim();
     const expected = expectedOverride || previous?.expected || String(signal);
     const decision = applySignal(previous, {
       signal,
@@ -169,6 +171,7 @@ export const signalResumeNode = defineNode({
       outputs: {
         [decision.status]: null,
         state: decision.state,
+        name,
         status: decision.status,
         signal,
         expected,

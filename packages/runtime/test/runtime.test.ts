@@ -5334,6 +5334,57 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("creates a wait_signal checkpoint with a dynamic expected input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_dynamic_expected_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const expected = flow.node("transform", {
+      id: "expected",
+      position: { x: 120, y: 0 },
+      config: { value: "accepted" },
+    });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_DYNAMIC_EXPECTED",
+        expected: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "expected:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), expected.in("in"));
+    flow.connect(expected.out("out"), wait.in("in"));
+    flow.connect(expected.out("output"), wait.in("expected"));
+    flow.connect(wait.out("waiting"), report.in("in"));
+    flow.connect(wait.out("expected"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_dynamic_expected_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("expected:accepted");
+    expect(variables.get("ORDER_APPROVAL_DYNAMIC_EXPECTED")).toMatchObject({
+      status: "waiting",
+      signal: null,
+      expected: "accepted",
+    });
+  });
+
   it("resumes a wait_signal checkpoint through signal_resume", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
@@ -5415,6 +5466,7 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(resumeOutput).toMatchObject({
       status: "resumed",
+      name: "ORDER_APPROVAL_SIGNAL",
       stateStatus: "received",
       signal: "approved",
       expected: "approved",
@@ -5440,6 +5492,71 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(received.succeeded).toBe(true);
     expect(received.output).toBe("wait:received");
+  });
+
+  it("resumes a wait_signal checkpoint with a dynamic expected input", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_DYNAMIC_EXPECTED_RESUME", {
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      requestedAt: Date.now(),
+      expiresAt: null,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_dynamic_expected_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const signal = flow.node("transform", {
+      id: "signal",
+      position: { x: 120, y: 0 },
+      config: { value: "accepted" },
+    });
+    const expected = flow.node("transform", {
+      id: "expected",
+      position: { x: 260, y: 0 },
+      config: { value: "accepted" },
+    });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 400, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_DYNAMIC_EXPECTED_RESUME",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), signal.in("in"));
+    flow.connect(signal.out("out"), expected.in("in"));
+    flow.connect(expected.out("out"), resume.in("in"));
+    flow.connect(signal.out("output"), resume.in("signal"));
+    flow.connect(expected.out("output"), resume.in("expected"));
+    flow.connect(resume.out("resumed"), report.in("in"));
+    flow.connect(resume.out("expected"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_dynamic_expected_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:accepted");
+    expect(variables.get("ORDER_APPROVAL_DYNAMIC_EXPECTED_RESUME")).toMatchObject({
+      status: "received",
+      signal: "accepted",
+      expected: "accepted",
+    });
   });
 
   it("routes signal_resume to missing when the wait state is absent", async () => {

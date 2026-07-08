@@ -69,6 +69,7 @@ export const waitSignalNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "signal", direction: "input", kind: "data", label: "Signal" },
+    { id: "expected", direction: "input", kind: "data", label: "Expected", schema: { type: "string" } },
     { id: "received", direction: "output", kind: "control", label: "Received" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
@@ -118,7 +119,7 @@ export const waitSignalNode = defineNode({
     }
 
     const now = Date.now();
-    const expected = String(config.expected ?? "approved");
+    const expected = String(input.expected ?? config.expected ?? "approved");
     const timeoutMs = Math.max(0, Math.trunc(Number(config.timeoutMs ?? 0)));
     const previous = readWaitSignalState(store.get(name), expected, timeoutMs, now);
     const signal = input.signal ?? previous.signal;
@@ -187,6 +188,7 @@ function evaluateState(
       ...previous,
       status: "received",
       signal: converted,
+      expected,
       updatedAt: now,
     };
   }
@@ -202,6 +204,7 @@ function evaluateState(
     ...previous,
     status: "waiting",
     signal: converted ?? previous.signal,
+    expected,
     updatedAt: now,
   };
 }
