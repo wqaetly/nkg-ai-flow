@@ -97,6 +97,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "过滤数组",
         description: "按条件保留数组中的部分元素。",
       },
+      first_success: {
+        title: "首个成功",
+        description: "从有序候选结果中选择第一个成功值。",
+      },
       for_begin: {
         title: "For 开始",
         description: "固定范围循环块入口，输出当前索引和总数。",

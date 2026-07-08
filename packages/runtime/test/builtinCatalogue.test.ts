@@ -29,6 +29,7 @@ const BUILTIN_TYPES = [
   "delay",
   "distinct_until_changed",
   "filter_items",
+  "first_success",
   "http",
   "idempotency_key",
   "join",

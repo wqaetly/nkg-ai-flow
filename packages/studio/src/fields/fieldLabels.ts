@@ -229,6 +229,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       filter_items: {
         condition: "过滤条件",
       },
+      first_success: {
+        mode: "成功判定模式",
+        valuePath: "输出字段路径",
+        statusPath: "状态字段路径",
+        successValues: "成功状态值",
+        errorPath: "错误字段路径",
+      },
       for_begin: {
         start: "起始值",
         end: "结束值",

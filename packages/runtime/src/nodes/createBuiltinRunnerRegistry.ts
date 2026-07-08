@@ -45,6 +45,7 @@ import {
   delayNode,
   distinctUntilChangedNode,
   filterItemsNode,
+  firstSuccessNode,
   agentNode,
   endNode,
   eventTriggerNode,
@@ -189,6 +190,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, delayNode);
   installNode(target, distinctUntilChangedNode);
   installNode(target, filterItemsNode);
+  installNode(target, firstSuccessNode);
   installNode(target, httpNode);
   installNode(target, idempotencyKeyNode);
   installNode(target, joinNode);

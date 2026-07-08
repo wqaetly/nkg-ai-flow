@@ -303,6 +303,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         rejected: "剔除项",
         count: "保留数量",
       },
+      first_success: {
+        candidates: "候选结果",
+        found: "已找到",
+        missing: "未找到",
+        value: "选中值",
+        candidate: "选中候选",
+        evaluations: "评估结果",
+        index: "选中索引",
+        count: "候选数量",
+        status: "状态",
+        reason: "原因",
+      },
       for_begin: {
         body: "循环体",
         index: "索引",

@@ -571,6 +571,109 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("issues:2");
   });
 
+  it("selects the first successful fallback candidate", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "first_success_found_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const primary = flow.node("transform", {
+      id: "primary",
+      position: { x: 120, y: 40 },
+      config: { value: { ok: false, error: "primary down", result: { text: "primary" } } },
+    });
+    const backup = flow.node("transform", {
+      id: "backup",
+      position: { x: 120, y: 140 },
+      config: { value: { ok: true, result: { text: "backup" } } },
+    });
+    const last = flow.node("transform", {
+      id: "last",
+      position: { x: 120, y: 240 },
+      config: { value: { ok: true, result: { text: "last" } } },
+    });
+    const selector = flow.node("first_success", {
+      id: "selector",
+      position: { x: 320, y: 140 },
+      config: {
+        mode: "ok",
+        valuePath: "result.text",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 140 },
+      config: { template: "chosen:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 140 } });
+
+    flow.connect(start.out("out"), primary.in("in"));
+    flow.connect(start.out("out"), backup.in("in"));
+    flow.connect(start.out("out"), last.in("in"));
+    flow.connect(primary.out("output"), selector.in("candidates"));
+    flow.connect(backup.out("output"), selector.in("candidates"));
+    flow.connect(last.out("output"), selector.in("candidates"));
+    flow.connect(selector.out("found"), report.in("in"));
+    flow.connect(selector.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "first_success_found_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("chosen:backup");
+  });
+
+  it("routes first_success to missing when no candidate passes", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "first_success_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const primary = flow.node("transform", {
+      id: "primary",
+      position: { x: 120, y: 40 },
+      config: { value: { status: "failed", error: "timeout" } },
+    });
+    const backup = flow.node("transform", {
+      id: "backup",
+      position: { x: 120, y: 140 },
+      config: { value: { status: "pending" } },
+    });
+    const selector = flow.node("first_success", {
+      id: "selector",
+      position: { x: 320, y: 80 },
+      config: {
+        mode: "status",
+        successValues: "ready,ok",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 80 },
+      config: { template: "fallback:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 80 } });
+
+    flow.connect(start.out("out"), primary.in("in"));
+    flow.connect(start.out("out"), backup.in("in"));
+    flow.connect(primary.out("output"), selector.in("candidates"));
+    flow.connect(backup.out("output"), selector.in("candidates"));
+    flow.connect(selector.out("missing"), report.in("in"));
+    flow.connect(selector.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "first_success_missing_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("fallback:no_successful_candidate");
+  });
+
   it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
