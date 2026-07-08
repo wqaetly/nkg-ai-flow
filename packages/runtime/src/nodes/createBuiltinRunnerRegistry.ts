@@ -205,6 +205,7 @@ export function createBuiltinRunnerRegistry(
     options.sandboxAdapter ? { sandboxAdapter: options.sandboxAdapter } : {},
   );
   const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const toolHost = createNodeAgentToolHost();
   const target = makeInstallTarget(registry, options.nodeTypeRegistry);
 
   installNode(target, startNode);
@@ -274,7 +275,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, subflowTemplateNode);
   installNode(target, switchCaseNode);
   installNode(target, stringifyJsonNode);
-  installNode(target, toolNode);
+  installNode(target, toolNode, { toolHost });
   installNode(target, uniqueItemsNode);
   installNode(target, windowItemsNode);
   installNode(target, textInputNode);
@@ -284,7 +285,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, llmNode, { llmProvider });
   installNode(target, agentNode, {
     llmProvider,
-    toolHost: createNodeAgentToolHost(),
+    toolHost,
   });
   installNode(target, eventTriggerNode);
   installNode(target, featureFlagNode);

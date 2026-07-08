@@ -134,6 +134,13 @@ export function getBuiltinNodeDefinitions(
       },
     },
   });
+  const toolDefined = toolNode({
+    toolHost: {
+      async callTool() {
+        return { ok: false, error: "runtime tools are unavailable in definitions mode" };
+      },
+    },
+  });
   return [
     startNode.definition,
     endNode.definition,
@@ -202,7 +209,7 @@ export function getBuiltinNodeDefinitions(
     subflowTemplateNode.definition,
     switchCaseNode.definition,
     stringifyJsonNode.definition,
-    toolNode.definition,
+    toolDefined.definition,
     uniqueItemsNode.definition,
     windowItemsNode.definition,
     textInputNode.definition,

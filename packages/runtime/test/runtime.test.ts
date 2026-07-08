@@ -4,6 +4,10 @@
  * and a deterministic test LLM provider so no external service is needed.
  */
 
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 import { defineFlow } from "@ai-native-flow/flow-builder";
 import { defineNode } from "@ai-native-flow/node-sdk";
@@ -147,6 +151,109 @@ describe("runtime / hello-flow end-to-end", () => {
         "run_finished",
       ]),
     );
+  });
+
+  it("invokes a built-in tool and exposes its structured result", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "nkg-tool-"));
+    try {
+      await writeFile(join(tmp, "input.txt"), "tool payload", "utf8");
+      const rt = newRuntime();
+      const flow = defineFlow({ id: "tool_read_file_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+      const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+      const tool = flow.node("tool", {
+        id: "read_tool",
+        position: { x: 120, y: 0 },
+        config: {
+          tool: "read_file",
+          args: { path: "input.txt" },
+          workingDir: tmp,
+          allowedTools: ["read_file"],
+          failOnError: true,
+        },
+      });
+      const report = flow.node("transform", {
+        id: "report",
+        position: { x: 260, y: 0 },
+        config: { template: "file=${input.content}" },
+      });
+      const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+      flow.connect(start.out("out"), tool.in("in"));
+      flow.connect(tool.out("success"), report.in("in"));
+      flow.connect(tool.out("result"), report.in("input"));
+      flow.connect(report.out("out"), end.in("in"));
+
+      await registerAndPromote(rt, flow);
+
+      const result = await rt.invocationRouter.invoke({
+        flowId: "tool_read_file_e2e",
+        input: null,
+      });
+
+      expect(result.succeeded).toBe(true);
+      expect(result.output).toBe("file=tool payload");
+
+      const events = await rt.eventBus.store.read(result.runRecord.runId);
+      expect(
+        events.find((event) => event.kind === "tool_call_started" && event.nodeId === "read_tool")
+          ?.payload,
+      ).toMatchObject({ toolName: "read_file", args: { path: "input.txt" } });
+      expect(
+        events.find((event) => event.kind === "tool_call_finished" && event.nodeId === "read_tool")
+          ?.payload,
+      ).toMatchObject({ toolName: "read_file", ok: true });
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("routes a failed tool call through the failed branch when failOnError is false", async () => {
+    const tmp = await mkdtemp(join(tmpdir(), "nkg-tool-"));
+    try {
+      const rt = newRuntime();
+      const flow = defineFlow({ id: "tool_failed_branch_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+      const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+      const tool = flow.node("tool", {
+        id: "read_missing",
+        position: { x: 120, y: 0 },
+        config: {
+          tool: "read_file",
+          args: { path: "missing.txt" },
+          workingDir: tmp,
+          allowedTools: ["read_file"],
+          failOnError: false,
+        },
+      });
+      const report = flow.node("transform", {
+        id: "report",
+        position: { x: 260, y: 0 },
+        config: { template: "failed=${input}" },
+      });
+      const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+      flow.connect(start.out("out"), tool.in("in"));
+      flow.connect(tool.out("failed"), report.in("in"));
+      flow.connect(tool.out("errorMessage"), report.in("input"));
+      flow.connect(report.out("out"), end.in("in"));
+
+      await registerAndPromote(rt, flow);
+
+      const result = await rt.invocationRouter.invoke({
+        flowId: "tool_failed_branch_e2e",
+        input: null,
+      });
+
+      expect(result.succeeded).toBe(true);
+      expect(String(result.output)).toContain("ENOENT");
+
+      const events = await rt.eventBus.store.read(result.runRecord.runId);
+      expect(
+        events.find((event) => event.kind === "tool_call_finished" && event.nodeId === "read_missing")
+          ?.payload,
+      ).toMatchObject({ toolName: "read_file", ok: false });
+    } finally {
+      await rm(tmp, { recursive: true, force: true });
+    }
   });
 
   it("waits in a delay node before continuing the flow", async () => {
