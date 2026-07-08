@@ -72,6 +72,9 @@ export const setPathNode = defineNode({
     controlIn,
     { id: "source", direction: "input", kind: "data", label: "Source" },
     { id: "value", direction: "input", kind: "data", label: "Value" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "createMissing", direction: "input", kind: "data", label: "Create missing", schema: { type: "boolean" } },
+    { id: "overwrite", direction: "input", kind: "data", label: "Overwrite", schema: { type: "boolean" } },
     { id: "updated", direction: "output", kind: "control", label: "Updated" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "skipped", direction: "output", kind: "control", label: "Skipped" },
@@ -101,6 +104,20 @@ export const setPathNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "createMissing",
+      direction: "output",
+      kind: "data",
+      label: "Create missing",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "overwrite",
+      direction: "output",
+      kind: "data",
+      label: "Overwrite",
+      schema: { type: "boolean" },
+    },
+    {
       id: "reason",
       direction: "output",
       kind: "data",
@@ -112,10 +129,12 @@ export const setPathNode = defineNode({
   run({ input, config, ctx }) {
     const source = readSource(input);
     const assigned = readAssigned(input, config);
-    const path = String(config.path ?? "").trim();
+    const path = String(input.path ?? config.path ?? "").trim();
+    const createMissing = readBoolean(input.createMissing) ?? readBoolean(config.createMissing) ?? true;
+    const overwrite = readBoolean(input.overwrite) ?? readBoolean(config.overwrite) ?? true;
     const result = writePath(source, path, assigned, {
-      createMissing: config.createMissing !== false,
-      overwrite: config.overwrite !== false,
+      createMissing,
+      overwrite,
     });
 
     ctx.log.debug("set_path wrote value", {
@@ -137,6 +156,8 @@ export const setPathNode = defineNode({
         exists: result.exists,
         changed: result.changed,
         path,
+        createMissing,
+        overwrite,
         reason: result.reason,
       },
     };
@@ -154,6 +175,17 @@ function readAssigned(
   if (Object.prototype.hasOwnProperty.call(input, "value")) return input.value;
   if (Object.prototype.hasOwnProperty.call(config, "value")) return config.value;
   return null;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value !== 0 : undefined;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return undefined;
 }
 
 function writePath(

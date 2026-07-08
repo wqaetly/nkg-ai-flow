@@ -1137,6 +1137,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         exists: "原先存在",
         changed: "是否改变",
         path: "路径",
+        createMissing: "创建缺失路径",
+        overwrite: "覆盖已有值",
         reason: "原因",
       },
       slice_items: {

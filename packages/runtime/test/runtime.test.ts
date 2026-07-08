@@ -16617,6 +16617,119 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe('updated={"order":{"id":"ord_1","status":"paid"}}');
   });
 
+  it("uses dynamic set_path path value and createMissing ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "set_path_dynamic_create_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "order.customer.name" },
+    });
+    const value = flow.node("transform", {
+      id: "value",
+      position: { x: 120, y: 240 },
+      config: { value: "dynamic-customer" },
+    });
+    const createMissing = flow.node("transform", {
+      id: "createMissing",
+      position: { x: 120, y: 360 },
+      config: { value: true },
+    });
+    const set = flow.node("set_path", {
+      id: "set",
+      position: { x: 320, y: 0 },
+      config: { path: "order.status", value: "static-status", createMissing: false },
+    });
+    const stringify = flow.node("stringify_json", {
+      id: "stringify",
+      position: { x: 480, y: 0 },
+      config: { sortKeys: true },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 640, y: 0 },
+      config: { template: "updated=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 780, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), value.in("in"));
+    flow.connect(start.out("out"), createMissing.in("in"));
+    flow.connect(input.out("out"), set.in("in"));
+    flow.connect(input.out("output"), set.in("source"));
+    flow.connect(path.out("output"), set.in("path"));
+    flow.connect(value.out("output"), set.in("value"));
+    flow.connect(createMissing.out("output"), set.in("createMissing"));
+    flow.connect(set.out("updated"), stringify.in("in"));
+    flow.connect(set.out("value"), stringify.in("value"));
+    flow.connect(stringify.out("stringified"), report.in("in"));
+    flow.connect(stringify.out("text"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "set_path_dynamic_create_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('updated={"order":{"customer":{"name":"dynamic-customer"},"id":"ord_1"}}');
+  });
+
+  it("uses dynamic set_path overwrite ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "set_path_dynamic_overwrite_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { status: "new" } } },
+    });
+    const overwrite = flow.node("transform", {
+      id: "overwrite",
+      position: { x: 120, y: 120 },
+      config: { value: true },
+    });
+    const set = flow.node("set_path", {
+      id: "set",
+      position: { x: 300, y: 0 },
+      config: { path: "order.status", value: "paid", overwrite: false },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "assigned=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), overwrite.in("in"));
+    flow.connect(input.out("out"), set.in("in"));
+    flow.connect(input.out("output"), set.in("source"));
+    flow.connect(overwrite.out("output"), set.in("overwrite"));
+    flow.connect(set.out("updated"), report.in("in"));
+    flow.connect(set.out("assigned"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "set_path_dynamic_overwrite_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("assigned=paid");
+  });
+
   it("routes set_path to missing when containers cannot be created", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "set_path_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
