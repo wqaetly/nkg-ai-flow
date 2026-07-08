@@ -31,6 +31,7 @@ const BUILTIN_TYPES = [
   "agent",
   "event_trigger",
   "send_event",
+  "state_get",
   "state_set",
   "foreach_begin",
   "foreach_end",

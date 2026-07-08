@@ -31,6 +31,7 @@ export { textInputNode } from "./textInput.js";
 export { agentNode } from "./agent.js";
 export { eventTriggerNode } from "./eventTrigger.js";
 export { sendEventNode } from "./sendEvent.js";
+export { stateGetNode } from "./stateGet.js";
 export { stateSetNode } from "./stateSet.js";
 export {
   foreachBeginNode,

@@ -171,6 +171,55 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("reads state as explicit data with state_get", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "state_get_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { status: "ready" } },
+    });
+    const setState = flow.node("state_set", {
+      id: "set_state",
+      position: { x: 260, y: 0 },
+      config: { name: "FLOW_STATE_OBJECT" },
+    });
+    const getState = flow.node("state_get", {
+      id: "get_state",
+      position: { x: 400, y: 0 },
+      config: { name: "FLOW_STATE_OBJECT" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "state=${input.status}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), setState.in("in"));
+    flow.connect(input.out("output"), setState.in("value"));
+    flow.connect(setState.out("out"), getState.in("in"));
+    flow.connect(getState.out("out"), report.in("in"));
+    flow.connect(getState.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "state_get_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("state=ready");
+  });
+
   it("joins fan-out branches and collects their values", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "join_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

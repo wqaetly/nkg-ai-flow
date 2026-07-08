@@ -133,6 +133,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "发送事件",
         description: "发送字符串事件以触发匹配的 active flow。",
       },
+      state_get: {
+        title: "读取状态",
+        description: "从运行时状态变量读取值并输出到数据流。",
+      },
       state_set: {
         title: "写入状态",
         description: "把输入或静态值写入运行时状态变量。",

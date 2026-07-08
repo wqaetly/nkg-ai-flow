@@ -219,6 +219,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         event: "事件",
         triggeredRuns: "触发运行数",
       },
+      state_get: {
+        name: "状态名",
+        value: "状态值",
+        found: "是否存在",
+        metadata: "元数据",
+      },
       state_set: {
         value: "状态值",
         previous: "原值",
