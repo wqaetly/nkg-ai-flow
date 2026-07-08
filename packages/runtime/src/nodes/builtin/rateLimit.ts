@@ -68,10 +68,16 @@ export const rateLimitNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
+    { id: "limit", direction: "input", kind: "data", label: "Limit", schema: { type: "number" } },
+    { id: "windowMs", direction: "input", kind: "data", label: "Window ms", schema: { type: "number" } },
+    { id: "cost", direction: "input", kind: "data", label: "Cost", schema: { type: "number" } },
     { id: "allowed", direction: "output", kind: "control", label: "Allowed" },
     { id: "limited", direction: "output", kind: "control", label: "Limited" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name" },
+    { id: "limit", direction: "output", kind: "data", label: "Limit", schema: { type: "number" } },
+    { id: "windowMs", direction: "output", kind: "data", label: "Window ms", schema: { type: "number" } },
+    { id: "cost", direction: "output", kind: "data", label: "Cost", schema: { type: "number" } },
     {
       id: "remaining",
       direction: "output",
@@ -115,9 +121,9 @@ export const rateLimitNode = defineNode({
     }
 
     const now = Date.now();
-    const limit = Math.max(1, Math.trunc(Number(config.limit ?? 60)));
-    const windowMs = Math.max(1, Math.trunc(Number(config.windowMs ?? 60000)));
-    const cost = Math.max(1, Math.trunc(Number(config.cost ?? 1)));
+    const limit = readPositiveInteger(input.limit) ?? readPositiveInteger(config.limit) ?? 60;
+    const windowMs = readPositiveInteger(input.windowMs) ?? readPositiveInteger(config.windowMs) ?? 60000;
+    const cost = readPositiveInteger(input.cost) ?? readPositiveInteger(config.cost) ?? 1;
     const previous = readRateLimitState(store.get(name), { limit, windowMs, now });
     const active = previous.timestamps.filter((timestamp) => now - timestamp < windowMs);
     const usedBefore = active.length;
@@ -153,6 +159,9 @@ export const rateLimitNode = defineNode({
         [branch]: null,
         state,
         name,
+        limit,
+        windowMs,
+        cost,
         remaining,
         used,
         retryAfterMs,

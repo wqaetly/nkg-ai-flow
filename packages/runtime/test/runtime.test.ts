@@ -3743,6 +3743,99 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic rate_limit policy inputs", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_DYNAMIC_POLICY_LIMIT", {
+      windowStart: now - 10_000,
+      windowMs: 60_000,
+      limit: 1,
+      timestamps: [now - 1_000],
+      updatedAt: now - 1_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "rate_limit_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const limitValue = flow.node("transform", {
+      id: "limitValue",
+      position: { x: 120, y: -120 },
+      config: { value: 3 },
+    });
+    const windowValue = flow.node("transform", {
+      id: "windowValue",
+      position: { x: 120, y: 0 },
+      config: { value: 120_000 },
+    });
+    const costValue = flow.node("transform", {
+      id: "costValue",
+      position: { x: 120, y: 120 },
+      config: { value: 2 },
+    });
+    const limit = flow.node("rate_limit", {
+      id: "limit",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "PAYMENT_DYNAMIC_POLICY_LIMIT",
+        limit: 1,
+        windowMs: 60_000,
+        cost: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "allowed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), limitValue.in("in"));
+    flow.connect(start.out("out"), windowValue.in("in"));
+    flow.connect(start.out("out"), costValue.in("in"));
+    flow.connect(start.out("out"), limit.in("in"));
+    flow.connect(limitValue.out("output"), limit.in("limit"));
+    flow.connect(windowValue.out("output"), limit.in("windowMs"));
+    flow.connect(costValue.out("output"), limit.in("cost"));
+    flow.connect(limit.out("allowed"), report.in("in"));
+    flow.connect(limit.out("used"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rate_limit_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("allowed:3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const limitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "limit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(limitOutput).toMatchObject({
+      name: "PAYMENT_DYNAMIC_POLICY_LIMIT",
+      limit: 3,
+      windowMs: 120_000,
+      cost: 2,
+      used: 3,
+      remaining: 0,
+      retryAfterMs: 0,
+    });
+    expect(variables.get("PAYMENT_DYNAMIC_POLICY_LIMIT")).toMatchObject({
+      limit: 3,
+      windowMs: 120_000,
+    });
+    expect(
+      (variables.get("PAYMENT_DYNAMIC_POLICY_LIMIT") as { timestamps?: unknown[] })
+        .timestamps,
+    ).toHaveLength(3);
+  });
+
   it("routes rate_limit to limited when the window is full", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_API_LIMIT", {
