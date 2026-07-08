@@ -11615,6 +11615,89 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("stores cache entries with dynamic policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cache_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -120 },
+      config: { value: "set" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 0 },
+      config: { value: 120_000 },
+    });
+    const value = flow.node("transform", {
+      id: "value",
+      position: { x: 120, y: 120 },
+      config: { value: { status: "ready", source: "dynamic-policy" } },
+    });
+    const cache = flow.node("cache", {
+      id: "cache",
+      position: { x: 320, y: 0 },
+      config: {
+        namespace: "http",
+        key: "GET:/orders/dynamic-policy",
+        mode: "get",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "cache:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), value.in("in"));
+    flow.connect(start.out("out"), cache.in("in"));
+    flow.connect(mode.out("output"), cache.in("mode"));
+    flow.connect(ttl.out("output"), cache.in("ttlMs"));
+    flow.connect(value.out("output"), cache.in("value"));
+    flow.connect(cache.out("stored"), report.in("in"));
+    flow.connect(cache.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cache_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cache:set");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/dynamic-policy",
+      storeKey: "CACHE:http:GET:/orders/dynamic-policy",
+      mode: "set",
+      ttlMs: 120_000,
+      count: 1,
+      remainingMs: expect.any(Number),
+      value: { status: "ready", source: "dynamic-policy" },
+    });
+    expect(variables.get("CACHE:http:GET:/orders/dynamic-policy")).toMatchObject({
+      value: { status: "ready", source: "dynamic-policy" },
+      hits: 0,
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("reads cache hits and updates hit count", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("CACHE:http:GET:/orders/1", {

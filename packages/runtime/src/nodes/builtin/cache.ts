@@ -87,6 +87,8 @@ export const cacheNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "namespace", direction: "input", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "input", kind: "data", label: "Key" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "hit", direction: "output", kind: "control", label: "Hit" },
     { id: "miss", direction: "output", kind: "control", label: "Miss" },
@@ -110,6 +112,14 @@ export const cacheNode = defineNode({
       kind: "data",
       label: "Store Key",
       schema: { type: "string" },
+    },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
+      schema: { type: "number" },
     },
     {
       id: "count",
@@ -141,7 +151,8 @@ export const cacheNode = defineNode({
     }
 
     const namespace = readNamespace(input.namespace ?? config.namespace);
-    const mode = config.mode ?? "get";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "get";
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 0;
     const now = Date.now();
     if (mode === "clear") {
       const prefix = cachePrefix(namespace);
@@ -154,6 +165,8 @@ export const cacheNode = defineNode({
         namespace,
         key: "",
         storeKey: prefix,
+        mode,
+        ttlMs,
         value: null,
         entry: null,
         count: keys.length,
@@ -174,6 +187,8 @@ export const cacheNode = defineNode({
         namespace,
         key,
         storeKey,
+        mode,
+        ttlMs,
         value: null,
         entry: null,
         count: existed ? 1 : 0,
@@ -189,7 +204,6 @@ export const cacheNode = defineNode({
         return error("node.cache.unsupported_value", "cache value must be JSON-compatible", ctx.nodeId);
       }
       const previous = readCacheEntry(store.get(storeKey));
-      const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 0)));
       const entry: CacheEntry = {
         value,
         createdAt: previous?.createdAt ?? now,
@@ -202,6 +216,8 @@ export const cacheNode = defineNode({
         namespace,
         key,
         storeKey,
+        mode,
+        ttlMs,
         value,
         entry,
         count: 1,
@@ -216,6 +232,8 @@ export const cacheNode = defineNode({
         namespace,
         key,
         storeKey,
+        mode,
+        ttlMs,
         value: null,
         entry: null,
         count: 0,
@@ -229,6 +247,8 @@ export const cacheNode = defineNode({
         namespace,
         key,
         storeKey,
+        mode,
+        ttlMs,
         value: entry.value,
         entry,
         count: 0,
@@ -242,6 +262,8 @@ export const cacheNode = defineNode({
       namespace,
       key,
       storeKey,
+      mode,
+      ttlMs,
       value: hit.value,
       entry: hit,
       count: 1,
@@ -257,6 +279,8 @@ function success(
     namespace: string;
     key: string;
     storeKey: string;
+    mode: CacheMode;
+    ttlMs: number;
     value: VariableValue | null;
     entry: CacheEntry | null;
     count: number;
@@ -273,6 +297,8 @@ function success(
       key: values.key,
       namespace: values.namespace,
       storeKey: values.storeKey,
+      mode: values.mode,
+      ttlMs: values.ttlMs,
       count: values.count,
       expiresAt: values.expiresAt,
       remainingMs: values.remainingMs,
@@ -289,6 +315,24 @@ function readKey(value: unknown): string {
   if (typeof value === "string") return value.trim();
   if (typeof value === "number" || typeof value === "boolean") return String(value);
   return "";
+}
+
+function readMode(value: unknown): CacheMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "get" ||
+    normalized === "set" ||
+    normalized === "delete" ||
+    normalized === "clear"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function cachePrefix(namespace: string): string {

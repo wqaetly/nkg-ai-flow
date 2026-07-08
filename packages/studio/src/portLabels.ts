@@ -282,6 +282,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         namespace: "命名空间",
         key: "缓存键",
         value: "缓存值",
+        mode: "模式",
+        ttlMs: "TTL 毫秒",
         hit: "命中",
         miss: "未命中",
         stored: "已写入",
