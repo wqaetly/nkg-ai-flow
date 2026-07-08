@@ -70,6 +70,7 @@ export const waitSignalNode = defineNode({
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "signal", direction: "input", kind: "data", label: "Signal" },
     { id: "expected", direction: "input", kind: "data", label: "Expected", schema: { type: "string" } },
+    { id: "timeoutMs", direction: "input", kind: "data", label: "Timeout ms", schema: { type: "number" } },
     { id: "received", direction: "output", kind: "control", label: "Received" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
@@ -120,7 +121,7 @@ export const waitSignalNode = defineNode({
 
     const now = Date.now();
     const expected = String(input.expected ?? config.expected ?? "approved");
-    const timeoutMs = Math.max(0, Math.trunc(Number(config.timeoutMs ?? 0)));
+    const timeoutMs = readIntegerAtLeast(input.timeoutMs, 0) ?? readIntegerAtLeast(config.timeoutMs, 0) ?? 0;
     const previous = readWaitSignalState(store.get(name), expected, timeoutMs, now);
     const signal = input.signal ?? previous.signal;
     const next = evaluateState(previous, signal, expected, now);
@@ -250,6 +251,13 @@ function readStatus(value: unknown): WaitStatus {
 
 function readTimestamp(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {

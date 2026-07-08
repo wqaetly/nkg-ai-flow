@@ -6339,6 +6339,72 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("creates a wait_signal checkpoint with a dynamic timeout input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_dynamic_timeout_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const timeout = flow.node("transform", {
+      id: "timeout",
+      position: { x: 120, y: 0 },
+      config: { value: 45_000 },
+    });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_DYNAMIC_TIMEOUT",
+        expected: "approved",
+        timeoutMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "timeout:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), timeout.in("in"));
+    flow.connect(timeout.out("out"), wait.in("in"));
+    flow.connect(timeout.out("output"), wait.in("timeoutMs"));
+    flow.connect(wait.out("waiting"), report.in("in"));
+    flow.connect(wait.out("timeoutMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_dynamic_timeout_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timeout:45000");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const waitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(waitOutput).toMatchObject({
+      status: "waiting",
+      expected: "approved",
+      timeoutMs: 45_000,
+      remainingMs: expect.any(Number),
+      waitingValue: true,
+    });
+    expect(variables.get("ORDER_APPROVAL_DYNAMIC_TIMEOUT")).toMatchObject({
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("resumes a wait_signal checkpoint through signal_resume", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
