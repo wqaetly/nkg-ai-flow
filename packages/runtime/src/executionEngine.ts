@@ -61,6 +61,7 @@ export interface ExecutionEngineOptions {
   runId: string;
   flowId: string;
   flowVersion: string;
+  traceId?: string;
   runInput: unknown;
   runners: NodeRunnerRegistry;
   variables: VariableStore;
@@ -231,6 +232,7 @@ export class ExecutionEngine {
       runId,
       flowId,
       flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       seq: 0,
       kind: "run_started",
       payload: { input: runInput },
@@ -333,6 +335,7 @@ export class ExecutionEngine {
         runId,
         flowId,
         flowVersion,
+        ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
         seq: 0,
         kind: "run_cancelled",
         payload: { reason: "external cancellation" },
@@ -380,6 +383,7 @@ export class ExecutionEngine {
       runId,
       flowId,
       flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       seq: 0,
       kind: "run_finished",
       payload: { output: this.finalOutput },
@@ -511,6 +515,7 @@ export class ExecutionEngine {
       runId,
       flowId,
       flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: node.id,
       nodeVersion: node.typeVersion,
       attempt,
@@ -549,6 +554,7 @@ export class ExecutionEngine {
       runId,
       flowId,
       flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: node.id,
       nodeVersion: node.typeVersion,
       attempt,
@@ -648,6 +654,7 @@ export class ExecutionEngine {
         runId,
         flowId,
         flowVersion,
+        ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
         nodeId: node.id,
         nodeVersion: node.typeVersion,
         attempt,
@@ -660,6 +667,7 @@ export class ExecutionEngine {
         runId,
         flowId,
         flowVersion,
+        ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
         nodeId: node.id,
         nodeVersion: node.typeVersion,
         attempt,
@@ -686,6 +694,7 @@ export class ExecutionEngine {
       runId: this.options.runId,
       flowId: this.options.flowId,
       flowVersion: this.options.flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: node.id,
       nodeVersion: node.typeVersion,
       attempt: payload.attempt,
@@ -1377,6 +1386,7 @@ export class ExecutionEngine {
       runId: this.options.runId,
       flowId: this.options.flowId,
       flowVersion: this.options.flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: beginNode.id,
       nodeVersion: beginNode.typeVersion,
       attempt: this.attempt,
@@ -1608,6 +1618,7 @@ export class ExecutionEngine {
       runId: this.options.runId,
       flowId: this.options.flowId,
       flowVersion: this.options.flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       seq: 0,
       kind: "run_failed",
       payload: { error },

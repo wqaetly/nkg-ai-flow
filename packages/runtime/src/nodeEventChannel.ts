@@ -35,6 +35,7 @@ export interface NodeEventChannelOptions {
   runId: string;
   flowId: string;
   flowVersion: string;
+  traceId?: string;
   nodeId: string;
   nodeVersion: string;
   attempt: number;
@@ -162,6 +163,7 @@ export class NodeEventChannel {
       runId: this.options.runId,
       flowId: this.options.flowId,
       flowVersion: this.options.flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: this.options.nodeId,
       nodeVersion: this.options.nodeVersion,
       attempt: this.options.attempt,
@@ -292,6 +294,7 @@ export class NodeEventChannel {
       runId: this.options.runId,
       flowId: this.options.flowId,
       flowVersion: this.options.flowVersion,
+      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
       nodeId: this.options.nodeId,
       nodeVersion: this.options.nodeVersion,
       attempt: this.options.attempt,

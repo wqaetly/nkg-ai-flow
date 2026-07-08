@@ -111,6 +111,44 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("input=Flow:3");
   });
 
+  it("propagates traceId onto persisted run, node, and node-channel events", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "trace_id_events_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 120, y: 0 },
+      config: { template: "trace:${input.name}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+    flow.connect(start.out("out"), report.in("in"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "trace_id_events_e2e",
+      traceId: "trace-order-1",
+      input: { name: "Flow" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.runRecord.traceId).toBe("trace-order-1");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.every((event) => event.traceId === "trace-order-1")).toBe(true);
+    expect(events.map((event) => event.kind)).toEqual(
+      expect.arrayContaining([
+        "run_started",
+        "node_started",
+        "node_log",
+        "node_finished",
+        "run_finished",
+      ]),
+    );
+  });
+
   it("waits in a delay node before continuing the flow", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "delay_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

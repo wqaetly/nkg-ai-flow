@@ -253,6 +253,7 @@ export class RunManager {
         runId: record.runId,
         flowId: record.flowId,
         flowVersion: record.flowVersion,
+        ...(record.traceId !== undefined ? { traceId: record.traceId } : {}),
         runInput: record.input,
         subflowDepth: record.subflowDepth ?? 0,
         runners: this.options.runners,
