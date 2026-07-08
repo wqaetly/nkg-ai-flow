@@ -109,6 +109,56 @@ export const retryPolicyNode = defineNode({
       label: "Attempt",
       schema: { type: "number" },
     },
+    {
+      id: "maxAttempts",
+      direction: "input",
+      kind: "data",
+      label: "Max Attempts",
+      schema: { type: "number" },
+    },
+    {
+      id: "baseDelayMs",
+      direction: "input",
+      kind: "data",
+      label: "Base Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "multiplier",
+      direction: "input",
+      kind: "data",
+      label: "Multiplier",
+      schema: { type: "number" },
+    },
+    {
+      id: "maxDelayMs",
+      direction: "input",
+      kind: "data",
+      label: "Max Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "jitterPercent",
+      direction: "input",
+      kind: "data",
+      label: "Jitter Percent",
+      schema: { type: "number" },
+    },
+    {
+      id: "retryableOnly",
+      direction: "input",
+      kind: "data",
+      label: "Retryable Only",
+      schema: { type: "boolean" },
+    },
+    { id: "retryableCodes", direction: "input", kind: "data", label: "Retryable Codes" },
+    {
+      id: "requireIdempotency",
+      direction: "input",
+      kind: "data",
+      label: "Require Idempotency",
+      schema: { type: "boolean" },
+    },
     { id: "retry", direction: "output", kind: "control", label: "Retry" },
     {
       id: "exhausted",
@@ -189,6 +239,42 @@ export const retryPolicyNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "baseDelayMs",
+      direction: "output",
+      kind: "data",
+      label: "Base Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "multiplier",
+      direction: "output",
+      kind: "data",
+      label: "Multiplier",
+      schema: { type: "number" },
+    },
+    {
+      id: "maxDelayMs",
+      direction: "output",
+      kind: "data",
+      label: "Max Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "jitterPercent",
+      direction: "output",
+      kind: "data",
+      label: "Jitter Percent",
+      schema: { type: "number" },
+    },
+    {
+      id: "retryableOnly",
+      direction: "output",
+      kind: "data",
+      label: "Retryable Only",
+      schema: { type: "boolean" },
+    },
+    { id: "retryableCodes", direction: "output", kind: "data", label: "Retryable Codes" },
+    {
       id: "exhaustedValue",
       direction: "output",
       kind: "data",
@@ -206,17 +292,18 @@ export const retryPolicyNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const attempt = readAttempt(input);
-    const maxAttempts = Math.max(1, Math.trunc(Number(config.maxAttempts ?? 3)));
-    const retryable = readRetryable(input.error, config.retryableCodes);
+    const policy = readPolicy(input, config);
+    const retryable = readRetryable(input.error, policy.retryableCodes);
     const idempotent = readIdempotent(input.idempotent, input.error);
-    const requiresIdempotency = config.requireIdempotency === true;
+    const maxAttempts = policy.maxAttempts;
+    const requiresIdempotency = policy.requireIdempotency;
     const blockedByIdempotency = requiresIdempotency && idempotent !== true;
     const canRetry =
       attempt < maxAttempts &&
       !blockedByIdempotency &&
-      (config.retryableOnly === false || retryable === true);
+      (!policy.retryableOnly || retryable === true);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
-    const delayMs = canRetry ? calculateDelay(config, input.error, attempt) : 0;
+    const delayMs = canRetry ? calculateDelay(policy, input.error, attempt) : 0;
     const branch = blockedByIdempotency ? "unsafe" : canRetry ? "retry" : "exhausted";
     const remainingAttempts = Math.max(0, maxAttempts - attempt);
 
@@ -226,6 +313,7 @@ export const retryPolicyNode = defineNode({
       retryable,
       idempotent,
       requiresIdempotency,
+      retryableOnly: policy.retryableOnly,
       branch,
       delayMs,
     });
@@ -245,6 +333,12 @@ export const retryPolicyNode = defineNode({
         status: branch,
         maxAttempts,
         remainingAttempts,
+        baseDelayMs: policy.baseDelayMs,
+        multiplier: policy.multiplier,
+        maxDelayMs: policy.maxDelayMs,
+        jitterPercent: policy.jitterPercent,
+        retryableOnly: policy.retryableOnly,
+        retryableCodes: policy.retryableCodes,
         exhaustedValue: branch === "exhausted",
         unsafeValue: branch === "unsafe",
       },
@@ -264,6 +358,67 @@ function readAttempt(input: Record<string, unknown>): number {
     return Math.trunc(contextAttempt);
   }
   return 1;
+}
+
+function readPolicy(
+  input: Record<string, unknown>,
+  config: {
+    maxAttempts?: unknown;
+    baseDelayMs?: unknown;
+    multiplier?: unknown;
+    maxDelayMs?: unknown;
+    jitterPercent?: unknown;
+    retryableOnly?: unknown;
+    retryableCodes?: unknown;
+    retryAfterMsPath?: unknown;
+    retryAfterAtPath?: unknown;
+    requireIdempotency?: unknown;
+  },
+): {
+  maxAttempts: number;
+  baseDelayMs: number;
+  multiplier: number;
+  maxDelayMs: number;
+  jitterPercent: number;
+  retryableOnly: boolean;
+  retryableCodes: string;
+  retryAfterMsPath: string;
+  retryAfterAtPath: string;
+  requireIdempotency: boolean;
+} {
+  return {
+    maxAttempts:
+      readIntegerAtLeast(input.maxAttempts, 1) ??
+      readIntegerAtLeast(config.maxAttempts, 1) ??
+      3,
+    baseDelayMs:
+      readIntegerAtLeast(input.baseDelayMs, 0) ??
+      readIntegerAtLeast(config.baseDelayMs, 0) ??
+      1000,
+    multiplier:
+      readNumberAtLeast(input.multiplier, 1) ??
+      readNumberAtLeast(config.multiplier, 1) ??
+      2,
+    maxDelayMs:
+      readIntegerAtLeast(input.maxDelayMs, 0) ??
+      readIntegerAtLeast(config.maxDelayMs, 0) ??
+      30000,
+    jitterPercent:
+      readNumberBetween(input.jitterPercent, 0, 100) ??
+      readNumberBetween(config.jitterPercent, 0, 100) ??
+      0,
+    retryableOnly:
+      readBoolean(input.retryableOnly) ??
+      readBoolean(config.retryableOnly) ??
+      true,
+    retryableCodes: String(input.retryableCodes ?? config.retryableCodes ?? ""),
+    retryAfterMsPath: String(config.retryAfterMsPath ?? "retryAfterMs"),
+    retryAfterAtPath: String(config.retryAfterAtPath ?? "retryAfterAt"),
+    requireIdempotency:
+      readBoolean(input.requireIdempotency) ??
+      readBoolean(config.requireIdempotency) ??
+      false,
+  };
 }
 
 function readRetryable(error: unknown, retryableCodes: unknown): boolean | undefined {
@@ -309,25 +464,25 @@ function matchesCodePattern(code: string, pattern: string): boolean {
 
 function calculateDelay(
   config: {
-    baseDelayMs?: unknown;
-    multiplier?: unknown;
-    maxDelayMs?: unknown;
-    jitterPercent?: unknown;
-    retryAfterMsPath?: unknown;
-    retryAfterAtPath?: unknown;
+    baseDelayMs: number;
+    multiplier: number;
+    maxDelayMs: number;
+    jitterPercent: number;
+    retryAfterMsPath: string;
+    retryAfterAtPath: string;
   },
   error: unknown,
   attempt: number,
 ): number {
-  const baseDelayMs = Math.max(0, Math.trunc(Number(config.baseDelayMs ?? 1000)));
-  const multiplier = Math.max(1, Number(config.multiplier ?? 2));
-  const maxDelayMs = Math.max(0, Math.trunc(Number(config.maxDelayMs ?? 30000)));
-  const jitterPercent = Math.min(100, Math.max(0, Number(config.jitterPercent ?? 0)));
+  const baseDelayMs = config.baseDelayMs;
+  const multiplier = config.multiplier;
+  const maxDelayMs = config.maxDelayMs;
+  const jitterPercent = config.jitterPercent;
   const exponential = baseDelayMs * multiplier ** Math.max(0, attempt - 1);
   const capped = Math.min(maxDelayMs, Math.trunc(exponential));
   const hinted = readRetryAfterDelay(error, {
-    retryAfterMsPath: String(config.retryAfterMsPath ?? "retryAfterMs"),
-    retryAfterAtPath: String(config.retryAfterAtPath ?? "retryAfterAt"),
+    retryAfterMsPath: config.retryAfterMsPath,
+    retryAfterAtPath: config.retryAfterAtPath,
     now: Date.now(),
   });
   if (jitterPercent <= 0 || capped <= 0) return Math.max(capped, hinted);
@@ -367,6 +522,36 @@ function readDottedPath(value: unknown, path: string): unknown {
 function readNonNegativeNumber(value: unknown): number | undefined {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? Math.trunc(number) : undefined;
+}
+
+function readNumberAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? number : undefined;
+}
+
+function readNumberBetween(
+  value: unknown,
+  minimum: number,
+  maximum: number,
+): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum && number <= maximum
+    ? number
+    : undefined;
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function readTimestamp(value: unknown): number | undefined {

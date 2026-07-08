@@ -2232,6 +2232,136 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("retry:5000");
   });
 
+  it("uses dynamic retry_policy strategy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_dynamic_strategy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.dynamic" } },
+    });
+    const idempotent = flow.node("transform", {
+      id: "idempotent",
+      position: { x: 260, y: 0 },
+      config: { value: true },
+    });
+    const maxAttempts = flow.node("transform", {
+      id: "max_attempts",
+      position: { x: 400, y: 0 },
+      config: { value: 4 },
+    });
+    const baseDelay = flow.node("transform", {
+      id: "base_delay",
+      position: { x: 540, y: 0 },
+      config: { value: 200 },
+    });
+    const multiplier = flow.node("transform", {
+      id: "multiplier",
+      position: { x: 680, y: 0 },
+      config: { value: 3 },
+    });
+    const maxDelay = flow.node("transform", {
+      id: "max_delay",
+      position: { x: 820, y: 0 },
+      config: { value: 1000 },
+    });
+    const jitter = flow.node("transform", {
+      id: "jitter",
+      position: { x: 960, y: 0 },
+      config: { value: 0 },
+    });
+    const retryableOnly = flow.node("transform", {
+      id: "retryable_only",
+      position: { x: 1100, y: 0 },
+      config: { value: true },
+    });
+    const retryableCodes = flow.node("transform", {
+      id: "retryable_codes",
+      position: { x: 1240, y: 0 },
+      config: { value: "payment.*" },
+    });
+    const requireIdempotency = flow.node("transform", {
+      id: "require_idempotency",
+      position: { x: 1380, y: 0 },
+      config: { value: true },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 1520, y: 0 },
+      config: {
+        maxAttempts: 1,
+        baseDelayMs: 9999,
+        multiplier: 1,
+        maxDelayMs: 9999,
+        retryableCodes: "inventory.*",
+        requireIdempotency: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 1660, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 1800, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("out"), idempotent.in("in"));
+    flow.connect(idempotent.out("out"), maxAttempts.in("in"));
+    flow.connect(maxAttempts.out("out"), baseDelay.in("in"));
+    flow.connect(baseDelay.out("out"), multiplier.in("in"));
+    flow.connect(multiplier.out("out"), maxDelay.in("in"));
+    flow.connect(maxDelay.out("out"), jitter.in("in"));
+    flow.connect(jitter.out("out"), retryableOnly.in("in"));
+    flow.connect(retryableOnly.out("out"), retryableCodes.in("in"));
+    flow.connect(retryableCodes.out("out"), requireIdempotency.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(idempotent.out("output"), policy.in("idempotent"));
+    flow.connect(maxAttempts.out("output"), policy.in("maxAttempts"));
+    flow.connect(baseDelay.out("output"), policy.in("baseDelayMs"));
+    flow.connect(multiplier.out("output"), policy.in("multiplier"));
+    flow.connect(maxDelay.out("output"), policy.in("maxDelayMs"));
+    flow.connect(jitter.out("output"), policy.in("jitterPercent"));
+    flow.connect(retryableOnly.out("output"), policy.in("retryableOnly"));
+    flow.connect(retryableCodes.out("output"), policy.in("retryableCodes"));
+    flow.connect(requireIdempotency.out("output"), policy.in("requireIdempotency"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_dynamic_strategy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:200");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(policyOutput).toMatchObject({
+      status: "retry",
+      retryable: true,
+      idempotent: true,
+      requiresIdempotency: true,
+      blockedByIdempotency: false,
+      maxAttempts: 4,
+      remainingAttempts: 3,
+      baseDelayMs: 200,
+      multiplier: 3,
+      maxDelayMs: 1000,
+      jitterPercent: 0,
+      retryableOnly: true,
+      retryableCodes: "payment.*",
+      delayMs: 200,
+    });
+  });
+
   it("routes exhausted retry_policy errors to the exhausted branch", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_exhausted_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
