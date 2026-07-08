@@ -93,6 +93,7 @@ import {
   sortItemsNode,
   splitTextNode,
   subflowNode,
+  subflowTemplateNode,
   switchCaseNode,
   stringifyJsonNode,
   foreachBeginNode,
@@ -264,6 +265,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, sortItemsNode);
   installNode(target, splitTextNode);
   installNode(target, subflowNode);
+  installNode(target, subflowTemplateNode);
   installNode(target, switchCaseNode);
   installNode(target, stringifyJsonNode);
   installNode(target, toolNode);

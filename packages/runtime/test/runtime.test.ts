@@ -4194,6 +4194,158 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.subflowDepth).toBe(1);
   });
 
+  it("invokes a reusable child flow with subflow_template defaults", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "template_child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const childTransform = child.node("transform", {
+      id: "child_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child:${input.name}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), childTransform.in("in"));
+    child.connect(childTransform.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_calls_template_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "echo_order",
+        inputMode: "template",
+        templates: {
+          echo_order: {
+            flowId: "template_child_echo",
+            flowVersion: "1.0.0",
+            input: { name: "Ada" },
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_calls_template_child",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:child:Ada");
+    const childRuns = await rt.runStore.listByFlow("template_child_echo");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.flowVersion).toBe("1.0.0");
+    expect(childRuns[0]?.subflowDepth).toBe(1);
+  });
+
+  it("routes subflow_template to missing when the template id is absent", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_missing_template", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "missing_template",
+        templates: {
+          echo_order: {
+            flowId: "template_child_echo",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "template:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("missing"), report.in("in"));
+    parent.connect(call.out("status"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_missing_template",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("template:missing");
+    expect(await rt.runStore.listByFlow("template_child_echo")).toEqual([]);
+  });
+
+  it("routes failed subflow_template child runs when failOnError is false", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "template_child_fails", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const broken = child.node("http", {
+      id: "broken_http",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), broken.in("in"));
+    child.connect(broken.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_template_failed_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "broken_template",
+        failOnError: false,
+        templates: {
+          broken_template: {
+            flowId: "template_child_fails",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "child:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("failed"), report.in("in"));
+    parent.connect(call.out("status"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_failed_child",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("child:failed");
+    const childRuns = await rt.runStore.listByFlow("template_child_fails");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.status).toBe("failed");
+  });
+
   it("blocks subflow invocation when maxDepth is reached", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_depth_limit", version: "1.0.0", registry: rt.nodeTypeRegistry });

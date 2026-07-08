@@ -317,6 +317,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "子流程",
         description: "调用另一个已注册 Flow，并根据子运行状态继续流程。",
       },
+      subflow_template: {
+        title: "子流程模板",
+        description: "通过模板 ID 调用固定版本的可复用子流程。",
+      },
       switch_case: {
         title: "多路分支",
         description: "根据输入值路由到 case 或 default 分支。",

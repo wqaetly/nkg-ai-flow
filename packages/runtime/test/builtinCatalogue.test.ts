@@ -73,6 +73,7 @@ const BUILTIN_TYPES = [
   "sort_items",
   "split_text",
   "subflow",
+  "subflow_template",
   "switch_case",
   "stringify_json",
   "tool",

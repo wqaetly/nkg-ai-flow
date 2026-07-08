@@ -505,6 +505,14 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         localVariables: "局部变量",
         failOnError: "失败时中断",
       },
+      subflow_template: {
+        templateId: "模板 ID",
+        templates: "模板表",
+        inputMode: "输入模式",
+        inputValue: "静态输入",
+        maxDepth: "最大子流程深度",
+        failOnError: "失败时中断",
+      },
       switch_case: {
         path: "匹配字段路径",
         case1: "匹配值 1",

@@ -73,6 +73,7 @@ export { sliceItemsNode } from "./sliceItems.js";
 export { sortItemsNode } from "./sortItems.js";
 export { splitTextNode } from "./splitText.js";
 export { subflowNode } from "./subflow.js";
+export { subflowTemplateNode } from "./subflowTemplate.js";
 export { switchCaseNode } from "./switchCase.js";
 export { stringifyJsonNode } from "./stringifyJson.js";
 export { toolNode } from "./tool.js";
