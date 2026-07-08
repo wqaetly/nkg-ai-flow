@@ -16518,6 +16518,59 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("customer=anonymous");
   });
 
+  it("uses dynamic select_path path and default inputs ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "select_path_dynamic_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { id: "ord_1" } } },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 120 },
+      config: { value: "order.customer.name" },
+    });
+    const defaultValue = flow.node("transform", {
+      id: "defaultValue",
+      position: { x: 120, y: 240 },
+      config: { value: "dynamic-customer" },
+    });
+    const select = flow.node("select_path", {
+      id: "select",
+      position: { x: 300, y: 0 },
+      config: { path: "order.id", defaultValue: "static-customer" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "customer=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), defaultValue.in("in"));
+    flow.connect(input.out("out"), select.in("in"));
+    flow.connect(input.out("output"), select.in("value"));
+    flow.connect(path.out("output"), select.in("path"));
+    flow.connect(defaultValue.out("output"), select.in("defaultValue"));
+    flow.connect(select.out("missing"), report.in("in"));
+    flow.connect(select.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "select_path_dynamic_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("customer=dynamic-customer");
+  });
+
   it("sets nested values by path with set_path", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "set_path_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

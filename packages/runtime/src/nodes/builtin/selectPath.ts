@@ -45,6 +45,8 @@ export const selectPathNode = defineNode({
   ports: [
     controlIn,
     { id: "value", direction: "input", kind: "data", label: "Value" },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "defaultValue", direction: "input", kind: "data", label: "Default value" },
     { id: "found", direction: "output", kind: "control", label: "Found" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "value", direction: "output", kind: "data", label: "Selected value" },
@@ -63,6 +65,7 @@ export const selectPathNode = defineNode({
       label: "Path",
       schema: { type: "string" },
     },
+    { id: "defaultValue", direction: "output", kind: "data", label: "Default value" },
     {
       id: "type",
       direction: "output",
@@ -81,11 +84,14 @@ export const selectPathNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const source = readSource(input);
-    const path = String(config.path ?? "").trim();
+    const path = String(input.path ?? config.path ?? "").trim();
     const selected = selectValue(source, path);
-    const hasDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
+    const hasInputDefault = Object.prototype.hasOwnProperty.call(input, "defaultValue");
+    const hasConfigDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
+    const hasDefault = hasInputDefault || hasConfigDefault;
+    const defaultValue = hasInputDefault ? input.defaultValue : config.defaultValue;
     const exists = selected.exists;
-    const value = exists ? selected.value : hasDefault ? config.defaultValue : null;
+    const value = exists ? selected.value : hasDefault ? defaultValue : null;
     const branch = exists ? "found" : "missing";
     const reason = exists
       ? path === ""
@@ -110,6 +116,7 @@ export const selectPathNode = defineNode({
         source,
         exists,
         path,
+        defaultValue: hasDefault ? defaultValue : null,
         type: valueType(value),
         reason,
       },

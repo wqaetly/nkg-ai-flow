@@ -1106,6 +1106,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         source: "来源数据",
         exists: "是否存在",
         path: "路径",
+        defaultValue: "默认值",
         type: "类型",
         reason: "原因",
       },
