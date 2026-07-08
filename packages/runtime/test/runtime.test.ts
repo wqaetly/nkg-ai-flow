@@ -6931,6 +6931,61 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("sets a dynamically named feature_flag state", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "feature_flag_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const flagName = flow.node("transform", {
+      id: "flagName",
+      position: { x: 120, y: -80 },
+      config: { value: "CHECKOUT_DYNAMIC_V2" },
+    });
+    const flag = flow.node("feature_flag", {
+      id: "flag",
+      position: { x: 260, y: 0 },
+      config: {
+        mode: "set",
+        enabled: true,
+        rolloutPercent: 50,
+        description: "Dynamic checkout rollout",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "flag:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), flagName.in("in"));
+    flow.connect(start.out("out"), flag.in("in"));
+    flow.connect(flagName.out("output"), flag.in("name"));
+    flow.connect(flag.out("updated"), report.in("in"));
+    flow.connect(flag.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "feature_flag_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flag:CHECKOUT_DYNAMIC_V2");
+    expect(variables.get("CHECKOUT_DYNAMIC_V2")).toMatchObject({
+      name: "CHECKOUT_DYNAMIC_V2",
+      enabled: true,
+      rolloutPercent: 50,
+      description: "Dynamic checkout rollout",
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes enabled feature_flag evaluations to enabled", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("CHECKOUT_V2", {

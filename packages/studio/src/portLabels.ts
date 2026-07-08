@@ -496,6 +496,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       feature_flag: {
         in: "输入",
+        name: "开关名",
         key: "灰度键",
         enabled: "已启用",
         disabled: "已禁用",

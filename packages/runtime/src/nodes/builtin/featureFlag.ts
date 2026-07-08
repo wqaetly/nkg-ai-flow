@@ -79,6 +79,7 @@ export const featureFlagNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "key", direction: "input", kind: "data", label: "Key" },
     { id: "enabled", direction: "output", kind: "control", label: "Enabled" },
     { id: "disabled", direction: "output", kind: "control", label: "Disabled" },
@@ -86,6 +87,7 @@ export const featureFlagNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "key", direction: "output", kind: "data", label: "Key", schema: { type: "string" } },
     {
       id: "enabledValue",
@@ -118,11 +120,11 @@ export const featureFlagNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.feature_flag.missing_name",
-        "feature_flag node requires config.name",
+        "feature_flag node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -188,6 +190,7 @@ function success(
     outputs: {
       [branch]: null,
       state,
+      name: state.name,
       key,
       enabledValue: branch === "enabled" || (branch === "updated" && state.enabled),
       bucket,
