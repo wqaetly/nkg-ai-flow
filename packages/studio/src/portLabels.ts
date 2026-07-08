@@ -235,6 +235,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         sequence: "序号",
       },
       compensation: {
+        in: "输入",
+        out: "继续",
         payload: "载荷",
         actions: "补偿动作列表",
         action: "补偿动作",

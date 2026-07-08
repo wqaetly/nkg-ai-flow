@@ -189,6 +189,34 @@ describe("runtime / built-in catalogue", () => {
         "tool_log",
       ]),
     );
+
+    const compensation = definitions.find(
+      (definition) => definition.type === "compensation",
+    );
+    expect(
+      compensation?.defaultPorts.filter(
+        (port) => port.id === "in" && port.direction === "input",
+      ),
+    ).toEqual([
+      expect.objectContaining({ kind: "control", multiple: true }),
+    ]);
+    expect(
+      compensation?.defaultPorts.filter(
+        (port) => port.id === "out" && port.direction === "output",
+      ),
+    ).toEqual([expect.objectContaining({ kind: "control" })]);
+    expect(compensation?.defaultPorts.map((port) => port.id)).toEqual(
+      expect.arrayContaining([
+        "name",
+        "mode",
+        "action",
+        "payload",
+        "actions",
+        "actionName",
+        "count",
+        "state",
+      ]),
+    );
   });
 
   it("uses long-text controls instead of dedicated JSON field controls", () => {
