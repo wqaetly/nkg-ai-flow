@@ -660,6 +660,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       mutex: {
         in: "输入",
+        name: "锁名",
         owner: "持有者",
         acquired: "已获得",
         locked: "已锁定",

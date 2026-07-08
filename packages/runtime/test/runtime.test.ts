@@ -3268,6 +3268,57 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes a dynamically named mutex to acquired", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const lockName = flow.node("transform", {
+      id: "lockName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_LOCK" },
+    });
+    const mutex = flow.node("mutex", {
+      id: "lock",
+      position: { x: 260, y: 0 },
+      config: {
+        owner: "worker-2",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "acquired:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), lockName.in("in"));
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(lockName.out("output"), mutex.in("name"));
+    flow.connect(mutex.out("acquired"), report.in("in"));
+    flow.connect(mutex.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("acquired:ORDER_DYNAMIC_LOCK");
+    expect(variables.get("ORDER_DYNAMIC_LOCK")).toMatchObject({
+      locked: true,
+      owner: "worker-2",
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes mutex to locked when another owner holds an active lock", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();

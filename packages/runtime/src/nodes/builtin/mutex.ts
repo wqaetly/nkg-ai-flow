@@ -81,11 +81,13 @@ export const mutexNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "owner", direction: "input", kind: "data", label: "Owner" },
     { id: "acquired", direction: "output", kind: "control", label: "Acquired" },
     { id: "locked", direction: "output", kind: "control", label: "Locked" },
     { id: "released", direction: "output", kind: "control", label: "Released" },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "owner", direction: "output", kind: "data", label: "Owner" },
     {
       id: "remainingMs",
@@ -104,11 +106,11 @@ export const mutexNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.mutex.missing_name",
-        "mutex node requires config.name",
+        "mutex node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -144,6 +146,7 @@ export const mutexNode = defineNode({
       outputs: {
         [decision.branch]: null,
         state: decision.state,
+        name,
         owner: decision.state.owner,
         remainingMs,
         expiresAt: decision.state.expiresAt,
