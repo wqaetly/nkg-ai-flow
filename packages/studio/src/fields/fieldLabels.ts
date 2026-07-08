@@ -238,6 +238,9 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         path: "取值路径",
         trimStrings: "裁剪字符串空白",
       },
+      expression_eval: {
+        expression: "求值表达式",
+      },
       error_classifier: {
         codes: "错误码匹配",
         kinds: "错误类型匹配",

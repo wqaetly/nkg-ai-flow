@@ -101,6 +101,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "空值门控",
         description: "按数组、对象、字符串或存在性判断空/非空分支。",
       },
+      expression_eval: {
+        title: "表达式求值",
+        description: "使用安全表达式从输入数据中计算结果和布尔值。",
+      },
       end: {
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",

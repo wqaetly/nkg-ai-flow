@@ -1,10 +1,9 @@
 /**
  * `condition` — boolean router.
  *
- * Phase 1 evaluates `config.expression` against `input` via the tiny
- * safe evaluator in `_helpers.evaluateCondition`: equality, presence,
- * and boolean negation, no arbitrary JS. Anything more advanced waits
- * for the Phase 3 Sandbox.
+ * Evaluates `config.expression` against `input` via the small safe
+ * expression grammar in `_helpers.evaluateCondition`: comparisons,
+ * boolean composition, presence checks, and allowlisted helper calls.
  */
 
 import { z } from "zod";
@@ -17,7 +16,7 @@ const conditionConfig = z
       .string()
       .default("")
       .describe(
-        "Boolean expression evaluated against input (`==`, `!=`, `!`, presence).",
+        "Boolean expression evaluated against input (`==`, `!=`, `>`, `>=`, `&&`, `||`, `!`, helpers).",
       ),
   })
   .passthrough();

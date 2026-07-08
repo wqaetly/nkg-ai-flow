@@ -4673,6 +4673,153 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("kept=keep,keep");
   });
 
+  it("evaluates expressions with expression_eval", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "expression_eval_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          amount: 12,
+          status: "ready",
+          tags: ["api", "batch"],
+        },
+      },
+    });
+    const expression = flow.node("expression_eval", {
+      id: "expression",
+      position: { x: 260, y: 0 },
+      config: {
+        expression: "input.amount >= 10 && input.status == 'ready' && contains(input.tags, 'batch')",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "truthy=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), expression.in("in"));
+    flow.connect(input.out("output"), expression.in("input"));
+    flow.connect(expression.out("out"), report.in("in"));
+    flow.connect(expression.out("truthy"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "expression_eval_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("truthy=true");
+  });
+
+  it("routes condition branches with numeric and boolean expressions", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "condition_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const condition = flow.node("condition", {
+      id: "condition",
+      position: { x: 160, y: 120 },
+      config: {
+        expression: "input.retryable && input.attempts < 3 && input.code != 'fatal'",
+      },
+    });
+    const yes = flow.node("transform", {
+      id: "yes",
+      position: { x: 320, y: 40 },
+      config: { value: "retry" },
+    });
+    const no = flow.node("transform", {
+      id: "no",
+      position: { x: 320, y: 200 },
+      config: { value: "stop" },
+    });
+    const merge = flow.node("merge", { id: "merge", position: { x: 480, y: 120 } });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 120 } });
+
+    flow.connect(start.out("out"), condition.in("in"));
+    flow.connect(condition.out("true"), yes.in("in"));
+    flow.connect(condition.out("false"), no.in("in"));
+    flow.connect(yes.out("out"), merge.in("in"));
+    flow.connect(no.out("out"), merge.in("in"));
+    flow.connect(yes.out("output"), merge.in("value"));
+    flow.connect(no.out("output"), merge.in("value"));
+    flow.connect(merge.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "condition_expression_e2e",
+      input: {
+        attempts: 2,
+        retryable: true,
+        code: "rate_limit",
+      },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry");
+  });
+
+  it("filters array items with numeric expressions", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "filter_items_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a", score: 2, tags: ["cold"] },
+          { id: "b", score: 5, tags: ["hot", "ready"] },
+          { id: "c", score: 8, tags: ["ready"] },
+        ],
+      },
+    });
+    const filter = flow.node("filter_items", {
+      id: "filter",
+      position: { x: 260, y: 0 },
+      config: { condition: "item.score >= 5 && contains(item.tags, 'ready')" },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${item.id}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "kept=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), filter.in("in"));
+    flow.connect(input.out("output"), filter.in("items"));
+    flow.connect(filter.out("out"), map.in("in"));
+    flow.connect(filter.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "filter_items_expression_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("kept=b,c");
+  });
+
   it("concatenates array sources with concat_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "concat_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

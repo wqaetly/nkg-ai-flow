@@ -35,6 +35,7 @@ const BUILTIN_TYPES = [
   "delay",
   "distinct_until_changed",
   "empty_gate",
+  "expression_eval",
   "filter_items",
   "flatten_items",
   "first_success",
