@@ -70,7 +70,7 @@ export const reduceItemsNode = defineNode({
   ],
   validateInput: false,
   run({ input, config }) {
-    const source = Array.isArray(input.items)
+    const source: unknown[] = Array.isArray(input.items)
       ? input.items
       : Array.isArray(input.input)
         ? input.input
@@ -80,7 +80,7 @@ export const reduceItemsNode = defineNode({
     const mode = config.mode ?? "count";
     const result =
       mode === "sum"
-        ? values.reduce((total, value) => total + numberOrZero(value), 0)
+        ? values.reduce<number>((total, value) => total + numberOrZero(value), 0)
         : mode === "join"
           ? values.map((value) => valueToString(value)).join(String(config.separator ?? ","))
           : source.length;
