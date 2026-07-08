@@ -3327,6 +3327,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("circuit:open");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "check") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkOutput).toMatchObject({
+      status: "open",
+      failureCount: 1,
+      failureThreshold: 1,
+      remainingFailures: 0,
+      resetTimeoutMs: 60_000,
+      isOpen: true,
+      isHalfOpen: false,
+      isClosed: false,
+      canPass: false,
+      remainingMs: expect.any(Number),
+    });
     expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
       status: "open",
       failureCount: 1,
@@ -3377,6 +3395,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("circuit:half_open");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "check") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkOutput).toMatchObject({
+      status: "half_open",
+      failureCount: 2,
+      failureThreshold: 3,
+      remainingFailures: 1,
+      resetTimeoutMs: 1,
+      isOpen: false,
+      isHalfOpen: true,
+      isClosed: false,
+      canPass: true,
+      remainingMs: 0,
+    });
     expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
       status: "half_open",
       failureCount: 2,

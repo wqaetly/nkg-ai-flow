@@ -108,6 +108,31 @@ export const circuitBreakerNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    {
+      id: "failureThreshold",
+      direction: "output",
+      kind: "data",
+      label: "Failure Threshold",
+      schema: { type: "number" },
+    },
+    {
+      id: "remainingFailures",
+      direction: "output",
+      kind: "data",
+      label: "Remaining Failures",
+      schema: { type: "number" },
+    },
+    {
+      id: "resetTimeoutMs",
+      direction: "output",
+      kind: "data",
+      label: "Reset Timeout ms",
+      schema: { type: "number" },
+    },
+    { id: "isOpen", direction: "output", kind: "data", label: "Is Open", schema: { type: "boolean" } },
+    { id: "isHalfOpen", direction: "output", kind: "data", label: "Is Half Open", schema: { type: "boolean" } },
+    { id: "isClosed", direction: "output", kind: "data", label: "Is Closed", schema: { type: "boolean" } },
+    { id: "canPass", direction: "output", kind: "data", label: "Can Pass", schema: { type: "boolean" } },
     { id: "openedAt", direction: "output", kind: "data", label: "Opened At", schema: { type: "string" } },
     { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
   ],
@@ -162,12 +187,18 @@ export const circuitBreakerNode = defineNode({
         : next.status === "half_open"
           ? "half_open"
           : "closed";
+    const isOpen = next.status === "open";
+    const isHalfOpen = next.status === "half_open";
+    const isClosed = next.status === "closed";
+    const canPass = isClosed || isHalfOpen;
+    const remainingFailures = Math.max(0, failureThreshold - next.failureCount);
 
     ctx.log.debug("circuit_breaker selected branch", {
       name,
       mode,
       branch,
       failureCount: next.failureCount,
+      failureThreshold,
       remainingMs,
     });
 
@@ -179,6 +210,13 @@ export const circuitBreakerNode = defineNode({
         status: next.status,
         failureCount: next.failureCount,
         remainingMs,
+        failureThreshold,
+        remainingFailures,
+        resetTimeoutMs,
+        isOpen,
+        isHalfOpen,
+        isClosed,
+        canPass,
         openedAt,
         updatedAt,
       },
