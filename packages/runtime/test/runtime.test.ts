@@ -6131,6 +6131,95 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("results=item=alpha,item=beta,item=gamma");
   });
 
+  it("emits traceable progress events for each foreach iteration", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_iteration_trace_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 300, y: 0 },
+      config: { template: "item=${input}" },
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 500, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(begin.out("item"), body.in("input"));
+    flow.connect(body.out("out"), end.in("body_done"));
+    flow.connect(body.out("output"), end.in("result"));
+    flow.connect(end.out("done"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_iteration_trace_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+    expect(progress.map((event) => event.seq)).toEqual([10_000, 10_001, 10_002, 10_003]);
+    expect(progress.map((event) => (event.payload as { phase: string }).phase)).toEqual([
+      "started",
+      "finished",
+      "started",
+      "finished",
+    ]);
+    expect(progress.map((event) => (event.payload as { iteration: number }).iteration)).toEqual([
+      0,
+      0,
+      1,
+      1,
+    ]);
+    expect(progress[0]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "foreach_begin",
+      beginNodeId: "begin",
+      endNodeId: "loop_end",
+      phase: "started",
+      iteration: 0,
+      status: "running",
+      context: {
+        item: "alpha",
+        index: 0,
+        count: 2,
+      },
+    });
+    expect(progress[3]?.payload).toMatchObject({
+      phase: "finished",
+      iteration: 1,
+      status: "completed",
+      context: {
+        item: "beta",
+        index: 1,
+        count: 2,
+      },
+    });
+  });
+
   it("stops a foreach block when loop_break runs inside the body", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
