@@ -3953,6 +3953,31 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(marked.succeeded).toBe(true);
     expect(marked.output).toBe("resume:marked");
+    const markEvents = await rt.eventBus.store.read(marked.runRecord.runId);
+    const markOutput = (
+      markEvents.find((event) => event.kind === "node_finished" && event.nodeId === "mark") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(markOutput).toMatchObject({
+      status: "marked",
+      stateStatus: "ready",
+      name: "ORDER_RESUME_POINT",
+      targetNodeId: "charge_payment",
+      reason: "payment timeout",
+      sourceRunId: expect.any(String),
+      version: 1,
+      markedAt: expect.any(String),
+      loadedAt: "",
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: true,
+      markedValue: true,
+      readyValue: false,
+      missingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
       status: "ready",
       targetNodeId: "charge_payment",
@@ -3966,6 +3991,31 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(loaded.succeeded).toBe(true);
     expect(loaded.output).toBe("target:charge_payment");
+    const loadEvents = await rt.eventBus.store.read(loaded.runRecord.runId);
+    const loadOutput = (
+      loadEvents.find((event) => event.kind === "node_finished" && event.nodeId === "load") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(loadOutput).toMatchObject({
+      status: "ready",
+      stateStatus: "ready",
+      name: "ORDER_RESUME_POINT",
+      targetNodeId: "charge_payment",
+      reason: "payment timeout",
+      sourceRunId: expect.any(String),
+      version: 1,
+      markedAt: expect.any(String),
+      loadedAt: expect.any(String),
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: true,
+      markedValue: false,
+      readyValue: true,
+      missingValue: false,
+      expiredValue: false,
+    });
   });
 
   it("routes resume_point load to missing when no recovery target exists", async () => {
@@ -4005,6 +4055,31 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("resume:missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const loadOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "load") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(loadOutput).toMatchObject({
+      status: "missing",
+      stateStatus: "",
+      name: "MISSING_RESUME_POINT",
+      targetNodeId: "",
+      reason: "",
+      sourceRunId: "",
+      version: 0,
+      markedAt: "",
+      loadedAt: "",
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: false,
+      markedValue: false,
+      readyValue: false,
+      missingValue: true,
+      expiredValue: false,
+    });
   });
 
   it("routes resume_point load to expired after its TTL window", async () => {

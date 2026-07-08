@@ -116,10 +116,23 @@ export const resumePointNode = defineNode({
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "snapshot", direction: "output", kind: "data", label: "Snapshot" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "targetNodeId", direction: "output", kind: "data", label: "Target Node Id", schema: { type: "string" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
+    { id: "sourceRunId", direction: "output", kind: "data", label: "Source Run Id", schema: { type: "string" } },
     { id: "version", direction: "output", kind: "data", label: "Version", schema: { type: "number" } },
+    { id: "markedAt", direction: "output", kind: "data", label: "Marked At", schema: { type: "string" } },
+    { id: "loadedAt", direction: "output", kind: "data", label: "Loaded At", schema: { type: "string" } },
+    { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
+      schema: { type: "number" },
+    },
     {
       id: "remainingMs",
       direction: "output",
@@ -127,6 +140,12 @@ export const resumePointNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
+    { id: "markedValue", direction: "output", kind: "data", label: "Marked", schema: { type: "boolean" } },
+    { id: "readyValue", direction: "output", kind: "data", label: "Ready", schema: { type: "boolean" } },
+    { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
+    { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -174,6 +193,14 @@ export const resumePointNode = defineNode({
       decision.state?.expiresAt === null || decision.state === null
         ? 0
         : Math.max(0, decision.state.expiresAt - now);
+    const state = decision.state;
+    const markedAt = state === null ? "" : new Date(state.markedAt).toISOString();
+    const loadedAt =
+      state?.loadedAt === null || state === null ? "" : new Date(state.loadedAt).toISOString();
+    const expiresAt =
+      state?.expiresAt === null || state === null ? "" : new Date(state.expiresAt).toISOString();
+    const ttlValue =
+      state?.expiresAt === null || state === null ? 0 : Math.max(0, state.expiresAt - state.markedAt);
 
     ctx.log.debug("resume_point selected branch", {
       name,
@@ -187,13 +214,26 @@ export const resumePointNode = defineNode({
       kind: "success",
       outputs: {
         [decision.branch]: null,
-        state: decision.state,
-        snapshot: decision.state?.snapshot ?? null,
-        targetNodeId: decision.state?.targetNodeId ?? "",
-        reason: decision.state?.reason ?? "",
+        state,
+        snapshot: state?.snapshot ?? null,
+        name: state?.name ?? name,
+        targetNodeId: state?.targetNodeId ?? "",
+        reason: state?.reason ?? "",
         status: decision.branch,
-        version: decision.state?.version ?? 0,
+        stateStatus: state?.status ?? "",
+        sourceRunId: state?.sourceRunId ?? "",
+        version: state?.version ?? 0,
+        markedAt,
+        loadedAt,
+        expiresAt,
+        ttlMs: ttlValue,
         remainingMs,
+        stateExists: state !== null,
+        markedValue: decision.branch === "marked",
+        readyValue: decision.branch === "ready",
+        missingValue: decision.branch === "missing",
+        clearedValue: decision.branch === "cleared",
+        expiredValue: decision.branch === "expired",
       },
     };
   },
