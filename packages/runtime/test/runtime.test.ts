@@ -15900,6 +15900,77 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("kept=b,c");
   });
 
+  it("uses dynamic filter_items condition input", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "filter_items_dynamic_condition_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a", status: "ready", score: 1 },
+          { id: "b", status: "blocked", score: 7 },
+          { id: "c", status: "ready", score: 9 },
+        ],
+      },
+    });
+    const condition = flow.node("transform", {
+      id: "condition",
+      position: { x: 120, y: 100 },
+      config: { value: "item.score >= 5" },
+    });
+    const filter = flow.node("filter_items", {
+      id: "filter",
+      position: { x: 320, y: 0 },
+      config: { condition: 'item.status == "ready"' },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 480, y: 0 },
+      config: { template: "${item.id}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 640, y: 0 },
+      config: { template: "kept=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), condition.in("in"));
+    flow.connect(input.out("out"), filter.in("in"));
+    flow.connect(input.out("output"), filter.in("items"));
+    flow.connect(condition.out("output"), filter.in("condition"));
+    flow.connect(filter.out("out"), map.in("in"));
+    flow.connect(filter.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "filter_items_dynamic_condition_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("kept=b,c");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const filterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "filter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(filterOutput).toMatchObject({
+      condition: "item.score >= 5",
+      count: 2,
+      rejectedCount: 1,
+      total: 3,
+    });
+  });
+
   it("concatenates array sources with concat_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "concat_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

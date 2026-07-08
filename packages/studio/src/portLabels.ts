@@ -578,6 +578,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         evaluations: "评估次数",
       },
       filter_items: {
+        condition: "条件",
         items: "保留项",
         rejected: "剔除项",
         count: "保留数量",

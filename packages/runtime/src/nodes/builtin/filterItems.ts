@@ -41,6 +41,7 @@ export const filterItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "condition", direction: "input", kind: "data", label: "Condition", schema: { type: "string" } },
     {
       id: "items",
       direction: "output",
@@ -55,6 +56,7 @@ export const filterItemsNode = defineNode({
       label: "Rejected items",
       schema: { type: "array" },
     },
+    { id: "condition", direction: "output", kind: "data", label: "Condition", schema: { type: "string" } },
     {
       id: "count",
       direction: "output",
@@ -86,7 +88,7 @@ export const filterItemsNode = defineNode({
         : [];
     const kept: unknown[] = [];
     const rejected: unknown[] = [];
-    const condition = String(config.condition ?? "item");
+    const condition = String(input.condition ?? config.condition ?? "item");
 
     source.forEach((item, index) => {
       const scope = { item, index, input: item };
@@ -103,6 +105,7 @@ export const filterItemsNode = defineNode({
         out: null,
         items: kept,
         rejected,
+        condition,
         count: kept.length,
         rejectedCount: rejected.length,
         total: source.length,
