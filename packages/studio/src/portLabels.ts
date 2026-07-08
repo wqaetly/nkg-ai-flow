@@ -585,6 +585,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       idempotency_key: {
         in: "输入",
+        namespace: "命名空间",
         key: "幂等键",
         value: "结果值",
         error: "错误",
@@ -595,6 +596,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         reset: "已重置",
         state: "幂等状态",
         status: "状态",
+        stateKey: "状态键",
         remainingMs: "剩余毫秒",
       },
       join: {

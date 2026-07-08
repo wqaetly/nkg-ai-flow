@@ -87,6 +87,7 @@ export const idempotencyKeyNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "namespace", direction: "input", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "input", kind: "data", label: "Key" },
     { id: "value", direction: "input", kind: "data", label: "Value" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
@@ -97,7 +98,9 @@ export const idempotencyKeyNode = defineNode({
     { id: "reset", direction: "output", kind: "control", label: "Reset" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
+    { id: "namespace", direction: "output", kind: "data", label: "Namespace", schema: { type: "string" } },
     { id: "key", direction: "output", kind: "data", label: "Key" },
+    { id: "stateKey", direction: "output", kind: "data", label: "State Key", schema: { type: "string" } },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "error", direction: "output", kind: "data", label: "Error" },
     {
@@ -128,7 +131,7 @@ export const idempotencyKeyNode = defineNode({
       );
     }
 
-    const namespace = sanitizeSegment(String(config.namespace ?? "default"));
+    const namespace = sanitizeSegment(String(input.namespace ?? config.namespace ?? "default"));
     const stateName = `IDEMPOTENCY:${namespace}:${sanitizeSegment(key)}`;
     const now = Date.now();
     const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 86400000)));
@@ -168,7 +171,9 @@ export const idempotencyKeyNode = defineNode({
         [decision.branch]: null,
         state,
         status: state?.status ?? "reset",
+        namespace,
         key,
+        stateKey: stateName,
         value: state?.value ?? null,
         error: state?.error ?? null,
         remainingMs,

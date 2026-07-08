@@ -3422,6 +3422,63 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes idempotency_key with a dynamic namespace input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "idempotency_dynamic_namespace_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const namespace = flow.node("transform", {
+      id: "namespace",
+      position: { x: 120, y: -80 },
+      config: { value: "payments dynamic" },
+    });
+    const key = flow.node("transform", {
+      id: "key",
+      position: { x: 120, y: 80 },
+      config: { value: "order-namespace" },
+    });
+    const idem = flow.node("idempotency_key", {
+      id: "idem",
+      position: { x: 300, y: 0 },
+      config: {
+        mode: "start",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "idem:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), namespace.in("in"));
+    flow.connect(start.out("out"), key.in("in"));
+    flow.connect(start.out("out"), idem.in("in"));
+    flow.connect(namespace.out("output"), idem.in("namespace"));
+    flow.connect(key.out("output"), idem.in("key"));
+    flow.connect(idem.out("started"), report.in("in"));
+    flow.connect(idem.out("stateKey"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "idempotency_dynamic_namespace_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("idem:IDEMPOTENCY:payments_dynamic:order-namespace");
+    expect(variables.get("IDEMPOTENCY:payments_dynamic:order-namespace")).toMatchObject({
+      key: "order-namespace",
+      status: "started",
+    });
+  });
+
   it("routes idempotency_key to replayed for a completed key", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();
