@@ -4984,6 +4984,117 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.status).toBe("failed");
   });
 
+  it("routes subflow_template input contract failures without invoking the child flow", async () => {
+    const rt = newRuntime();
+    const parent = defineFlow({ id: "parent_template_input_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "contract_child",
+        contractMode: "route",
+        inputSchema: {
+          type: "object",
+          required: ["name"],
+          properties: {
+            name: { type: "string", minLength: 1 },
+          },
+        },
+        templates: {
+          contract_child: {
+            flowId: "template_input_contract_child",
+            flowVersion: "1.0.0",
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "template-input-contract:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("contract_failed"), report.in("in"));
+    parent.connect(call.out("contractIssueCount"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_input_contract",
+      input: { id: "missing-name" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("template-input-contract:1");
+    expect(await rt.runStore.listByFlow("template_input_contract_child")).toEqual([]);
+  });
+
+  it("routes subflow_template output contract failures after a successful child run", async () => {
+    const rt = newRuntime();
+    const child = defineFlow({ id: "template_output_contract_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childStart = child.node("start", { id: "child_start", position: { x: 0, y: 0 } });
+    const childTransform = child.node("transform", {
+      id: "child_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child:${input.name}" },
+    });
+    const childEnd = child.node("end", { id: "child_end", position: { x: 240, y: 0 } });
+    child.connect(childStart.out("out"), childTransform.in("in"));
+    child.connect(childTransform.out("out"), childEnd.in("in"));
+
+    const parent = defineFlow({ id: "parent_template_output_contract", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const call = parent.node("subflow_template", {
+      id: "call_template",
+      position: { x: 140, y: 0 },
+      config: {
+        templateId: "contract_child",
+        contractMode: "route",
+        inputMode: "template",
+        outputSchema: {
+          type: "object",
+          required: ["ok"],
+        },
+        templates: {
+          contract_child: {
+            flowId: "template_output_contract_child",
+            flowVersion: "1.0.0",
+            input: { name: "Ada" },
+          },
+        },
+      },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 300, y: 0 },
+      config: { template: "template-output-contract:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 440, y: 0 } });
+
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(call.out("contract_failed"), report.in("in"));
+    parent.connect(call.out("contractStage"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, child);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_template_output_contract",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("template-output-contract:output");
+    const childRuns = await rt.runStore.listByFlow("template_output_contract_child");
+    expect(childRuns).toHaveLength(1);
+    expect(childRuns[0]?.status).toBe("succeeded");
+  });
+
   it("blocks subflow invocation when maxDepth is reached", async () => {
     const rt = newRuntime();
     const parent = defineFlow({ id: "parent_depth_limit", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -798,6 +798,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         input: "子流程输入",
         succeeded: "成功",
         failed: "失败",
+        contract_failed: "契约失败",
         cancelled: "已取消",
         missing: "缺失模板",
         output: "子流程输出",
@@ -806,6 +807,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         runRecord: "子运行记录",
         flowId: "流程 ID",
         flowVersion: "流程版本",
+        contractStage: "契约阶段",
+        contractIssues: "契约问题",
+        contractIssueCount: "契约问题数量",
+        firstContractIssue: "首个契约问题",
       },
       switch_case: {
         in: "输入",
