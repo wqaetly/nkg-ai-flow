@@ -84,6 +84,34 @@ export const allSuccessNode = defineNode({
       label: "Results",
       multiple: true,
     },
+    {
+      id: "mode",
+      direction: "input",
+      kind: "data",
+      label: "Mode",
+      schema: { type: "string" },
+    },
+    {
+      id: "statusPath",
+      direction: "input",
+      kind: "data",
+      label: "Status Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "successValues",
+      direction: "input",
+      kind: "data",
+      label: "Success Values",
+      schema: { type: "string" },
+    },
+    {
+      id: "errorPath",
+      direction: "input",
+      kind: "data",
+      label: "Error Path",
+      schema: { type: "string" },
+    },
     { id: "all_success", direction: "output", kind: "control", label: "All success" },
     { id: "failed", direction: "output", kind: "control", label: "Failed" },
     { id: "empty", direction: "output", kind: "control", label: "Empty" },
@@ -97,6 +125,10 @@ export const allSuccessNode = defineNode({
     { id: "successCount", direction: "output", kind: "data", label: "Success count", schema: { type: "number" } },
     { id: "failureCount", direction: "output", kind: "data", label: "Failure count", schema: { type: "number" } },
     { id: "total", direction: "output", kind: "data", label: "Total", schema: { type: "number" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "statusPath", direction: "output", kind: "data", label: "Status Path", schema: { type: "string" } },
+    { id: "successValues", direction: "output", kind: "data", label: "Success Values" },
+    { id: "errorPath", direction: "output", kind: "data", label: "Error Path", schema: { type: "string" } },
     { id: "hasSuccess", direction: "output", kind: "data", label: "Has Success", schema: { type: "boolean" } },
     { id: "hasFailure", direction: "output", kind: "data", label: "Has Failure", schema: { type: "boolean" } },
     { id: "successRate", direction: "output", kind: "data", label: "Success Rate", schema: { type: "number" } },
@@ -106,14 +138,17 @@ export const allSuccessNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const results = normalizeResults(input.results);
-    const mode = readMode(config.mode);
-    const successValues = parseSuccessValues(config.successValues);
+    const mode = readMode(input.mode ?? config.mode);
+    const statusPath = String(input.statusPath ?? config.statusPath ?? "status");
+    const successValues = parseSuccessValues(input.successValues ?? config.successValues);
+    const successValueList = [...successValues];
+    const errorPath = String(input.errorPath ?? config.errorPath ?? "error");
     const evaluations = results.map((result, index) =>
       evaluateResult(result, index, {
         mode,
-        statusPath: String(config.statusPath ?? "status"),
+        statusPath,
         successValues,
-        errorPath: String(config.errorPath ?? "error"),
+        errorPath,
       }),
     );
     const successes = evaluations
@@ -140,6 +175,10 @@ export const allSuccessNode = defineNode({
       successCount,
       failureCount,
       total,
+      mode,
+      statusPath,
+      successValues: successValueList,
+      errorPath,
       hasSuccess,
       hasFailure,
       successRate,
@@ -162,6 +201,10 @@ export const allSuccessNode = defineNode({
         successCount,
         failureCount,
         total,
+        mode,
+        statusPath,
+        successValues: successValueList,
+        errorPath,
         hasSuccess,
         hasFailure,
         successRate,

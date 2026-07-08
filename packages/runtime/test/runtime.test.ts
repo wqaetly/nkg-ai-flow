@@ -12033,6 +12033,108 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic all_success policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "all_success_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 180 } });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 140, y: 80 },
+      config: {
+        value: [
+          { state: "ready", label: "a" },
+          { state: "done", label: "b" },
+        ],
+      },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 140, y: 180 },
+      config: { value: "status" },
+    });
+    const statusPath = flow.node("transform", {
+      id: "status_path",
+      position: { x: 140, y: 280 },
+      config: { value: "state" },
+    });
+    const successValues = flow.node("transform", {
+      id: "success_values",
+      position: { x: 140, y: 380 },
+      config: { value: "ready,done" },
+    });
+    const errorPath = flow.node("transform", {
+      id: "error_path",
+      position: { x: 140, y: 480 },
+      config: { value: "failure" },
+    });
+    const all = flow.node("all_success", {
+      id: "all",
+      position: { x: 360, y: 260 },
+      config: {
+        mode: "ok",
+        statusPath: "status",
+        successValues: "ok",
+        errorPath: "error",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 560, y: 260 },
+      config: { template: "all=${input.mode}:${input.successCount}/${input.total}:${input.statusPath}:${input.errorPath}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 800, y: 260 } });
+
+    flow.connect(start.out("out"), results.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), statusPath.in("in"));
+    flow.connect(start.out("out"), successValues.in("in"));
+    flow.connect(start.out("out"), errorPath.in("in"));
+    flow.connect(results.out("output"), all.in("results"));
+    flow.connect(mode.out("output"), all.in("mode"));
+    flow.connect(statusPath.out("output"), all.in("statusPath"));
+    flow.connect(successValues.out("output"), all.in("successValues"));
+    flow.connect(errorPath.out("output"), all.in("errorPath"));
+    flow.connect(all.out("all_success"), report.in("in"));
+    flow.connect(all.out("summary"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "all_success_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("all=status:2/2:state:failure");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const allOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "all") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(allOutput).toMatchObject({
+      status: "all_success",
+      successCount: 2,
+      failureCount: 0,
+      total: 2,
+      mode: "status",
+      statusPath: "state",
+      successValues: ["ready", "done"],
+      errorPath: "failure",
+      hasSuccess: true,
+      hasFailure: false,
+      successRate: 1,
+      failureRate: 0,
+      firstSuccess: { state: "ready", label: "a" },
+      firstFailure: null,
+    });
+  });
+
   it("routes all_success to failed when any branch result fails", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "all_success_failed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

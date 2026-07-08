@@ -131,6 +131,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       all_success: {
         results: "分支结果",
+        mode: "判定模式",
+        statusPath: "状态路径",
+        successValues: "成功值",
+        errorPath: "错误路径",
         all_success: "全部成功",
         failed: "存在失败",
         empty: "空结果",
