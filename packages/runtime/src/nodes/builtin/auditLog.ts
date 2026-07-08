@@ -93,6 +93,7 @@ export const auditLogNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "appended", direction: "output", kind: "control", label: "Appended" },
     { id: "read", direction: "output", kind: "control", label: "Read" },
@@ -100,6 +101,7 @@ export const auditLogNode = defineNode({
     { id: "cleared", direction: "output", kind: "control", label: "Cleared" },
     { id: "entries", direction: "output", kind: "data", label: "Entries" },
     { id: "entry", direction: "output", kind: "data", label: "Entry" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     {
       id: "count",
@@ -118,11 +120,11 @@ export const auditLogNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.audit_log.missing_name",
-        "audit_log node requires config.name",
+        "audit_log node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -174,6 +176,7 @@ export const auditLogNode = defineNode({
         [decision.branch]: null,
         entries: decision.entries,
         entry: decision.entries[0] ?? null,
+        name,
         state: decision.state,
         count: decision.entries.length,
         sequence: decision.state.sequence,

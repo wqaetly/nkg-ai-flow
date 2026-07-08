@@ -6192,6 +6192,75 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("appends business events into a dynamically named audit_log", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "audit_log_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const logName = flow.node("transform", {
+      id: "logName",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_AUDIT_LOG" },
+    });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 0 },
+      config: { value: { orderId: "order-2", decision: "rejected" } },
+    });
+    const audit = flow.node("audit_log", {
+      id: "audit",
+      position: { x: 260, y: 0 },
+      config: {
+        type: "approval",
+        actor: "finance",
+        message: "Order rejected",
+        maxEntries: 10,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "audit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), logName.in("in"));
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), audit.in("in"));
+    flow.connect(logName.out("output"), audit.in("name"));
+    flow.connect(payload.out("output"), audit.in("payload"));
+    flow.connect(audit.out("appended"), report.in("in"));
+    flow.connect(audit.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "audit_log_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("audit:ORDER_DYNAMIC_AUDIT_LOG");
+    expect(variables.get("ORDER_DYNAMIC_AUDIT_LOG")).toMatchObject({
+      sequence: 1,
+      entries: [
+        {
+          sequence: 1,
+          type: "approval",
+          actor: "finance",
+          message: "Order rejected",
+          payload: { orderId: "order-2", decision: "rejected" },
+          nodeId: "audit",
+        },
+      ],
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("reads recent audit_log entries with a limit", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_AUDIT_LOG", {

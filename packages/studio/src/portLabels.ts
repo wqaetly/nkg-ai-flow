@@ -206,6 +206,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       audit_log: {
         in: "输入",
+        name: "日志名",
         payload: "事件载荷",
         appended: "已记录",
         read: "已读取",
