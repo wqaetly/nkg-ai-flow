@@ -153,6 +153,20 @@ export const retryPolicyNode = defineNode({
     },
     { id: "retryableCodes", direction: "input", kind: "data", label: "Retryable Codes" },
     {
+      id: "retryAfterMsPath",
+      direction: "input",
+      kind: "data",
+      label: "Retry After ms Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "retryAfterAtPath",
+      direction: "input",
+      kind: "data",
+      label: "Retry After At Path",
+      schema: { type: "string" },
+    },
+    {
       id: "requireIdempotency",
       direction: "input",
       kind: "data",
@@ -275,6 +289,20 @@ export const retryPolicyNode = defineNode({
     },
     { id: "retryableCodes", direction: "output", kind: "data", label: "Retryable Codes" },
     {
+      id: "retryAfterMsPath",
+      direction: "output",
+      kind: "data",
+      label: "Retry After ms Path",
+      schema: { type: "string" },
+    },
+    {
+      id: "retryAfterAtPath",
+      direction: "output",
+      kind: "data",
+      label: "Retry After At Path",
+      schema: { type: "string" },
+    },
+    {
       id: "exhaustedValue",
       direction: "output",
       kind: "data",
@@ -339,6 +367,8 @@ export const retryPolicyNode = defineNode({
         jitterPercent: policy.jitterPercent,
         retryableOnly: policy.retryableOnly,
         retryableCodes: policy.retryableCodes,
+        retryAfterMsPath: policy.retryAfterMsPath,
+        retryAfterAtPath: policy.retryAfterAtPath,
         exhaustedValue: branch === "exhausted",
         unsafeValue: branch === "unsafe",
       },
@@ -412,8 +442,8 @@ function readPolicy(
       readBoolean(config.retryableOnly) ??
       true,
     retryableCodes: String(input.retryableCodes ?? config.retryableCodes ?? ""),
-    retryAfterMsPath: String(config.retryAfterMsPath ?? "retryAfterMs"),
-    retryAfterAtPath: String(config.retryAfterAtPath ?? "retryAfterAt"),
+    retryAfterMsPath: String(input.retryAfterMsPath ?? config.retryAfterMsPath ?? "retryAfterMs"),
+    retryAfterAtPath: String(input.retryAfterAtPath ?? config.retryAfterAtPath ?? "retryAfterAt"),
     requireIdempotency:
       readBoolean(input.requireIdempotency) ??
       readBoolean(config.requireIdempotency) ??
