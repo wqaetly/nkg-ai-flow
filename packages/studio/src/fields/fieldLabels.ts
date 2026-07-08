@@ -438,6 +438,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         multiplier: "退避倍率",
         maxDelayMs: "最大等待毫秒",
         retryableOnly: "仅重试可重试错误",
+        retryableCodes: "可重试错误码",
       },
       retry_state: {
         name: "重试状态名",
@@ -449,6 +450,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxDelayMs: "最大等待毫秒",
         jitterPercent: "抖动比例",
         retryableOnly: "仅重试可重试错误",
+        retryableCodes: "可重试错误码",
       },
       resume_point: {
         name: "恢复状态名",

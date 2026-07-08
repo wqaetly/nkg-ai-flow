@@ -70,6 +70,10 @@ const retryStateConfig = z
       .boolean()
       .default(true)
       .describe("Only retry errors whose retryable flag is true."),
+    retryableCodes: z
+      .string()
+      .default("")
+      .describe("Comma-separated exact or wildcard error codes allowed to retry."),
   })
   .passthrough();
 
@@ -110,6 +114,7 @@ export const retryStateNode = defineNode({
     maxDelayMs: { label: "Max Delay (ms)", control: "number", order: 7 },
     jitterPercent: { label: "Jitter Percent", control: "number", order: 8 },
     retryableOnly: { label: "Retryable Only", control: "switch", order: 9 },
+    retryableCodes: { label: "Retryable Codes", control: "input", order: 10 },
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
@@ -162,6 +167,7 @@ export const retryStateNode = defineNode({
       multiplier: Math.max(1, Number(config.multiplier ?? 2)),
       maxDelayMs: readNonNegativeInteger(config.maxDelayMs, 30000),
       jitterPercent: Math.min(100, Math.max(0, Number(config.jitterPercent ?? 0))),
+      retryableCodes: config.retryableCodes,
       stateKey,
       now,
       nodeId: ctx.nodeId,
@@ -221,6 +227,7 @@ function applyMode(
     multiplier: number;
     maxDelayMs: number;
     jitterPercent: number;
+    retryableCodes: unknown;
     stateKey: string;
     now: number;
     nodeId: string;
@@ -256,7 +263,7 @@ function applyMode(
       options.nodeId,
     );
   }
-  const retryable = readRetryable(options.error);
+  const retryable = readRetryable(options.error, options.retryableCodes);
   const attempt = (previous?.attempt ?? 0) + 1;
   const canRetry =
     attempt < options.maxAttempts && (!options.retryableOnly || retryable !== false);
@@ -331,9 +338,37 @@ function stableUnit(value: string): number {
   return (hash >>> 0) / 0xffffffff;
 }
 
-function readRetryable(error: unknown): boolean | undefined {
+function readRetryable(error: unknown, retryableCodes: unknown): boolean | undefined {
+  const codeAllowed = matchesRetryableCodes(error, retryableCodes);
+  if (codeAllowed !== undefined && !codeAllowed) return false;
   const retryable = readPath(error, ["retryable"]);
+  if (codeAllowed === true && retryable === undefined) return true;
   return typeof retryable === "boolean" ? retryable : undefined;
+}
+
+function matchesRetryableCodes(error: unknown, retryableCodes: unknown): boolean | undefined {
+  const patterns = parseCodePatterns(retryableCodes);
+  if (patterns.length === 0) return undefined;
+  const code = readPath(error, ["code"]);
+  if (typeof code !== "string" || code.trim() === "") return false;
+  return patterns.some((pattern) => matchesCodePattern(code, pattern));
+}
+
+function parseCodePatterns(value: unknown): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function matchesCodePattern(code: string, pattern: string): boolean {
+  if (pattern === "*") return true;
+  if (!pattern.includes("*")) return code === pattern;
+  const escaped = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${escaped}$`).test(code);
 }
 
 function readRetryState(value: unknown): PersistedRetryState | null {

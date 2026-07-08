@@ -39,6 +39,10 @@ const retryPolicyConfig = z
       .boolean()
       .default(true)
       .describe("Only retry errors whose retryable flag is true."),
+    retryableCodes: z
+      .string()
+      .default("")
+      .describe("Comma-separated exact or wildcard error codes allowed to retry."),
   })
   .passthrough();
 
@@ -55,6 +59,7 @@ export const retryPolicyNode = defineNode({
     multiplier: { label: "Multiplier", control: "number", order: 3 },
     maxDelayMs: { label: "Max Delay (ms)", control: "number", order: 4 },
     retryableOnly: { label: "Retryable Only", control: "switch", order: 5 },
+    retryableCodes: { label: "Retryable Codes", control: "input", order: 6 },
   },
   ports: [
     { id: "error", direction: "input", kind: "data", label: "Error" },
@@ -106,7 +111,7 @@ export const retryPolicyNode = defineNode({
   run({ input, config, ctx }) {
     const attempt = readAttempt(input);
     const maxAttempts = Math.max(1, Math.trunc(Number(config.maxAttempts ?? 3)));
-    const retryable = readRetryable(input.error);
+    const retryable = readRetryable(input.error, config.retryableCodes);
     const canRetry =
       attempt < maxAttempts && (!config.retryableOnly || retryable !== false);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
@@ -149,9 +154,37 @@ function readAttempt(input: Record<string, unknown>): number {
   return 1;
 }
 
-function readRetryable(error: unknown): boolean | undefined {
+function readRetryable(error: unknown, retryableCodes: unknown): boolean | undefined {
+  const codeAllowed = matchesRetryableCodes(error, retryableCodes);
+  if (codeAllowed !== undefined && !codeAllowed) return false;
   const retryable = readPath(error, ["retryable"]);
+  if (codeAllowed === true && retryable === undefined) return true;
   return typeof retryable === "boolean" ? retryable : undefined;
+}
+
+function matchesRetryableCodes(error: unknown, retryableCodes: unknown): boolean | undefined {
+  const patterns = parseCodePatterns(retryableCodes);
+  if (patterns.length === 0) return undefined;
+  const code = readPath(error, ["code"]);
+  if (typeof code !== "string" || code.trim() === "") return false;
+  return patterns.some((pattern) => matchesCodePattern(code, pattern));
+}
+
+function parseCodePatterns(value: unknown): string[] {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function matchesCodePattern(code: string, pattern: string): boolean {
+  if (pattern === "*") return true;
+  if (!pattern.includes("*")) return code === pattern;
+  const escaped = pattern
+    .split("*")
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join(".*");
+  return new RegExp(`^${escaped}$`).test(code);
 }
 
 function calculateDelay(
