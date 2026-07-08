@@ -85,6 +85,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",
       },
+      error_classifier: {
+        title: "错误分类",
+        description: "按错误码、类型、类别、可重试标记或消息内容路由错误。",
+      },
       event_trigger: {
         title: "事件触发",
         description: "收到匹配的字符串事件时启动流程。",

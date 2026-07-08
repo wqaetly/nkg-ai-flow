@@ -978,6 +978,88 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("exhausted:1");
   });
 
+  it("routes error_classifier to matched by error code and category", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "error_classifier_matched_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const classifier = flow.node("error_classifier", {
+      id: "classifier",
+      position: { x: 260, y: 0 },
+      config: {
+        codes: "node.http.*",
+        categories: "author",
+        label: "author_http",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "class:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), failing.in("in"));
+    flow.connect(failing.out("error"), classifier.in("error"));
+    flow.connect(classifier.out("matched"), report.in("in"));
+    flow.connect(classifier.out("label"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "error_classifier_matched_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("class:author_http");
+  });
+
+  it("routes error_classifier to unmatched when filters do not match", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "error_classifier_unmatched_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const failing = flow.node("http", {
+      id: "failing",
+      position: { x: 120, y: 0 },
+      config: { method: "GET" },
+    });
+    const classifier = flow.node("error_classifier", {
+      id: "classifier",
+      position: { x: 260, y: 0 },
+      config: {
+        codes: "node.llm.*",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "miss:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), failing.in("in"));
+    flow.connect(failing.out("error"), classifier.in("error"));
+    flow.connect(classifier.out("unmatched"), report.in("in"));
+    flow.connect(classifier.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "error_classifier_unmatched_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("miss:code_mismatch");
+  });
+
   it("routes rate_limit to allowed and records a sliding-window hit", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

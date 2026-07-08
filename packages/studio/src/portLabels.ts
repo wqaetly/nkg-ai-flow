@@ -281,6 +281,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         evaluations: "评估次数",
         changes: "变化次数",
       },
+      error_classifier: {
+        error: "错误",
+        matched: "已匹配",
+        unmatched: "未匹配",
+        code: "错误码",
+        kind: "错误类型",
+        category: "错误类别",
+        retryable: "可重试",
+        message: "错误消息",
+        label: "分类标签",
+        reason: "匹配原因",
+      },
       event_trigger: {
         event: "事件",
       },

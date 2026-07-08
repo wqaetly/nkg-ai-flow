@@ -14,6 +14,7 @@ import { DeterministicLlmProvider } from "./helpers/deterministicLlmProvider.js"
 const BUILTIN_TYPES = [
   "start",
   "end",
+  "error_classifier",
   "transform",
   "approval",
   "audit_log",

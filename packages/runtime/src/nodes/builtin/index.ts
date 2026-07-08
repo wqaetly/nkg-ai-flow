@@ -14,6 +14,7 @@
 
 export { startNode } from "./start.js";
 export { endNode } from "./end.js";
+export { errorClassifierNode } from "./errorClassifier.js";
 export { transformNode } from "./transform.js";
 export { approvalNode } from "./approval.js";
 export { auditLogNode } from "./auditLog.js";

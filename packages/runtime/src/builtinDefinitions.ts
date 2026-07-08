@@ -35,6 +35,7 @@ import {
   delayNode,
   distinctUntilChangedNode,
   endNode,
+  errorClassifierNode,
   eventTriggerNode,
   featureFlagNode,
   filterItemsNode,
@@ -103,6 +104,7 @@ export function getBuiltinNodeDefinitions(
   return [
     startNode.definition,
     endNode.definition,
+    errorClassifierNode.definition,
     transformNode.definition,
     approvalNode.definition,
     auditLogNode.definition,

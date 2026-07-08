@@ -215,6 +215,14 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         emitInitial: "首次是否触发",
         value: "静态比较值",
       },
+      error_classifier: {
+        codes: "错误码匹配",
+        kinds: "错误类型匹配",
+        categories: "错误类别匹配",
+        retryable: "可重试过滤",
+        messageIncludes: "消息包含",
+        label: "分类标签",
+      },
       event_trigger: {
         event: "触发事件",
       },
