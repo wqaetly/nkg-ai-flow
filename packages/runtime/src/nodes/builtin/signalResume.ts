@@ -20,6 +20,9 @@ interface WaitSignalState {
   status: "waiting" | "received" | "expired";
   signal: VariableValue | null;
   expected: string;
+  waitFlowId: string;
+  waitRunId: string;
+  waitNodeId: string;
   requestedAt: number;
   expiresAt: number | null;
   updatedAt: number;
@@ -94,6 +97,9 @@ export const signalResumeNode = defineNode({
     { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
     { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
+    { id: "waitFlowId", direction: "output", kind: "data", label: "Wait Flow Id", schema: { type: "string" } },
+    { id: "waitRunId", direction: "output", kind: "data", label: "Wait Run Id", schema: { type: "string" } },
+    { id: "waitNodeId", direction: "output", kind: "data", label: "Wait Node Id", schema: { type: "string" } },
     { id: "matched", direction: "output", kind: "data", label: "Matched", schema: { type: "boolean" } },
     {
       id: "createIfMissing",
@@ -147,7 +153,8 @@ export const signalResumeNode = defineNode({
       );
     }
 
-    const previous = readWaitSignalState(store.get(name));
+    const locator = { waitFlowId: ctx.flowId, waitRunId: ctx.runId, waitNodeId: ctx.nodeId };
+    const previous = readWaitSignalState(store.get(name), locator);
     const expectedOverride = String(input.expected ?? config.expected ?? "").trim();
     const expected = expectedOverride || previous?.expected || String(signal);
     const createIfMissing =
@@ -157,6 +164,7 @@ export const signalResumeNode = defineNode({
       expected,
       now,
       createIfMissing,
+      locator,
     });
 
     if (decision.state) {
@@ -173,6 +181,9 @@ export const signalResumeNode = defineNode({
         ? 0
         : Math.max(0, decision.state.expiresAt - now);
     const stateStatus = decision.state?.status ?? "";
+    const waitFlowId = decision.state?.waitFlowId ?? "";
+    const waitRunId = decision.state?.waitRunId ?? "";
+    const waitNodeId = decision.state?.waitNodeId ?? "";
     const matched = String(signal) === expected;
 
     ctx.log.debug("signal_resume selected branch", {
@@ -194,6 +205,9 @@ export const signalResumeNode = defineNode({
         expected,
         stateStatus,
         stateExists: decision.state !== null,
+        waitFlowId,
+        waitRunId,
+        waitNodeId,
         matched,
         createIfMissing,
         requestedAt,
@@ -215,15 +229,19 @@ function applySignal(
     expected: string;
     now: number;
     createIfMissing: boolean;
+    locator: { waitFlowId: string; waitRunId: string; waitNodeId: string };
   },
 ): { status: ResumeStatus; state: WaitSignalState | null } {
-  const { signal, expected, now, createIfMissing } = options;
+  const { signal, expected, now, createIfMissing, locator } = options;
   if (!previous) {
     if (!createIfMissing) return { status: "missing", state: null };
     const state: WaitSignalState = {
       status: String(signal) === expected ? "received" : "waiting",
       signal,
       expected,
+      waitFlowId: locator.waitFlowId,
+      waitRunId: locator.waitRunId,
+      waitNodeId: locator.waitNodeId,
       requestedAt: now,
       expiresAt: null,
       updatedAt: now,
@@ -284,7 +302,10 @@ function applySignal(
   };
 }
 
-function readWaitSignalState(value: unknown): WaitSignalState | null {
+function readWaitSignalState(
+  value: unknown,
+  locator: { waitFlowId: string; waitRunId: string; waitNodeId: string },
+): WaitSignalState | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const expected = typeof record.expected === "string" ? record.expected : "";
@@ -295,6 +316,9 @@ function readWaitSignalState(value: unknown): WaitSignalState | null {
       : "waiting",
     signal: toJsonValue(record.signal) ?? null,
     expected,
+    waitFlowId: readString(record.waitFlowId) ?? locator.waitFlowId,
+    waitRunId: readString(record.waitRunId) ?? locator.waitRunId,
+    waitNodeId: readString(record.waitNodeId) ?? locator.waitNodeId,
     requestedAt: readTimestamp(record.requestedAt) ?? Date.now(),
     expiresAt: readTimestamp(record.expiresAt),
     updatedAt: readTimestamp(record.updatedAt) ?? Date.now(),
@@ -303,6 +327,10 @@ function readWaitSignalState(value: unknown): WaitSignalState | null {
 
 function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function readBoolean(value: unknown): boolean | undefined {
@@ -357,6 +385,9 @@ function toVariableValue(state: WaitSignalState): VariableValue {
     status: state.status,
     signal: state.signal,
     expected: state.expected,
+    waitFlowId: state.waitFlowId,
+    waitRunId: state.waitRunId,
+    waitNodeId: state.waitNodeId,
     requestedAt: state.requestedAt,
     expiresAt: state.expiresAt,
     updatedAt: state.updatedAt,

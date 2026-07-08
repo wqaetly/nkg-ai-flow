@@ -22,6 +22,9 @@ interface WaitSignalState {
   status: WaitStatus;
   signal: VariableValue | null;
   expected: string;
+  waitFlowId: string;
+  waitRunId: string;
+  waitNodeId: string;
   requestedAt: number;
   expiresAt: number | null;
   updatedAt: number;
@@ -79,6 +82,9 @@ export const waitSignalNode = defineNode({
     { id: "status", direction: "output", kind: "data", label: "Status" },
     { id: "signal", direction: "output", kind: "data", label: "Signal" },
     { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
+    { id: "waitFlowId", direction: "output", kind: "data", label: "Wait Flow Id", schema: { type: "string" } },
+    { id: "waitRunId", direction: "output", kind: "data", label: "Wait Run Id", schema: { type: "string" } },
+    { id: "waitNodeId", direction: "output", kind: "data", label: "Wait Node Id", schema: { type: "string" } },
     { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
     { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
     {
@@ -122,7 +128,8 @@ export const waitSignalNode = defineNode({
     const now = Date.now();
     const expected = String(input.expected ?? config.expected ?? "approved");
     const timeoutMs = readIntegerAtLeast(input.timeoutMs, 0) ?? readIntegerAtLeast(config.timeoutMs, 0) ?? 0;
-    const previous = readWaitSignalState(store.get(name), expected, timeoutMs, now);
+    const locator = { waitFlowId: ctx.flowId, waitRunId: ctx.runId, waitNodeId: ctx.nodeId };
+    const previous = readWaitSignalState(store.get(name), expected, timeoutMs, now, locator);
     const signal = input.signal ?? previous.signal;
     const next = evaluateState(previous, signal, expected, now);
     const remainingMs =
@@ -151,6 +158,9 @@ export const waitSignalNode = defineNode({
         status: next.status,
         signal: next.signal,
         expected: next.expected,
+        waitFlowId: next.waitFlowId,
+        waitRunId: next.waitRunId,
+        waitNodeId: next.waitNodeId,
         requestedAt: requestedAtIso,
         expiresAt: expiresAtIso,
         timeoutMs: effectiveTimeoutMs,
@@ -215,6 +225,7 @@ function readWaitSignalState(
   expected: string,
   timeoutMs: number,
   now: number,
+  locator: { waitFlowId: string; waitRunId: string; waitNodeId: string },
 ): WaitSignalState {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
@@ -228,6 +239,9 @@ function readWaitSignalState(
         typeof record.expected === "string" && record.expected.length > 0
           ? record.expected
           : expected,
+      waitFlowId: readString(record.waitFlowId) ?? locator.waitFlowId,
+      waitRunId: readString(record.waitRunId) ?? locator.waitRunId,
+      waitNodeId: readString(record.waitNodeId) ?? locator.waitNodeId,
       requestedAt,
       expiresAt: readTimestamp(record.expiresAt) ?? configuredExpiresAt,
       updatedAt: readTimestamp(record.updatedAt) ?? now,
@@ -237,6 +251,9 @@ function readWaitSignalState(
     status: "waiting",
     signal: null,
     expected,
+    waitFlowId: locator.waitFlowId,
+    waitRunId: locator.waitRunId,
+    waitNodeId: locator.waitNodeId,
     requestedAt: now,
     expiresAt: timeoutMs > 0 ? now + timeoutMs : null,
     updatedAt: now,
@@ -251,6 +268,10 @@ function readStatus(value: unknown): WaitStatus {
 
 function readTimestamp(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
@@ -303,6 +324,9 @@ function toVariableValue(state: WaitSignalState): VariableValue {
     status: state.status,
     signal: state.signal,
     expected: state.expected,
+    waitFlowId: state.waitFlowId,
+    waitRunId: state.waitRunId,
+    waitNodeId: state.waitNodeId,
     requestedAt: state.requestedAt,
     expiresAt: state.expiresAt,
     updatedAt: state.updatedAt,

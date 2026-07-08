@@ -7717,6 +7717,9 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "waiting",
       signal: null,
       expected: "approved",
+      waitFlowId: "wait_signal_waiting_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "wait",
       requestedAt: expect.any(String),
       expiresAt: expect.any(String),
       timeoutMs: 60_000,
@@ -7729,6 +7732,9 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "waiting",
       signal: null,
       expected: "approved",
+      waitFlowId: "wait_signal_waiting_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "wait",
     });
   });
 
@@ -7985,6 +7991,9 @@ describe("runtime / hello-flow end-to-end", () => {
       signal: "approved",
       expected: "approved",
       stateExists: true,
+      waitFlowId: "signal_resume_wait_e2e",
+      waitRunId: waiting.runRecord.runId,
+      waitNodeId: "wait",
       matched: true,
       requestedAt: expect.any(String),
       expiresAt: "",
@@ -7998,6 +8007,9 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "received",
       signal: "approved",
       expected: "approved",
+      waitFlowId: "signal_resume_wait_e2e",
+      waitRunId: waiting.runRecord.runId,
+      waitNodeId: "wait",
     });
 
     const received = await rt.invocationRouter.invoke({
