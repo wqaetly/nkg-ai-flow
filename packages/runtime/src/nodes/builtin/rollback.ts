@@ -109,6 +109,10 @@ export const rollbackNode = defineNode({
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
     { id: "pending", direction: "output", kind: "data", label: "Pending" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "successPath", direction: "output", kind: "data", label: "Success Path", schema: { type: "string" } },
+    { id: "errorPath", direction: "output", kind: "data", label: "Error Path", schema: { type: "string" } },
+    { id: "missingResult", direction: "output", kind: "data", label: "Missing Result", schema: { type: "string" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     {
       id: "successCount",
@@ -131,13 +135,32 @@ export const rollbackNode = defineNode({
       label: "Pending count",
       schema: { type: "number" },
     },
+    { id: "successRate", direction: "output", kind: "data", label: "Success Rate", schema: { type: "number" } },
+    { id: "failureRate", direction: "output", kind: "data", label: "Failure Rate", schema: { type: "number" } },
+    { id: "pendingRate", direction: "output", kind: "data", label: "Pending Rate", schema: { type: "number" } },
+    { id: "hasFailures", direction: "output", kind: "data", label: "Has Failures", schema: { type: "boolean" } },
+    { id: "hasPending", direction: "output", kind: "data", label: "Has Pending", schema: { type: "boolean" } },
+    { id: "rollbackValue", direction: "output", kind: "data", label: "Rollback", schema: { type: "boolean" } },
+    { id: "emptyValue", direction: "output", kind: "data", label: "Empty", schema: { type: "boolean" } },
+    { id: "succeededValue", direction: "output", kind: "data", label: "Succeeded", schema: { type: "boolean" } },
+    { id: "partialValue", direction: "output", kind: "data", label: "Partial", schema: { type: "boolean" } },
+    { id: "failedValue", direction: "output", kind: "data", label: "Failed", schema: { type: "boolean" } },
+    { id: "incompleteValue", direction: "output", kind: "data", label: "Incomplete", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
+    const mode = config.mode ?? "plan";
+    const diagnostics = {
+      mode,
+      successPath: String(config.successPath ?? "status"),
+      errorPath: String(config.errorPath ?? "error"),
+      missingResult: config.missingResult ?? "pending",
+    };
     const actions = readActions(input.actions ?? input.input);
     if (actions.length === 0) {
-      ctx.log.debug("rollback selected branch", { mode: config.mode, branch: "empty" });
+      ctx.log.debug("rollback selected branch", { mode, branch: "empty" });
       return success("empty", {
+        ...diagnostics,
         actions: [],
         results: [],
         failures: [],
@@ -150,13 +173,14 @@ export const rollbackNode = defineNode({
       });
     }
 
-    if ((config.mode ?? "plan") === "plan") {
+    if (mode === "plan") {
       ctx.log.debug("rollback selected branch", {
         mode: "plan",
         branch: "rollback",
         count: actions.length,
       });
       return success("rollback", {
+        ...diagnostics,
         actions,
         results: [],
         failures: [],
@@ -170,10 +194,10 @@ export const rollbackNode = defineNode({
     }
 
     const evaluations = summarize(actions, input.results, {
-      successPath: String(config.successPath ?? "status"),
+      successPath: diagnostics.successPath,
       successValues: normalizeSuccessValues(config.successValues),
-      errorPath: String(config.errorPath ?? "error"),
-      missingResult: config.missingResult ?? "pending",
+      errorPath: diagnostics.errorPath,
+      missingResult: diagnostics.missingResult,
     });
     const failures = evaluations.filter((item) => item.status === "failed");
     const pending = evaluations.filter((item) => item.status === "pending");
@@ -195,6 +219,7 @@ export const rollbackNode = defineNode({
     });
 
     return success(branch, {
+      ...diagnostics,
       actions,
       results: evaluations,
       failures,
@@ -312,11 +337,31 @@ function toJsonValue(value: unknown): VariableValue | undefined {
 }
 
 function success(branch: RollbackBranch, outputs: Record<string, unknown>) {
+  const count = readCount(outputs.count);
+  const successCount = readCount(outputs.successCount);
+  const failureCount = readCount(outputs.failureCount);
+  const pendingCount = readCount(outputs.pendingCount);
   return {
     kind: "success" as const,
     outputs: {
       [branch]: null,
       ...outputs,
+      successRate: count > 0 ? successCount / count : 0,
+      failureRate: count > 0 ? failureCount / count : 0,
+      pendingRate: count > 0 ? pendingCount / count : 0,
+      hasFailures: failureCount > 0,
+      hasPending: pendingCount > 0,
+      rollbackValue: branch === "rollback",
+      emptyValue: branch === "empty",
+      succeededValue: branch === "succeeded",
+      partialValue: branch === "partial",
+      failedValue: branch === "failed",
+      incompleteValue: branch === "incomplete",
     },
   };
+}
+
+function readCount(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : 0;
 }

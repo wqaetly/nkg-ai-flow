@@ -3773,6 +3773,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("rollback:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const rollbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "rollback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(rollbackOutput).toMatchObject({
+      status: "rollback",
+      mode: "plan",
+      successPath: "status",
+      errorPath: "error",
+      missingResult: "pending",
+      count: 2,
+      successCount: 0,
+      failureCount: 0,
+      pendingCount: 2,
+      successRate: 0,
+      failureRate: 0,
+      pendingRate: 1,
+      hasFailures: false,
+      hasPending: true,
+      rollbackValue: true,
+      emptyValue: false,
+      partialValue: false,
+      incompleteValue: false,
+    });
     expect(variables.get("ORDER_ROLLBACKS")).toMatchObject({
       actions: [],
     });
@@ -3864,6 +3890,31 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("partial:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const rollbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "rollback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(rollbackOutput).toMatchObject({
+      status: "partial",
+      mode: "summarize",
+      successPath: "status",
+      errorPath: "error",
+      missingResult: "pending",
+      count: 2,
+      successCount: 1,
+      failureCount: 1,
+      pendingCount: 0,
+      successRate: 0.5,
+      failureRate: 0.5,
+      pendingRate: 0,
+      hasFailures: true,
+      hasPending: false,
+      rollbackValue: false,
+      partialValue: true,
+      incompleteValue: false,
+    });
   });
 
   it("routes rollback summarize to incomplete when results are still pending", async () => {
