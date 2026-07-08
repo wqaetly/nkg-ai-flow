@@ -88,6 +88,7 @@ export const checkpointNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "snapshot", direction: "input", kind: "data", label: "Snapshot" },
     { id: "saved", direction: "output", kind: "control", label: "Saved" },
     { id: "loaded", direction: "output", kind: "control", label: "Loaded" },
@@ -132,11 +133,11 @@ export const checkpointNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.checkpoint.missing_name",
-        "checkpoint node requires config.name",
+        "checkpoint node requires config.name or name input",
         ctx.nodeId,
       );
     }

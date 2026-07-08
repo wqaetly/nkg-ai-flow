@@ -4351,6 +4351,72 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("marks a resume_point with dynamic name and reason inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "resume_point_dynamic_inputs_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: -120 },
+      config: { value: "ORDER_DYNAMIC_RESUME" },
+    });
+    const reason = flow.node("transform", {
+      id: "reason",
+      position: { x: 120, y: 0 },
+      config: { value: "dynamic payment timeout" },
+    });
+    const target = flow.node("transform", {
+      id: "target",
+      position: { x: 120, y: 120 },
+      config: { value: "charge_payment" },
+    });
+    const mark = flow.node("resume_point", {
+      id: "mark",
+      position: { x: 320, y: 0 },
+      config: {
+        mode: "mark",
+        snapshot: { orderId: "order-dynamic", step: "charge_payment" },
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(start.out("out"), reason.in("in"));
+    flow.connect(start.out("out"), target.in("in"));
+    flow.connect(start.out("out"), mark.in("in"));
+    flow.connect(name.out("output"), mark.in("name"));
+    flow.connect(reason.out("output"), mark.in("reason"));
+    flow.connect(target.out("output"), mark.in("targetNodeId"));
+    flow.connect(mark.out("marked"), report.in("in"));
+    flow.connect(mark.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "resume_point_dynamic_inputs_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:ORDER_DYNAMIC_RESUME");
+    expect(variables.get("ORDER_DYNAMIC_RESUME")).toMatchObject({
+      status: "ready",
+      targetNodeId: "charge_payment",
+      reason: "dynamic payment timeout",
+      snapshot: { orderId: "order-dynamic", step: "charge_payment" },
+    });
+  });
+
   it("routes resume_point load to missing when no recovery target exists", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
@@ -8521,6 +8587,65 @@ describe("runtime / hello-flow end-to-end", () => {
       snapshot: { step: "payment", status: "authorized" },
       version: 1,
       label: "after payment authorization",
+    });
+  });
+
+  it("saves a checkpoint with a dynamic name input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: -80 },
+      config: { value: "ORDER_DYNAMIC_CHECKPOINT" },
+    });
+    const snapshot = flow.node("transform", {
+      id: "snapshot",
+      position: { x: 120, y: 80 },
+      config: { value: { step: "fulfillment", status: "packed" } },
+    });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 300, y: 0 },
+      config: {
+        mode: "save",
+        label: "packed",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "checkpoint:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(start.out("out"), snapshot.in("in"));
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(name.out("output"), checkpoint.in("name"));
+    flow.connect(snapshot.out("output"), checkpoint.in("snapshot"));
+    flow.connect(checkpoint.out("saved"), report.in("in"));
+    flow.connect(checkpoint.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:ORDER_DYNAMIC_CHECKPOINT");
+    expect(variables.get("ORDER_DYNAMIC_CHECKPOINT")).toMatchObject({
+      name: "ORDER_DYNAMIC_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "fulfillment", status: "packed" },
+      label: "packed",
     });
   });
 

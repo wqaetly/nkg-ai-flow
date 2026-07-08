@@ -107,8 +107,10 @@ export const resumePointNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "snapshot", direction: "input", kind: "data", label: "Snapshot" },
     { id: "targetNodeId", direction: "input", kind: "data", label: "Target Node Id", schema: { type: "string" } },
+    { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
     { id: "marked", direction: "output", kind: "control", label: "Marked" },
     { id: "ready", direction: "output", kind: "control", label: "Ready" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
@@ -149,11 +151,11 @@ export const resumePointNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const name = String(config.name ?? "").trim();
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.resume_point.missing_name",
-        "resume_point node requires config.name",
+        "resume_point node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -175,7 +177,7 @@ export const resumePointNode = defineNode({
       mode: config.mode ?? "mark",
       targetNodeId: String(input.targetNodeId ?? config.targetNodeId ?? "").trim(),
       snapshot: toJsonValue(input.snapshot ?? input.input ?? input.in ?? config.snapshot ?? null),
-      reason: String(config.reason ?? ""),
+      reason: String(input.reason ?? config.reason ?? ""),
       sourceRunId: ctx.runId,
       ttlMs,
       now,
