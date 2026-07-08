@@ -11445,6 +11445,106 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("saves a checkpoint with dynamic policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const name = flow.node("transform", {
+      id: "name",
+      position: { x: 120, y: -150 },
+      config: { value: "ORDER_DYNAMIC_POLICY_CHECKPOINT" },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: -50 },
+      config: { value: "save" },
+    });
+    const label = flow.node("transform", {
+      id: "label",
+      position: { x: 120, y: 50 },
+      config: { value: "dynamic checkpoint" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 150 },
+      config: { value: 120_000 },
+    });
+    const snapshot = flow.node("transform", {
+      id: "snapshot",
+      position: { x: 120, y: 250 },
+      config: { value: { step: "delivery", status: "scheduled" } },
+    });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 340, y: 0 },
+      config: {
+        mode: "load",
+        label: "static ignored",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 0 },
+      config: { template: "checkpoint:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), name.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), label.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), snapshot.in("in"));
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(name.out("output"), checkpoint.in("name"));
+    flow.connect(mode.out("output"), checkpoint.in("mode"));
+    flow.connect(label.out("output"), checkpoint.in("label"));
+    flow.connect(ttl.out("output"), checkpoint.in("ttlMs"));
+    flow.connect(snapshot.out("output"), checkpoint.in("snapshot"));
+    flow.connect(checkpoint.out("saved"), report.in("in"));
+    flow.connect(checkpoint.out("mode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:save");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      mode: "save",
+      status: "saved",
+      name: "ORDER_DYNAMIC_POLICY_CHECKPOINT",
+      label: "dynamic checkpoint",
+      version: 1,
+      ttlMs: 120_000,
+      remainingMs: expect.any(Number),
+      stateExists: true,
+      savedValue: true,
+    });
+    expect(variables.get("ORDER_DYNAMIC_POLICY_CHECKPOINT")).toMatchObject({
+      name: "ORDER_DYNAMIC_POLICY_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "delivery", status: "scheduled" },
+      label: "dynamic checkpoint",
+      version: 1,
+      expiresAt: expect.any(Number),
+    });
+  });
+
   it("loads an existing checkpoint snapshot", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();

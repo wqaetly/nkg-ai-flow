@@ -348,6 +348,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         state: "检查点状态",
         status: "状态",
         name: "检查点名",
+        mode: "模式",
         label: "标签",
         version: "版本",
         savedAt: "保存时间",

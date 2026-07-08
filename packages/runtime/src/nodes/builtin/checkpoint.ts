@@ -89,7 +89,10 @@ export const checkpointNode = defineNode({
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "snapshot", direction: "input", kind: "data", label: "Snapshot" },
+    { id: "label", direction: "input", kind: "data", label: "Label", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "saved", direction: "output", kind: "control", label: "Saved" },
     { id: "loaded", direction: "output", kind: "control", label: "Loaded" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
@@ -98,6 +101,7 @@ export const checkpointNode = defineNode({
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "snapshot", direction: "output", kind: "data", label: "Snapshot" },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "label", direction: "output", kind: "data", label: "Label", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     {
@@ -152,12 +156,14 @@ export const checkpointNode = defineNode({
     }
 
     const now = Date.now();
-    const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 0)));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "save";
+    const label = String(input.label ?? config.label ?? "");
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 0;
     const previous = normalizeExpired(readCheckpoint(store.get(name)), now);
     const decision = applyMode(previous, {
       name,
-      mode: config.mode ?? "save",
-      label: String(config.label ?? ""),
+      mode,
+      label,
       ttlMs,
       now,
       snapshot: toJsonValue(input.snapshot ?? input.input ?? input.in ?? config.snapshot ?? null),
@@ -184,7 +190,7 @@ export const checkpointNode = defineNode({
 
     ctx.log.debug("checkpoint selected branch", {
       name,
-      mode: config.mode ?? "save",
+      mode,
       branch: decision.branch,
       version: decision.state?.version ?? 0,
     });
@@ -196,6 +202,7 @@ export const checkpointNode = defineNode({
         state,
         snapshot: state?.snapshot ?? null,
         name: state?.name ?? name,
+        mode,
         label: state?.label ?? "",
         status: decision.branch,
         version: state?.version ?? 0,
@@ -317,6 +324,24 @@ function readTimestamp(value: unknown): number | null {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function readMode(value: unknown): CheckpointMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "save" ||
+    normalized === "load" ||
+    normalized === "clear" ||
+    normalized === "touch"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
