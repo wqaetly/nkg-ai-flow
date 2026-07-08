@@ -14216,6 +14216,11 @@ describe("runtime / hello-flow end-to-end", () => {
       complete: true,
       firstValue: "upper:Flow",
       lastValue: "lower:Flow",
+      indexedValues: [
+        { index: 0, value: "upper:Flow", present: true },
+        { index: 1, value: "lower:Flow", present: true },
+      ],
+      presentIndexes: [0, 1],
     });
   });
 

@@ -65,6 +65,19 @@ export const joinNode = defineNode({
       label: "Values",
     },
     {
+      id: "indexedValues",
+      direction: "output",
+      kind: "data",
+      label: "Indexed Values",
+    },
+    {
+      id: "presentIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Present Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
       id: "count",
       direction: "output",
       kind: "data",
@@ -132,11 +145,21 @@ export const joinNode = defineNode({
     const missingCount = Math.max(0, expectedCount - count);
     const complete = missingCount === 0;
     const empty = count === 0;
+    const indexedValues = values.map((value, index) => ({
+      index,
+      value,
+      present: value !== null && value !== undefined,
+    }));
+    const presentIndexes = indexedValues
+      .filter((entry) => entry.present)
+      .map((entry) => entry.index);
     return {
       kind: "success",
       outputs: {
         out: null,
         values,
+        indexedValues,
+        presentIndexes,
         count,
         expectedCount,
         missingCount,

@@ -733,6 +733,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         expectedCount: "期望数量",
         out: "继续",
         values: "多路数据",
+        indexedValues: "索引数据",
+        presentIndexes: "有效索引",
         count: "数量",
         missingCount: "缺失数量",
         complete: "是否完整",
