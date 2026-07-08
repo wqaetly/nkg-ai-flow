@@ -73,6 +73,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "Loop 开始",
         description: "While / Until 循环块入口，输出状态和轮次。",
       },
+      loop_break: {
+        title: "跳出循环",
+        description: "在循环体内提前结束 foreach / for / loop 块。",
+      },
       loop_end: {
         title: "Loop 结束",
         description: "While / Until 循环块出口，输出最终状态或上限分支。",

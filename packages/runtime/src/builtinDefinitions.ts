@@ -31,6 +31,7 @@ import {
   forBeginNode,
   forEndNode,
   loopBeginNode,
+  loopBreakNode,
   loopEndNode,
   sendEventNode,
   startNode,
@@ -79,6 +80,7 @@ export function getBuiltinNodeDefinitions(
     forBeginNode.definition,
     forEndNode.definition,
     loopBeginNode.definition,
+    loopBreakNode.definition,
     loopEndNode.definition,
   ];
 }

@@ -29,5 +29,6 @@ export {
   forBeginNode,
   forEndNode,
   loopBeginNode,
+  loopBreakNode,
   loopEndNode,
 } from "./loopBlocks.js";

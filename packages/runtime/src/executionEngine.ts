@@ -671,9 +671,10 @@ export class ExecutionEngine {
 
     for (const outputs of iterations) {
       this.recordOutputs(beginNode, outputs);
-      const bodyOk = await this.executeLoopBody(block, queue);
-      if (!bodyOk) return true;
+      const bodyStatus = await this.executeLoopBody(block, queue);
+      if (bodyStatus === "failed") return true;
       this.collectLoopEndInputs(block, aggregated);
+      if (bodyStatus === "break") break;
     }
 
     this.applyLoopEndOverrides(block.endNode, aggregated);
@@ -737,11 +738,22 @@ export class ExecutionEngine {
         state,
         iteration,
       });
-      const bodyOk = await this.executeLoopBody(block, queue);
-      if (!bodyOk) return true;
+      const bodyStatus = await this.executeLoopBody(block, queue);
+      if (bodyStatus === "failed") return true;
 
       const aggregated = new Map<string, unknown[]>();
       this.collectLoopEndInputs(block, aggregated);
+      if (bodyStatus === "break") {
+        const nextState = lastAggregatedValue(aggregated, "nextState");
+        if (nextState !== undefined) state = nextState;
+        this.recordOutputs(block.endNode, { done: null, finalState: state });
+        this.enqueueReadyDownstream(
+          block.endNode,
+          { done: null, finalState: state },
+          queue,
+        );
+        return true;
+      }
       this.applyLoopEndOverrides(block.endNode, aggregated);
       const endResult = await this.executeNode(block.endNode);
       this.clearLoopEndOverrides(block.endNode, aggregated);
@@ -769,7 +781,7 @@ export class ExecutionEngine {
   private async executeLoopBody(
     block: LoopBlock,
     queue: string[],
-  ): Promise<boolean> {
+  ): Promise<LoopBodyStatus> {
     const localQueue = [...block.bodyStartNodeIds];
     const seen = new Set<string>();
     while (localQueue.length > 0) {
@@ -781,7 +793,13 @@ export class ExecutionEngine {
       const result = await this.executeNode(node);
       if (result.kind === "skip") continue;
       if (result.kind === "error") {
-        return this.routeErrorOrFail(node, result.error, queue);
+        return (await this.routeErrorOrFail(node, result.error, queue))
+          ? "completed"
+          : "failed";
+      }
+      if (node.type === "loop_break") {
+        this.recordOutputs(node, result.outputs);
+        return "break";
       }
       this.recordOutputs(node, result.outputs);
       for (const edge of this.outEdges.get(node.id) ?? []) {
@@ -792,7 +810,7 @@ export class ExecutionEngine {
         localQueue.push(edge.to.nodeId);
       }
     }
-    return true;
+    return "completed";
   }
 
   private collectLoopEndInputs(
@@ -929,6 +947,8 @@ interface LoopBlock {
   bodyStartNodeIds: string[];
 }
 
+type LoopBodyStatus = "completed" | "break" | "failed";
+
 function loopSpecFor(type: string): { endType: string } | undefined {
   switch (type) {
     case "foreach_begin":
@@ -950,6 +970,14 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function lastAggregatedValue(
+  aggregated: Map<string, unknown[]>,
+  portId: string,
+): unknown {
+  const values = aggregated.get(portId);
+  return values && values.length > 0 ? values.at(-1) : undefined;
 }
 
 /**

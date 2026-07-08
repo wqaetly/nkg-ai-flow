@@ -28,6 +28,7 @@ const BUILTIN_TYPES = [
   "for_begin",
   "for_end",
   "loop_begin",
+  "loop_break",
   "loop_end",
 ] as const;
 

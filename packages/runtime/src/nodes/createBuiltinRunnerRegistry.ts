@@ -42,6 +42,7 @@ import {
   forEndNode,
   llmNode,
   loopBeginNode,
+  loopBreakNode,
   loopEndNode,
   sendEventNode,
   startNode,
@@ -154,6 +155,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, forBeginNode);
   installNode(target, forEndNode);
   installNode(target, loopBeginNode);
+  installNode(target, loopBreakNode);
   installNode(target, loopEndNode);
 
   return registry;

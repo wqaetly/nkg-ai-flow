@@ -31,6 +31,13 @@ const maxedOut: PortDefinition = {
   label: "达到上限",
 };
 
+const breakOut: PortDefinition = {
+  id: "break",
+  direction: "output",
+  kind: "control",
+  label: "跳出循环",
+};
+
 const foreachBeginConfig = z
   .object({
     mode: z.enum(["sequential", "parallel"]).default("sequential"),
@@ -267,6 +274,22 @@ export const loopEndNode = defineNode({
         [shouldContinue ? "maxed" : "done"]: null,
         finalState: nextState,
       },
+    };
+  },
+});
+
+export const loopBreakNode = defineNode({
+  type: "loop_break",
+  typeVersion: "1.0.0",
+  title: "Loop Break",
+  description: "在循环体内提前结束 foreach / for / loop 块。",
+  kind: "pseudo",
+  ports: [controlIn, breakOut],
+  validateInput: false,
+  run() {
+    return {
+      kind: "success",
+      outputs: { break: null },
     };
   },
 });

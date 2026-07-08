@@ -27,6 +27,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       false: "条件为假",
       body: "循环体",
       body_done: "循环体完成",
+      break: "跳出循环",
       batchSize: "批大小",
       checkMode: "检查时机",
       concurrency: "并发数",
@@ -126,6 +127,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         initialState: "初始状态",
         state: "当前状态",
         iteration: "轮次",
+      },
+      loop_break: {
+        break: "跳出循环",
       },
       loop_end: {
         body_done: "循环体完成",
