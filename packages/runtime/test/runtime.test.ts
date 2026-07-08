@@ -2183,6 +2183,106 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes retry_policy to unsafe when idempotency is required but unknown", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_idempotency_unsafe_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        requireIdempotency: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "unsafe:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(policy.out("unsafe"), report.in("in"));
+    flow.connect(policy.out("blockedByIdempotency"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_idempotency_unsafe_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("unsafe:true");
+    expect(policyOutput).toMatchObject({
+      status: "unsafe",
+      retryable: true,
+      requiresIdempotency: true,
+      blockedByIdempotency: true,
+      exhaustedValue: false,
+      unsafeValue: true,
+      delayMs: 0,
+    });
+    expect(policyOutput?.idempotent).toBeUndefined();
+  });
+
+  it("allows retry_policy retries when required idempotency is confirmed", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_idempotent_retry_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true, idempotent: true } },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 260, y: 0 },
+      config: {
+        maxAttempts: 3,
+        baseDelayMs: 100,
+        requireIdempotency: true,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_idempotent_retry_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:100");
+  });
+
   it("routes retry_policy to exhausted when error code is not retryable", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_code_filter_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

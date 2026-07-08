@@ -57,6 +57,10 @@ const retryPolicyConfig = z
       .string()
       .default("retryAfterAt")
       .describe("Dotted path to an absolute retry-after timestamp."),
+    requireIdempotency: z
+      .boolean()
+      .default(false)
+      .describe("When true, route non-idempotent or unknown operations to unsafe instead of retrying."),
   })
   .passthrough();
 
@@ -87,9 +91,17 @@ export const retryPolicyNode = defineNode({
       order: 9,
       placeholder: "retryAfterAt",
     },
+    requireIdempotency: { label: "Require Idempotency", control: "switch", order: 10 },
   },
   ports: [
     { id: "error", direction: "input", kind: "data", label: "Error" },
+    {
+      id: "idempotent",
+      direction: "input",
+      kind: "data",
+      label: "Idempotent",
+      schema: { type: "boolean" },
+    },
     {
       id: "attempt",
       direction: "input",
@@ -104,6 +116,7 @@ export const retryPolicyNode = defineNode({
       kind: "control",
       label: "Exhausted",
     },
+    { id: "unsafe", direction: "output", kind: "control", label: "Unsafe" },
     { id: "error", direction: "output", kind: "data", label: "Error" },
     {
       id: "attempt",
@@ -134,6 +147,27 @@ export const retryPolicyNode = defineNode({
       schema: { type: "boolean" },
     },
     {
+      id: "idempotent",
+      direction: "output",
+      kind: "data",
+      label: "Idempotent",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "requiresIdempotency",
+      direction: "output",
+      kind: "data",
+      label: "Requires Idempotency",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "blockedByIdempotency",
+      direction: "output",
+      kind: "data",
+      label: "Blocked By Idempotency",
+      schema: { type: "boolean" },
+    },
+    {
       id: "status",
       direction: "output",
       kind: "data",
@@ -161,23 +195,37 @@ export const retryPolicyNode = defineNode({
       label: "Exhausted",
       schema: { type: "boolean" },
     },
+    {
+      id: "unsafeValue",
+      direction: "output",
+      kind: "data",
+      label: "Unsafe",
+      schema: { type: "boolean" },
+    },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const attempt = readAttempt(input);
     const maxAttempts = Math.max(1, Math.trunc(Number(config.maxAttempts ?? 3)));
     const retryable = readRetryable(input.error, config.retryableCodes);
+    const idempotent = readIdempotent(input.idempotent, input.error);
+    const requiresIdempotency = config.requireIdempotency === true;
+    const blockedByIdempotency = requiresIdempotency && idempotent !== true;
     const canRetry =
-      attempt < maxAttempts && (config.retryableOnly === false || retryable === true);
+      attempt < maxAttempts &&
+      !blockedByIdempotency &&
+      (config.retryableOnly === false || retryable === true);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
     const delayMs = canRetry ? calculateDelay(config, input.error, attempt) : 0;
-    const branch = canRetry ? "retry" : "exhausted";
+    const branch = blockedByIdempotency ? "unsafe" : canRetry ? "retry" : "exhausted";
     const remainingAttempts = Math.max(0, maxAttempts - attempt);
 
     ctx.log.debug("retry_policy selected branch", {
       attempt,
       maxAttempts,
       retryable,
+      idempotent,
+      requiresIdempotency,
       branch,
       delayMs,
     });
@@ -191,10 +239,14 @@ export const retryPolicyNode = defineNode({
         nextAttempt,
         delayMs,
         retryable,
+        idempotent,
+        requiresIdempotency,
+        blockedByIdempotency,
         status: branch,
         maxAttempts,
         remainingAttempts,
-        exhaustedValue: !canRetry,
+        exhaustedValue: branch === "exhausted",
+        unsafeValue: branch === "unsafe",
       },
     };
   },
@@ -220,6 +272,14 @@ function readRetryable(error: unknown, retryableCodes: unknown): boolean | undef
   const retryable = readPath(error, ["retryable"]);
   if (codeAllowed === true && retryable === undefined) return true;
   return typeof retryable === "boolean" ? retryable : undefined;
+}
+
+function readIdempotent(inputValue: unknown, error: unknown): boolean | undefined {
+  if (typeof inputValue === "boolean") return inputValue;
+  const direct = readPath(error, ["idempotent"]);
+  if (typeof direct === "boolean") return direct;
+  const context = readPath(error, ["context", "idempotent"]);
+  return typeof context === "boolean" ? context : undefined;
 }
 
 function matchesRetryableCodes(error: unknown, retryableCodes: unknown): boolean | undefined {
