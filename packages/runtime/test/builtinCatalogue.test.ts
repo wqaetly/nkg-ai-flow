@@ -23,6 +23,7 @@ const BUILTIN_TYPES = [
   "circuit_breaker",
   "compensation",
   "condition",
+  "cooldown_gate",
   "deadline",
   "dead_letter",
   "delay",

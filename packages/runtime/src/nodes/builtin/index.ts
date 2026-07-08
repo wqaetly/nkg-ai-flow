@@ -23,6 +23,7 @@ export { checkpointNode } from "./checkpoint.js";
 export { circuitBreakerNode } from "./circuitBreaker.js";
 export { compensationNode } from "./compensation.js";
 export { conditionNode } from "./condition.js";
+export { cooldownGateNode } from "./cooldownGate.js";
 export { deadlineNode } from "./deadline.js";
 export { deadLetterNode } from "./deadLetter.js";
 export { delayNode } from "./delay.js";

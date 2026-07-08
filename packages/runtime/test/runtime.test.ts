@@ -571,6 +571,120 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("issues:2");
   });
 
+  it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cooldown_gate_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    start.addPort({ id: "runInput", direction: "output", kind: "data", label: "Run Input" });
+    const gate = flow.node("cooldown_gate", {
+      id: "gate",
+      position: { x: 140, y: 80 },
+      config: {
+        name: "ALERT_COOLDOWN",
+        durationMs: 1000,
+      },
+    });
+    const ready = flow.node("transform", {
+      id: "ready",
+      position: { x: 320, y: 20 },
+      config: { template: "ready:${input}" },
+    });
+    const cooling = flow.node("transform", {
+      id: "cooling",
+      position: { x: 320, y: 140 },
+      config: { template: "cooling:${input}" },
+    });
+    const merge = flow.node("merge", { id: "merge", position: { x: 500, y: 80 } });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 80 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(start.out("runInput"), gate.in("now"));
+    flow.connect(gate.out("ready"), ready.in("in"));
+    flow.connect(gate.out("cooling"), cooling.in("in"));
+    flow.connect(gate.out("status"), ready.in("input"));
+    flow.connect(gate.out("remainingMs"), cooling.in("input"));
+    flow.connect(ready.out("out"), merge.in("in"));
+    flow.connect(cooling.out("out"), merge.in("in"));
+    flow.connect(ready.out("output"), merge.in("value"));
+    flow.connect(cooling.out("output"), merge.in("value"));
+    flow.connect(merge.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const first = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_e2e",
+      input: 1000,
+    });
+    const second = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_e2e",
+      input: 1400,
+    });
+    const third = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_e2e",
+      input: 2100,
+    });
+
+    expect(first.succeeded).toBe(true);
+    expect(second.succeeded).toBe(true);
+    expect(third.succeeded).toBe(true);
+    expect(first.output).toBe("ready:ready");
+    expect(second.output).toBe("cooling:600");
+    expect(third.output).toBe("ready:ready");
+  });
+
+  it("resets cooldown_gate state explicitly", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "cooldown_gate_reset_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("cooldown_gate", {
+      id: "gate",
+      position: { x: 140, y: 0 },
+      config: {
+        name: "RESETTABLE_COOLDOWN",
+        durationMs: 1000,
+      },
+    });
+    const reset = flow.node("cooldown_gate", {
+      id: "reset",
+      position: { x: 300, y: 0 },
+      config: {
+        name: "RESETTABLE_COOLDOWN",
+        mode: "reset",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "reset:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("ready"), reset.in("in"));
+    flow.connect(reset.out("reset"), report.in("in"));
+    flow.connect(reset.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "cooldown_gate_reset_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("reset:reset");
+    expect(variables.has("RESETTABLE_COOLDOWN")).toBe(false);
+  });
+
   it("routes distinct_until_changed only when the selected value changes", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

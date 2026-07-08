@@ -170,6 +170,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       condition: {
         expression: "条件表达式",
       },
+      cooldown_gate: {
+        name: "冷却状态名",
+        durationMs: "冷却时长（毫秒）",
+        mode: "模式",
+      },
       deadline: {
         deadlineAt: "截止时间",
         durationMs: "相对时长（毫秒）",
