@@ -53,6 +53,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       end: "结束值",
       expression: "表达式",
       event: "事件",
+      failureThreshold: "失败阈值",
       flow_version: "流程版本",
       headers: "请求头",
       lint_sources: "校验源码",
@@ -76,6 +77,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       package_scope: "包作用域",
       path: "字段路径",
       prompt: "提示词",
+      resetTimeoutMs: "重置等待毫秒",
       separator: "分隔符",
       strict: "严格模式",
       start: "起始值",
@@ -118,6 +120,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       },
       condition: {
         expression: "条件表达式",
+      },
+      circuit_breaker: {
+        name: "熔断状态名",
+        failureThreshold: "失败阈值",
+        resetTimeoutMs: "重置等待毫秒",
+        mode: "模式",
       },
       delay: {
         durationMs: "等待时长（毫秒）",

@@ -21,6 +21,7 @@
 import type { NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import {
   agentNode,
+  circuitBreakerNode,
   conditionNode,
   delayNode,
   endNode,
@@ -79,6 +80,7 @@ export function getBuiltinNodeDefinitions(
     startNode.definition,
     endNode.definition,
     transformNode.definition,
+    circuitBreakerNode.definition,
     conditionNode.definition,
     delayNode.definition,
     filterItemsNode.definition,

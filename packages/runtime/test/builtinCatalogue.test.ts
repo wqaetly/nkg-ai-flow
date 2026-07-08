@@ -15,6 +15,7 @@ const BUILTIN_TYPES = [
   "start",
   "end",
   "transform",
+  "circuit_breaker",
   "condition",
   "delay",
   "filter_items",

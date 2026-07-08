@@ -15,6 +15,7 @@
 export { startNode } from "./start.js";
 export { endNode } from "./end.js";
 export { transformNode } from "./transform.js";
+export { circuitBreakerNode } from "./circuitBreaker.js";
 export { conditionNode } from "./condition.js";
 export { delayNode } from "./delay.js";
 export { filterItemsNode } from "./filterItems.js";

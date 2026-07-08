@@ -29,6 +29,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "代码合成器（LLM 并行）",
         description: "并行生成节点代码，并组装 FlowGraph、构建脚本和运行时文件。",
       },
+      circuit_breaker: {
+        title: "熔断器",
+        description: "根据持久化熔断状态路由到 closed / open / half-open 分支。",
+      },
       condition: {
         title: "条件分支",
         description: "根据布尔表达式把流程路由到 true / false 分支。",

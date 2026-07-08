@@ -205,6 +205,112 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("exhausted:1");
   });
 
+  it("opens a circuit_breaker after recorded failures and routes checks to open", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const recordFailure = flow.node("circuit_breaker", {
+      id: "record_failure",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_CIRCUIT",
+        failureThreshold: 1,
+        resetTimeoutMs: 60_000,
+        mode: "record_failure",
+      },
+    });
+    const check = flow.node("circuit_breaker", {
+      id: "check",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "PAYMENT_CIRCUIT",
+        failureThreshold: 1,
+        resetTimeoutMs: 60_000,
+        mode: "check",
+      },
+    });
+    const fallback = flow.node("transform", {
+      id: "fallback",
+      position: { x: 400, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), recordFailure.in("in"));
+    flow.connect(recordFailure.out("open"), check.in("in"));
+    flow.connect(check.out("open"), fallback.in("in"));
+    flow.connect(check.out("status"), fallback.in("input"));
+    flow.connect(fallback.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:open");
+    expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
+      status: "open",
+      failureCount: 1,
+    });
+  });
+
+  it("routes expired open circuit_breaker state to half_open", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_CIRCUIT", {
+      status: "open",
+      failureCount: 2,
+      openedAt: Date.now() - 10_000,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_half_open_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const check = flow.node("circuit_breaker", {
+      id: "check",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_CIRCUIT",
+        resetTimeoutMs: 1,
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), check.in("in"));
+    flow.connect(check.out("half_open"), report.in("in"));
+    flow.connect(check.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_half_open_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:half_open");
+    expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
+      status: "half_open",
+      failureCount: 2,
+    });
+  });
+
   it("writes state for downstream variable resolution with state_set", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
