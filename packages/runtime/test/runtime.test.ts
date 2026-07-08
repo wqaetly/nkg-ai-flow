@@ -3191,6 +3191,134 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("uses dynamic retry_state policy inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", meta: { retryAfterMs: 700 }, idempotent: true } },
+    });
+    const mode = flow.node("transform", { id: "mode", position: { x: 120, y: -420 }, config: { value: "record_failure" } });
+    const maxAttempts = flow.node("transform", { id: "maxAttempts", position: { x: 120, y: -340 }, config: { value: 4 } });
+    const baseDelay = flow.node("transform", { id: "baseDelay", position: { x: 120, y: -260 }, config: { value: 500 } });
+    const multiplier = flow.node("transform", { id: "multiplier", position: { x: 120, y: -180 }, config: { value: 3 } });
+    const maxDelay = flow.node("transform", { id: "maxDelay", position: { x: 120, y: -100 }, config: { value: 9000 } });
+    const jitter = flow.node("transform", { id: "jitter", position: { x: 120, y: 100 }, config: { value: 0 } });
+    const retryableOnly = flow.node("transform", { id: "retryableOnly", position: { x: 120, y: 180 }, config: { value: true } });
+    const retryableCodes = flow.node("transform", { id: "retryableCodes", position: { x: 120, y: 260 }, config: { value: "payment.*" } });
+    const retryAfterMsPath = flow.node("transform", { id: "retryAfterMsPath", position: { x: 120, y: 340 }, config: { value: "meta.retryAfterMs" } });
+    const retryAfterAtPath = flow.node("transform", { id: "retryAfterAtPath", position: { x: 120, y: 420 }, config: { value: "meta.retryAfterAt" } });
+    const requireIdempotency = flow.node("transform", { id: "requireIdempotency", position: { x: 120, y: 500 }, config: { value: true } });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 360, y: 0 },
+      config: {
+        name: "PAYMENT_DYNAMIC_POLICY_RETRY",
+        key: "order-policy",
+        mode: "reset",
+        maxAttempts: 1,
+        baseDelayMs: 1,
+        multiplier: 1,
+        maxDelayMs: 1,
+        retryableOnly: false,
+        retryableCodes: "other.*",
+        retryAfterMsPath: "retryAfterMs",
+        retryAfterAtPath: "retryAfterAt",
+        requireIdempotency: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 560, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 720, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    for (const node of [
+      mode,
+      maxAttempts,
+      baseDelay,
+      multiplier,
+      maxDelay,
+      jitter,
+      retryableOnly,
+      retryableCodes,
+      retryAfterMsPath,
+      retryAfterAtPath,
+      requireIdempotency,
+    ]) {
+      flow.connect(start.out("out"), node.in("in"));
+    }
+    flow.connect(source.out("out"), retry.in("in"));
+    flow.connect(source.out("output"), retry.in("error"));
+    flow.connect(mode.out("output"), retry.in("mode"));
+    flow.connect(maxAttempts.out("output"), retry.in("maxAttempts"));
+    flow.connect(baseDelay.out("output"), retry.in("baseDelayMs"));
+    flow.connect(multiplier.out("output"), retry.in("multiplier"));
+    flow.connect(maxDelay.out("output"), retry.in("maxDelayMs"));
+    flow.connect(jitter.out("output"), retry.in("jitterPercent"));
+    flow.connect(retryableOnly.out("output"), retry.in("retryableOnly"));
+    flow.connect(retryableCodes.out("output"), retry.in("retryableCodes"));
+    flow.connect(retryAfterMsPath.out("output"), retry.in("retryAfterMsPath"));
+    flow.connect(retryAfterAtPath.out("output"), retry.in("retryAfterAtPath"));
+    flow.connect(requireIdempotency.out("output"), retry.in("requireIdempotency"));
+    flow.connect(retry.out("retry"), report.in("in"));
+    flow.connect(retry.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:700");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const retryOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(retryOutput).toMatchObject({
+      stateKey: "PAYMENT_DYNAMIC_POLICY_RETRY:order-policy",
+      mode: "record_failure",
+      maxAttempts: 4,
+      baseDelayMs: 500,
+      multiplier: 3,
+      maxDelayMs: 9000,
+      jitterPercent: 0,
+      retryableOnly: true,
+      retryableCodes: "payment.*",
+      retryAfterMsPath: "meta.retryAfterMs",
+      retryAfterAtPath: "meta.retryAfterAt",
+      requiresIdempotency: true,
+      blockedByIdempotency: false,
+      attempt: 1,
+      delayMs: 700,
+      retryAfterMs: 700,
+      retryable: true,
+      idempotent: true,
+    });
+    expect(variables.get("PAYMENT_DYNAMIC_POLICY_RETRY:order-policy")).toMatchObject({
+      status: "waiting",
+      attempt: 1,
+      maxAttempts: 4,
+      retryable: true,
+      idempotent: true,
+      requiresIdempotency: true,
+      lastError: { code: "payment.timeout", meta: { retryAfterMs: 700 }, idempotent: true },
+    });
+  });
+
   it("persists retry_state unsafe when required idempotency is unknown", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

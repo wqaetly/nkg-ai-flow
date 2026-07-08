@@ -150,6 +150,17 @@ export const retryStateNode = defineNode({
     { id: "error", direction: "input", kind: "data", label: "Error" },
     { id: "idempotent", direction: "input", kind: "data", label: "Idempotent", schema: { type: "boolean" } },
     { id: "key", direction: "input", kind: "data", label: "Key", schema: { type: "string" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "maxAttempts", direction: "input", kind: "data", label: "Max Attempts", schema: { type: "number" } },
+    { id: "baseDelayMs", direction: "input", kind: "data", label: "Base Delay ms", schema: { type: "number" } },
+    { id: "multiplier", direction: "input", kind: "data", label: "Multiplier", schema: { type: "number" } },
+    { id: "maxDelayMs", direction: "input", kind: "data", label: "Max Delay ms", schema: { type: "number" } },
+    { id: "jitterPercent", direction: "input", kind: "data", label: "Jitter Percent", schema: { type: "number" } },
+    { id: "retryableOnly", direction: "input", kind: "data", label: "Retryable Only", schema: { type: "boolean" } },
+    { id: "retryableCodes", direction: "input", kind: "data", label: "Retryable Codes", schema: { type: "string" } },
+    { id: "retryAfterMsPath", direction: "input", kind: "data", label: "Retry After Ms Path", schema: { type: "string" } },
+    { id: "retryAfterAtPath", direction: "input", kind: "data", label: "Retry After At Path", schema: { type: "string" } },
+    { id: "requireIdempotency", direction: "input", kind: "data", label: "Require Idempotency", schema: { type: "boolean" } },
     { id: "retry", direction: "output", kind: "control", label: "Retry" },
     { id: "waiting", direction: "output", kind: "control", label: "Waiting" },
     { id: "exhausted", direction: "output", kind: "control", label: "Exhausted" },
@@ -159,6 +170,7 @@ export const retryStateNode = defineNode({
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "error", direction: "output", kind: "data", label: "Error" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "attempt", direction: "output", kind: "data", label: "Attempt", schema: { type: "number" } },
     { id: "nextAttempt", direction: "output", kind: "data", label: "Next Attempt", schema: { type: "number" } },
@@ -171,6 +183,14 @@ export const retryStateNode = defineNode({
     { id: "blockedByIdempotency", direction: "output", kind: "data", label: "Blocked By Idempotency", schema: { type: "boolean" } },
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
     { id: "maxAttempts", direction: "output", kind: "data", label: "Max Attempts", schema: { type: "number" } },
+    { id: "baseDelayMs", direction: "output", kind: "data", label: "Base Delay ms", schema: { type: "number" } },
+    { id: "multiplier", direction: "output", kind: "data", label: "Multiplier", schema: { type: "number" } },
+    { id: "maxDelayMs", direction: "output", kind: "data", label: "Max Delay ms", schema: { type: "number" } },
+    { id: "jitterPercent", direction: "output", kind: "data", label: "Jitter Percent", schema: { type: "number" } },
+    { id: "retryableOnly", direction: "output", kind: "data", label: "Retryable Only", schema: { type: "boolean" } },
+    { id: "retryableCodes", direction: "output", kind: "data", label: "Retryable Codes", schema: { type: "string" } },
+    { id: "retryAfterMsPath", direction: "output", kind: "data", label: "Retry After Ms Path", schema: { type: "string" } },
+    { id: "retryAfterAtPath", direction: "output", kind: "data", label: "Retry After At Path", schema: { type: "string" } },
     { id: "remainingAttempts", direction: "output", kind: "data", label: "Remaining Attempts", schema: { type: "number" } },
     { id: "exhaustedValue", direction: "output", kind: "data", label: "Exhausted", schema: { type: "boolean" } },
     { id: "unsafeValue", direction: "output", kind: "data", label: "Unsafe", schema: { type: "boolean" } },
@@ -199,20 +219,41 @@ export const retryStateNode = defineNode({
 
     const now = Date.now();
     const previous = readRetryState(store.get(stateKey));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "record_failure";
+    const requireIdempotency =
+      readBoolean(input.requireIdempotency) ?? (config.requireIdempotency === true);
+    const retryableOnly =
+      readBoolean(input.retryableOnly) ?? (config.retryableOnly !== false);
+    const policyMaxAttempts =
+      readPositiveInteger(input.maxAttempts, undefined) ??
+      readPositiveInteger(config.maxAttempts, 3);
+    const policyBaseDelayMs =
+      readNonNegativeInteger(input.baseDelayMs, undefined) ??
+      readNonNegativeInteger(config.baseDelayMs, 1000);
+    const policyMultiplier =
+      readNumberAtLeast(input.multiplier, 1) ?? readNumberAtLeast(config.multiplier, 1) ?? 2;
+    const policyMaxDelayMs =
+      readNonNegativeInteger(input.maxDelayMs, undefined) ??
+      readNonNegativeInteger(config.maxDelayMs, 30000);
+    const policyJitterPercent =
+      clampPercent(input.jitterPercent) ?? clampPercent(config.jitterPercent) ?? 0;
+    const retryableCodes = String(input.retryableCodes ?? config.retryableCodes ?? "");
+    const retryAfterMsPath = String(input.retryAfterMsPath ?? config.retryAfterMsPath ?? "retryAfterMs");
+    const retryAfterAtPath = String(input.retryAfterAtPath ?? config.retryAfterAtPath ?? "retryAfterAt");
     const decision = applyMode(previous, {
-      mode: config.mode ?? "record_failure",
+      mode,
       error: input.error ?? null,
       idempotent: input.idempotent,
-      requireIdempotency: config.requireIdempotency === true,
-      retryableOnly: config.retryableOnly !== false,
-      maxAttempts: readPositiveInteger(config.maxAttempts, 3),
-      baseDelayMs: readNonNegativeInteger(config.baseDelayMs, 1000),
-      multiplier: Math.max(1, Number(config.multiplier ?? 2)),
-      maxDelayMs: readNonNegativeInteger(config.maxDelayMs, 30000),
-      jitterPercent: Math.min(100, Math.max(0, Number(config.jitterPercent ?? 0))),
-      retryableCodes: config.retryableCodes,
-      retryAfterMsPath: String(config.retryAfterMsPath ?? "retryAfterMs"),
-      retryAfterAtPath: String(config.retryAfterAtPath ?? "retryAfterAt"),
+      requireIdempotency,
+      retryableOnly,
+      maxAttempts: policyMaxAttempts,
+      baseDelayMs: policyBaseDelayMs,
+      multiplier: policyMultiplier,
+      maxDelayMs: policyMaxDelayMs,
+      jitterPercent: policyJitterPercent,
+      retryableCodes,
+      retryAfterMsPath,
+      retryAfterAtPath,
       stateKey,
       now,
       nodeId: ctx.nodeId,
@@ -234,8 +275,7 @@ export const retryStateNode = defineNode({
         ? ""
         : new Date(decision.state.nextRetryAt).toISOString();
     const attempt = decision.state?.attempt ?? 0;
-    const maxAttempts =
-      decision.state?.maxAttempts ?? readPositiveInteger(config.maxAttempts, 3);
+    const maxAttempts = decision.state?.maxAttempts ?? policyMaxAttempts;
     const remainingAttempts = Math.max(0, maxAttempts - attempt);
     const stateStatus = decision.state?.status ?? decision.branch;
     const exhaustedValue =
@@ -245,7 +285,7 @@ export const retryStateNode = defineNode({
 
     ctx.log.debug("retry_state selected branch", {
       stateKey,
-      mode: config.mode ?? "record_failure",
+      mode,
       branch: decision.branch,
       attempt,
       retryAfterMs,
@@ -258,6 +298,7 @@ export const retryStateNode = defineNode({
         state: decision.state,
         name,
         error: decision.state?.lastError ?? null,
+        mode,
         status: decision.branch,
         attempt,
         nextAttempt: decision.branch === "retry" ? attempt + 1 : attempt,
@@ -266,10 +307,18 @@ export const retryStateNode = defineNode({
         nextRetryAt,
         retryable: decision.state?.retryable ?? null,
         idempotent: decision.state?.idempotent ?? null,
-        requiresIdempotency: decision.state?.requiresIdempotency ?? config.requireIdempotency === true,
+        requiresIdempotency: decision.state?.requiresIdempotency ?? requireIdempotency,
         blockedByIdempotency: decision.state?.blockedByIdempotency ?? false,
         stateStatus,
         maxAttempts,
+        baseDelayMs: policyBaseDelayMs,
+        multiplier: policyMultiplier,
+        maxDelayMs: policyMaxDelayMs,
+        jitterPercent: policyJitterPercent,
+        retryableOnly,
+        retryableCodes,
+        retryAfterMsPath,
+        retryAfterAtPath,
         remainingAttempts,
         exhaustedValue,
         unsafeValue,
@@ -547,14 +596,51 @@ function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function readPositiveInteger(value: unknown, fallback: number): number {
-  const parsed = Math.trunc(Number(value ?? fallback));
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+function readMode(value: unknown): RetryStateMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "record_failure" ||
+    normalized === "record_success" ||
+    normalized === "check" ||
+    normalized === "reset"
+    ? normalized
+    : undefined;
 }
 
-function readNonNegativeInteger(value: unknown, fallback: number): number {
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
+}
+
+function readPositiveInteger(value: unknown, fallback: number): number;
+function readPositiveInteger(value: unknown, fallback?: undefined): number | undefined;
+function readPositiveInteger(value: unknown, fallback?: number): number | undefined {
   const parsed = Math.trunc(Number(value ?? fallback));
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  if (Number.isFinite(parsed) && parsed > 0) return parsed;
+  return fallback;
+}
+
+function readNonNegativeInteger(value: unknown, fallback: number): number;
+function readNonNegativeInteger(value: unknown, fallback?: undefined): number | undefined;
+function readNonNegativeInteger(value: unknown, fallback?: number): number | undefined {
+  const parsed = Math.trunc(Number(value ?? fallback));
+  if (Number.isFinite(parsed) && parsed >= 0) return parsed;
+  return fallback;
+}
+
+function readNumberAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= minimum ? number : undefined;
+}
+
+function clampPercent(value: unknown): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  return Math.min(100, Math.max(0, number));
 }
 
 function readPath(value: unknown, path: readonly string[]): unknown {
