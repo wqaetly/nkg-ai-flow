@@ -257,6 +257,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       filter_items: {
         condition: "过滤条件",
       },
+      flatten_items: {
+        path: "展平字段路径",
+        depth: "展平深度",
+        includeNulls: "保留空值",
+      },
       first_success: {
         mode: "成功判定模式",
         valuePath: "输出字段路径",

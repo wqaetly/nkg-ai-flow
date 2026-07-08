@@ -49,6 +49,7 @@ import {
   errorClassifierNode,
   fallbackNode,
   filterItemsNode,
+  flattenItemsNode,
   firstSuccessNode,
   groupItemsNode,
   agentNode,
@@ -202,6 +203,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, distinctUntilChangedNode);
   installNode(target, emptyGateNode);
   installNode(target, filterItemsNode);
+  installNode(target, flattenItemsNode);
   installNode(target, firstSuccessNode);
   installNode(target, groupItemsNode);
   installNode(target, httpNode);

@@ -33,6 +33,7 @@ const BUILTIN_TYPES = [
   "distinct_until_changed",
   "empty_gate",
   "filter_items",
+  "flatten_items",
   "first_success",
   "group_items",
   "http",

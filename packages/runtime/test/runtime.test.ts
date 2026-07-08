@@ -4673,6 +4673,57 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("kept=keep,keep");
   });
 
+  it("flattens nested arrays with flatten_items", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "flatten_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { source: "a", items: ["a1", "a2"] },
+          { source: "b", items: ["b1"] },
+        ],
+      },
+    });
+    const flatten = flow.node("flatten_items", {
+      id: "flatten",
+      position: { x: 260, y: 0 },
+      config: { path: "items", depth: 1 },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${index}:${item}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "flat=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), flatten.in("in"));
+    flow.connect(input.out("output"), flatten.in("items"));
+    flow.connect(flatten.out("out"), map.in("in"));
+    flow.connect(flatten.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "flatten_items_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("flat=0:a1,1:a2,2:b1");
+  });
+
   it("maps array items with map_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "map_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

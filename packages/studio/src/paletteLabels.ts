@@ -113,6 +113,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "过滤数组",
         description: "按条件保留数组中的部分元素。",
       },
+      flatten_items: {
+        title: "展平数组",
+        description: "把嵌套数组或数组字段展平成一维项目列表。",
+      },
       first_success: {
         title: "首个成功",
         description: "从有序候选结果中选择第一个成功值。",

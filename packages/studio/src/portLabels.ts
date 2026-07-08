@@ -350,6 +350,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         rejected: "剔除项",
         count: "保留数量",
       },
+      flatten_items: {
+        items: "展平项",
+        count: "数量",
+        inputCount: "输入数量",
+      },
       first_success: {
         candidates: "候选结果",
         found: "已找到",
