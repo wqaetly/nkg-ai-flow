@@ -115,6 +115,7 @@ export const anySuccessNode = defineNode({
     { id: "any_success", direction: "output", kind: "control", label: "Any success" },
     { id: "no_success", direction: "output", kind: "control", label: "No success" },
     { id: "empty", direction: "output", kind: "control", label: "Empty" },
+    { id: "values", direction: "output", kind: "data", label: "Values" },
     { id: "value", direction: "output", kind: "data", label: "First success" },
     { id: "successes", direction: "output", kind: "data", label: "Successes" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
@@ -191,6 +192,7 @@ export const anySuccessNode = defineNode({
       kind: "success",
       outputs: {
         [status]: null,
+        values: results,
         value: successes[0] ?? null,
         successes,
         failures,

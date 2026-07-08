@@ -15609,6 +15609,10 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(anyOutput).toMatchObject({
       status: "any_success",
+      values: [
+        { status: "failed", error: "api timeout" },
+        { status: "succeeded", value: "fresh" },
+      ],
       value: { status: "succeeded", value: "fresh" },
       firstSuccess: { status: "succeeded", value: "fresh" },
       firstFailure: { status: "failed", error: "api timeout" },
@@ -15705,6 +15709,10 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(anyOutput).toMatchObject({
       status: "any_success",
+      values: [
+        { state: "blocked", failure: "api timeout", label: "a" },
+        { state: "done", label: "b" },
+      ],
       value: { state: "done", label: "b" },
       successCount: 1,
       failureCount: 1,
@@ -15771,6 +15779,10 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(anyOutput).toMatchObject({
       status: "no_success",
+      values: [
+        { status: "failed", error: "api timeout" },
+        { status: "rejected" },
+      ],
       value: null,
       firstSuccess: null,
       firstFailure: { status: "failed", error: "api timeout" },
@@ -15817,6 +15829,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("any=empty");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const anyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "any") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(anyOutput).toMatchObject({
+      status: "empty",
+      values: [],
+      value: null,
+      successCount: 0,
+      failureCount: 0,
+      total: 0,
+    });
   });
 
   it("fans out through parallel branches and rejoins selected branches", async () => {

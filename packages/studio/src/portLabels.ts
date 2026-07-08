@@ -163,6 +163,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         any_success: "任一成功",
         no_success: "无成功",
         empty: "空结果",
+        values: "结果数组",
         value: "首个成功",
         successes: "成功项",
         failures: "失败项",
