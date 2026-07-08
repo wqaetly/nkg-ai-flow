@@ -1244,18 +1244,22 @@ export class ExecutionEngine {
         state,
         iteration,
       };
+      const iterationState: ExecutionState = {
+        portValues: new Map(executionState.portValues),
+        inputOverrides: new Map(executionState.inputOverrides),
+      };
       await this.publishLoopIterationProgress(beginNode, block, {
         phase: "started",
         iteration,
         status: "running",
         context: loopIterationContext(outputs),
       });
-      this.recordOutputs(beginNode, outputs, executionState);
+      this.recordOutputs(beginNode, outputs, iterationState);
       const bodyResult = await this.executeLoopBody(
         block,
         queue,
         errorPolicy,
-        executionState,
+        iterationState,
       );
       loopErrors.push(...bodyResult.errors);
       const aggregated = new Map<string, unknown[]>();
@@ -1263,7 +1267,7 @@ export class ExecutionEngine {
         block,
         aggregated,
         bodyResult.executedNodeIds,
-        executionState,
+        iterationState,
       );
       if (bodyResult.status === "failed") {
         await this.publishLoopIterationProgress(beginNode, block, {
@@ -1345,9 +1349,9 @@ export class ExecutionEngine {
       }
 
       addLoopErrors(aggregated, loopErrors);
-      this.applyLoopEndOverrides(block.endNode, aggregated, executionState);
-      const endResult = await this.executeNode(block.endNode, executionState);
-      this.clearLoopEndOverrides(block.endNode, aggregated, executionState);
+      this.applyLoopEndOverrides(block.endNode, aggregated, iterationState);
+      const endResult = await this.executeNode(block.endNode, iterationState);
+      this.clearLoopEndOverrides(block.endNode, aggregated, iterationState);
       if (endResult.kind === "error") {
         await this.routeErrorOrFail(block.endNode, endResult.error, queue);
         return true;

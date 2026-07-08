@@ -9676,6 +9676,119 @@ describe("runtime / hello-flow end-to-end", () => {
     ).toHaveLength(1);
   });
 
+  it("isolates loop_begin data scope between while iterations", async () => {
+    const stepNode = defineNode({
+      type: "loop_scope_step",
+      typeVersion: "1.0.0",
+      title: "Loop Scope Step",
+      ports: [
+        { id: "state", direction: "input", kind: "data", label: "State" },
+        { id: "observed", direction: "input", kind: "data", label: "Observed" },
+        { id: "nextState", direction: "output", kind: "data", label: "Next State" },
+      ],
+      validateInput: false,
+      run({ input }) {
+        const state =
+          input.state && typeof input.state === "object"
+            ? (input.state as Record<string, unknown>)
+            : {};
+        const next =
+          state.next && typeof state.next === "object"
+            ? (state.next as Record<string, unknown>)
+            : { continue: false };
+        return {
+          kind: "success",
+          outputs: {
+            out: null,
+            nextState: {
+              ...next,
+              observed: input.observed ?? null,
+            },
+          },
+        };
+      },
+    });
+    const rt = newRuntime({ nodes: [stepNode] });
+    const flow = defineFlow({
+      id: "loop_iteration_scope_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 120 },
+      config: {
+        value: {
+          continue: true,
+          run: true,
+          value: "first",
+          next: {
+            continue: true,
+            run: false,
+            value: "second",
+            next: { continue: false, value: "done" },
+          },
+        },
+      },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 260, y: 120 },
+      config: { checkMode: "after", maxIterations: 3 },
+    });
+    const gate = flow.node("condition", {
+      id: "gate",
+      position: { x: 400, y: 120 },
+      config: { expression: "input.run" },
+    });
+    const optional = flow.node("transform", {
+      id: "optional",
+      position: { x: 540, y: 60 },
+    });
+    const step = flow.node("loop_scope_step", {
+      id: "step",
+      position: { x: 680, y: 120 },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 820, y: 120 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 960, y: 120 },
+      config: { template: "observed=${input.observed.value}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 1100, y: 120 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(begin.out("body"), gate.in("in"));
+    flow.connect(begin.out("state"), optional.in("input"));
+    flow.connect(begin.out("state"), step.in("state"));
+    flow.connect(gate.out("true"), optional.in("in"));
+    flow.connect(gate.out("false"), step.in("in"));
+    flow.connect(optional.out("out"), step.in("in"));
+    flow.connect(optional.out("output"), step.in("observed"));
+    flow.connect(step.out("out"), loopEnd.in("body_done"));
+    flow.connect(step.out("nextState"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("finalState"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_iteration_scope_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("observed=");
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",
