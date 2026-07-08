@@ -25,8 +25,8 @@
  *     is wired, the Run fails with `run_failed`.
  *   - Cancellation: `runOptions.signal` aborts every in-flight runner.
  *
- * Phase 1 does NOT yet implement: Fork/Join with multiple/condition
- * branches deeper than one, retry/timeout policy, checkpoints, replay.
+ * Later phases add loop blocks, explicit parallel/join nodes, retry /
+ * timeout policy, checkpoint nodes, resume points, and event replay.
  */
 
 import {
@@ -705,6 +705,18 @@ export class ExecutionEngine {
       appliedOverrides.add(portId);
     }
 
+    if (node.id === this.entryNodeId) {
+      for (const edge of inbound) {
+        const toPort = this.findPort(edge.to.nodeId, edge.to.portId);
+        if (toPort?.kind !== "data") continue;
+        const valueKey = `${edge.from.nodeId}.${edge.from.portId}`;
+        if (state.portValues.has(valueKey)) continue;
+        if (appliedOverrides.has(edge.to.portId)) continue;
+        inputs[edge.to.portId] = this.options.runInput;
+        appliedOverrides.add(edge.to.portId);
+      }
+    }
+
     // 4. When a node has only control inbound (no data wiring), surface
     // the upstream node's primary data output as `inputs.in` so simple
     // `A -> B -> end` flows can author plain `${input.field}` templates
@@ -721,6 +733,15 @@ export class ExecutionEngine {
       }
       if (inputs.in === undefined || inputs.in === null) {
         inputs.in = upstreamData ?? this.options.runInput;
+      }
+    }
+
+    if (node.id === this.entryNodeId) {
+      if (inputs.input === undefined || inputs.input === null) {
+        inputs.input = this.options.runInput;
+      }
+      if (inputs.in === undefined || inputs.in === null) {
+        inputs.in = this.options.runInput;
       }
     }
 

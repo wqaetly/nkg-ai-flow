@@ -22,6 +22,7 @@ import {
   chainVariableStores,
   type SecretStore,
   type VariableStore,
+  type VariableValue,
 } from "@ai-native-flow/variable-store";
 import { ExecutionEngine } from "./executionEngine.js";
 import type { NodeInvokeFlow } from "./nodeContext.js";
@@ -77,6 +78,20 @@ export interface CreateRunInput {
    * node instead of all ordinary zero-indegree start nodes.
    */
   entryNodeId?: string;
+}
+
+export interface ResumeFromPointInput {
+  flowId: string;
+  flowVersion: string;
+  flowArtifactHash: string;
+  graph: FlowGraph;
+  resumePointName: string;
+  traceId?: string;
+  subflowDepth?: number;
+  /** Optional run-scoped variable overrides. */
+  variables?: VariableStore;
+  /** @deprecated Use `variables`; treated as the same store. */
+  secrets?: SecretStore;
 }
 
 export interface ExecuteResult {
@@ -149,6 +164,50 @@ export class RunManager {
     return { runRecord, completed };
   }
 
+  /**
+   * Resume a flow from a durable `resume_point` marker. The marker's
+   * snapshot becomes the new Run input, and its `targetNodeId` becomes
+   * the execution entry node.
+   */
+  async resumeFromPoint(input: ResumeFromPointInput): Promise<ExecuteResult> {
+    const point = this.resolveResumePoint(input);
+    return this.invoke({
+      flowId: input.flowId,
+      flowVersion: input.flowVersion,
+      flowArtifactHash: input.flowArtifactHash,
+      graph: input.graph,
+      input: point.snapshot,
+      entryNodeId: point.targetNodeId,
+      ...(input.traceId !== undefined ? { traceId: input.traceId } : {}),
+      ...(input.subflowDepth !== undefined ? { subflowDepth: input.subflowDepth } : {}),
+      ...(input.variables !== undefined ? { variables: input.variables } : {}),
+      ...(input.secrets !== undefined ? { secrets: input.secrets } : {}),
+    });
+  }
+
+  /**
+   * Two-phase counterpart of `resumeFromPoint()`, returning the run id
+   * immediately plus a promise for terminal completion.
+   */
+  async startFromPoint(input: ResumeFromPointInput): Promise<{
+    runRecord: RunRecord;
+    completed: Promise<ExecuteResult>;
+  }> {
+    const point = this.resolveResumePoint(input);
+    return this.start({
+      flowId: input.flowId,
+      flowVersion: input.flowVersion,
+      flowArtifactHash: input.flowArtifactHash,
+      graph: input.graph,
+      input: point.snapshot,
+      entryNodeId: point.targetNodeId,
+      ...(input.traceId !== undefined ? { traceId: input.traceId } : {}),
+      ...(input.subflowDepth !== undefined ? { subflowDepth: input.subflowDepth } : {}),
+      ...(input.variables !== undefined ? { variables: input.variables } : {}),
+      ...(input.secrets !== undefined ? { secrets: input.secrets } : {}),
+    });
+  }
+
   /** Create the Run and persist the initial record. */
   async create(input: CreateRunInput): Promise<RunRecord> {
     const runId = (this.options.generateRunId ?? defaultRunId)();
@@ -184,10 +243,11 @@ export class RunManager {
 
     let result;
     try {
-      const variables =
-        options.variables && options.secrets && options.secrets !== options.variables
-          ? chainVariableStores(options.variables, options.secrets)
-          : options.variables ?? options.secrets ?? this.options.variables;
+      const variables = selectVariableStore(
+        options.variables,
+        options.secrets,
+        this.options.variables,
+      );
       const engine = new ExecutionEngine({
         graph,
         runId: record.runId,
@@ -282,8 +342,220 @@ export class RunManager {
   async get(runId: string): Promise<RunRecord | undefined> {
     return this.options.runStore.get(runId);
   }
+
+  private resolveResumePoint(input: ResumeFromPointInput): ResolvedResumePoint {
+    const name = input.resumePointName.trim();
+    if (name === "") {
+      throw new RuntimeErrorException(
+        createRuntimeError({
+          code: "run_manager.resume_point_missing_name",
+          kind: "validation",
+          category: "user_input",
+          message: "resumeFromPoint requires resumePointName",
+          source: {
+            module: "run_manager",
+            flowId: input.flowId,
+            flowVersion: input.flowVersion,
+          },
+        }),
+      );
+    }
+
+    const variables = selectVariableStore(
+      input.variables,
+      input.secrets,
+      this.options.variables,
+    );
+    const state = readResumePoint(name, variables.get(name));
+    if (!state) {
+      throw new RuntimeErrorException(
+        createRuntimeError({
+          code: "run_manager.resume_point_missing",
+          kind: "not_found",
+          category: "user_input",
+          message: `resume point "${name}" does not exist or is invalid`,
+          source: {
+            module: "run_manager",
+            flowId: input.flowId,
+            flowVersion: input.flowVersion,
+          },
+          context: { resumePointName: name },
+        }),
+      );
+    }
+
+    const now = Date.now();
+    if (state.status === "expired" || (state.expiresAt !== null && now >= state.expiresAt)) {
+      markResumePointExpired(name, state, variables, now);
+      throw new RuntimeErrorException(
+        createRuntimeError({
+          code: "run_manager.resume_point_expired",
+          kind: "timeout",
+          category: "user_input",
+          message: `resume point "${name}" has expired`,
+          source: {
+            module: "run_manager",
+            flowId: input.flowId,
+            flowVersion: input.flowVersion,
+          },
+          context: { resumePointName: name, targetNodeId: state.targetNodeId },
+        }),
+      );
+    }
+
+    const exists = input.graph.nodes.some((node) => node.id === state.targetNodeId);
+    if (!exists) {
+      throw new RuntimeErrorException(
+        createRuntimeError({
+          code: "flow.node.not_found",
+          kind: "not_found",
+          category: "user_input",
+          message: `flow ${input.flowId}@${input.flowVersion} has no resume target node with id "${state.targetNodeId}"`,
+          source: {
+            module: "run_manager",
+            flowId: input.flowId,
+            flowVersion: input.flowVersion,
+          },
+          context: {
+            resumePointName: name,
+            targetNodeId: state.targetNodeId,
+          },
+        }),
+      );
+    }
+
+    markResumePointLoaded(name, state, variables, now);
+    return state;
+  }
 }
 
 function defaultRunId(): string {
   return `run_${crypto.randomUUID().replace(/-/g, "").slice(0, 22)}`;
+}
+
+interface ResolvedResumePoint {
+  name: string;
+  status: "ready" | "expired";
+  targetNodeId: string;
+  snapshot: VariableValue | null;
+  reason: string;
+  sourceRunId: string;
+  version: number;
+  markedAt: number;
+  loadedAt: number | null;
+  expiresAt: number | null;
+  updatedAt: number;
+}
+
+function selectVariableStore(
+  variables: VariableStore | undefined,
+  secrets: SecretStore | undefined,
+  fallback: VariableStore,
+): VariableStore {
+  return variables && secrets && secrets !== variables
+    ? chainVariableStores(variables, secrets)
+    : variables ?? secrets ?? fallback;
+}
+
+function readResumePoint(
+  expectedName: string,
+  value: unknown,
+): ResolvedResumePoint | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const name = typeof record.name === "string" ? record.name : "";
+  const targetNodeId =
+    typeof record.targetNodeId === "string" ? record.targetNodeId : "";
+  if (name !== expectedName || targetNodeId === "") return null;
+  return {
+    name,
+    status: record.status === "expired" ? "expired" : "ready",
+    targetNodeId,
+    snapshot: toJsonValue(record.snapshot) ?? null,
+    reason: typeof record.reason === "string" ? record.reason : "",
+    sourceRunId: typeof record.sourceRunId === "string" ? record.sourceRunId : "",
+    version: readNonNegativeInteger(record.version),
+    markedAt: readTimestamp(record.markedAt) ?? Date.now(),
+    loadedAt: readTimestamp(record.loadedAt),
+    expiresAt: readTimestamp(record.expiresAt),
+    updatedAt: readTimestamp(record.updatedAt) ?? Date.now(),
+  };
+}
+
+function markResumePointLoaded(
+  name: string,
+  state: ResolvedResumePoint,
+  store: VariableStore,
+  now: number,
+): void {
+  if (!isMutableVariableStore(store)) return;
+  store.set(name, toVariableValue({ ...state, status: "ready", loadedAt: now, updatedAt: now }));
+}
+
+function markResumePointExpired(
+  name: string,
+  state: ResolvedResumePoint,
+  store: VariableStore,
+  now: number,
+): void {
+  if (!isMutableVariableStore(store)) return;
+  store.set(name, toVariableValue({ ...state, status: "expired", updatedAt: now }));
+}
+
+function isMutableVariableStore(
+  value: VariableStore,
+): value is VariableStore & { set(name: string, value: VariableValue): void } {
+  return typeof (value as { set?: unknown }).set === "function";
+}
+
+function readTimestamp(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readNonNegativeInteger(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? Math.trunc(number) : 0;
+}
+
+function toJsonValue(value: unknown): VariableValue | undefined {
+  if (value === null) return null;
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return Number.isNaN(value) ? undefined : value;
+  }
+  if (Array.isArray(value)) {
+    const items = value.map(toJsonValue);
+    return items.some((item) => item === undefined)
+      ? undefined
+      : (items as VariableValue[]);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, VariableValue> = {};
+    for (const [key, item] of Object.entries(value)) {
+      const converted = toJsonValue(item);
+      if (converted === undefined) return undefined;
+      out[key] = converted;
+    }
+    return out;
+  }
+  return undefined;
+}
+
+function toVariableValue(state: ResolvedResumePoint): VariableValue {
+  return {
+    name: state.name,
+    status: state.status,
+    targetNodeId: state.targetNodeId,
+    snapshot: state.snapshot,
+    reason: state.reason,
+    sourceRunId: state.sourceRunId,
+    version: state.version,
+    markedAt: state.markedAt,
+    loadedAt: state.loadedAt,
+    expiresAt: state.expiresAt,
+    updatedAt: state.updatedAt,
+  };
 }

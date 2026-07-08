@@ -52,6 +52,20 @@ export interface InvokeNodeArgs extends InvokeArgs {
   nodeId: string;
 }
 
+export interface ResumeFromPointArgs {
+  flowId: string;
+  /** Optional explicit version pin; defaults to active version. */
+  flowVersion?: string;
+  /** Name used by the `resume_point` node when the recovery target was marked. */
+  resumePointName: string;
+  traceId?: string;
+  subflowDepth?: number;
+  /** Optional run-scoped variable overrides. */
+  variables?: VariableStore;
+  /** Optional run-scoped secret overrides. */
+  secrets?: SecretStore;
+}
+
 export interface TriggerEventArgs {
   event: string;
   traceId?: string;
@@ -127,6 +141,30 @@ export class InvocationRouter {
       graph: ref.graph,
       input: args.input,
       sinkNodeId: args.nodeId,
+      ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
+      ...(args.variables !== undefined ? { variables: args.variables } : {}),
+      ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
+    });
+  }
+
+  /**
+   * Resume a flow from a durable `resume_point` marker. The marker
+   * supplies both the target node and the snapshot used as the resumed
+   * run input. Flow-level inputSchema validation is skipped for the same
+   * reason as `invokeNode()`: the resumed run enters the graph mid-flow.
+   */
+  async resumeFromPoint(args: ResumeFromPointArgs): Promise<ExecuteResult> {
+    const ref = args.flowVersion
+      ? await this.options.registry.resolve(args.flowId, args.flowVersion)
+      : await this.options.registry.getActive(args.flowId);
+
+    return this.options.runManager.resumeFromPoint({
+      flowId: ref.flowId,
+      flowVersion: ref.version,
+      flowArtifactHash: ref.artifactHash,
+      graph: ref.graph,
+      resumePointName: args.resumePointName,
       ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
       ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
       ...(args.variables !== undefined ? { variables: args.variables } : {}),
@@ -224,6 +262,29 @@ export class InvocationRouter {
       runRecord: deferred.runRecord,
       completed: deferred.completed,
     };
+  }
+
+  /**
+   * Two-phase counterpart of `resumeFromPoint()`. Returns a RunRecord
+   * immediately plus a completion promise.
+   */
+  async startFromPoint(args: ResumeFromPointArgs): Promise<StartedRun> {
+    const ref = args.flowVersion
+      ? await this.options.registry.resolve(args.flowId, args.flowVersion)
+      : await this.options.registry.getActive(args.flowId);
+
+    const started = await this.options.runManager.startFromPoint({
+      flowId: ref.flowId,
+      flowVersion: ref.version,
+      flowArtifactHash: ref.artifactHash,
+      graph: ref.graph,
+      resumePointName: args.resumePointName,
+      ...(args.traceId !== undefined ? { traceId: args.traceId } : {}),
+      ...(args.subflowDepth !== undefined ? { subflowDepth: args.subflowDepth } : {}),
+      ...(args.variables !== undefined ? { variables: args.variables } : {}),
+      ...(args.secrets !== undefined ? { secrets: args.secrets } : {}),
+    });
+    return started;
   }
 
   /**

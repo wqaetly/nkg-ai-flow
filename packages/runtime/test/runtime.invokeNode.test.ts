@@ -217,3 +217,158 @@ describe("runtime / invocationRouter.startNode", () => {
     expect(result.runRecord.status).toBe("succeeded");
   });
 });
+
+describe("runtime / invocationRouter.resumeFromPoint", () => {
+  it("starts at the resume target and uses the saved snapshot as entry input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-1", step: "charge" },
+      reason: "payment timeout",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+
+    const flow = defineFlow({ id: "router_resume_point", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const prep = flow.node("transform", {
+      id: "prep",
+      position: { x: 100, y: 0 },
+      config: { template: "prep:${input.name}" },
+    });
+    const recover = flow.node("transform", {
+      id: "recover",
+      position: { x: 220, y: 0 },
+      config: { template: "recover:${input.orderId}:${input.step}" },
+    });
+    const tail = flow.node("transform", {
+      id: "tail",
+      position: { x: 340, y: 0 },
+      config: { template: "tail:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 460, y: 0 } });
+
+    flow.connect(start.out("out"), prep.in("in"));
+    flow.connect(prep.out("output"), recover.in("input"));
+    flow.connect(recover.out("output"), tail.in("input"));
+    flow.connect(tail.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.resumeFromPoint({
+      flowId: "router_resume_point",
+      resumePointName: "ORDER_RESUME_POINT",
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("tail:recover:order-1:charge");
+    expect(result.runRecord.input).toEqual({ orderId: "order-1", step: "charge" });
+    expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
+      loadedAt: expect.any(Number),
+      targetNodeId: "recover",
+    });
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.find((event) => event.kind === "node_started" && event.nodeId === "prep"),
+    ).toBeUndefined();
+    expect(
+      events.find((event) => event.kind === "node_started" && event.nodeId === "recover"),
+    ).toBeDefined();
+  });
+
+  it("returns a runRecord before executing a started resume-point run", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-2" },
+      reason: "manual replay",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now,
+      loadedAt: null,
+      expiresAt: null,
+      updatedAt: now,
+    });
+
+    const flow = defineFlow({ id: "router_start_resume_point", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const recover = flow.node("transform", {
+      id: "recover",
+      position: { x: 120, y: 0 },
+      config: { template: "recover:${input.orderId}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+    flow.connect(start.out("out"), recover.in("in"));
+    flow.connect(recover.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const { runRecord, completed } = await rt.invocationRouter.startFromPoint({
+      flowId: "router_start_resume_point",
+      resumePointName: "ORDER_RESUME_POINT",
+    });
+
+    expect(["queued", "running"]).toContain(runRecord.status);
+    expect(runRecord.input).toEqual({ orderId: "order-2" });
+
+    const result = await completed;
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("recover:order-2");
+    expect(result.runRecord.runId).toBe(runRecord.runId);
+  });
+
+  it("rejects expired resume points before creating a run", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const now = Date.now();
+    variables.set("ORDER_RESUME_POINT", {
+      name: "ORDER_RESUME_POINT",
+      status: "ready",
+      targetNodeId: "recover",
+      snapshot: { orderId: "order-3" },
+      reason: "expired replay",
+      sourceRunId: "run_original",
+      version: 1,
+      markedAt: now - 10_000,
+      loadedAt: null,
+      expiresAt: now - 1,
+      updatedAt: now - 10_000,
+    });
+
+    const flow = buildLinearFlow(rt.nodeTypeRegistry, "router_expired_resume_point");
+    await registerAndPromote(rt, flow);
+
+    await expect(
+      rt.invocationRouter.resumeFromPoint({
+        flowId: "router_expired_resume_point",
+        resumePointName: "ORDER_RESUME_POINT",
+      }),
+    ).rejects.toThrow("has expired");
+
+    expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
+      status: "expired",
+    });
+    const list = await rt.runStore.listByFlow("router_expired_resume_point");
+    expect(list).toHaveLength(0);
+  });
+});
