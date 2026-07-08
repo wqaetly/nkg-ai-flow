@@ -2014,6 +2014,82 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("selected:live");
   });
 
+  it("uses dynamic fallback policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "fallback_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { result: { text: "live" }, meta: { state: "accepted" } } },
+    });
+    const mode = flow.node("transform", { id: "mode", position: { x: 120, y: -320 }, config: { value: "status" } });
+    const valuePath = flow.node("transform", { id: "valuePath", position: { x: 120, y: -240 }, config: { value: "result.text" } });
+    const errorPath = flow.node("transform", { id: "errorPath", position: { x: 120, y: -160 }, config: { value: "meta.error" } });
+    const statusPath = flow.node("transform", { id: "statusPath", position: { x: 120, y: -80 }, config: { value: "meta.state" } });
+    const successValues = flow.node("transform", { id: "successValues", position: { x: 120, y: 80 }, config: { value: "accepted,ready" } });
+    const fallback = flow.node("fallback", {
+      id: "fallback",
+      position: { x: 340, y: 0 },
+      config: {
+        mode: "present",
+        valuePath: "missing",
+        errorPath: "error",
+        statusPath: "status",
+        successValues: "ready",
+        fallbackValue: "cached",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "selected:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    for (const node of [mode, valuePath, errorPath, statusPath, successValues]) {
+      flow.connect(start.out("out"), node.in("in"));
+    }
+    flow.connect(source.out("out"), fallback.in("in"));
+    flow.connect(source.out("output"), fallback.in("value"));
+    flow.connect(mode.out("output"), fallback.in("mode"));
+    flow.connect(valuePath.out("output"), fallback.in("valuePath"));
+    flow.connect(errorPath.out("output"), fallback.in("errorPath"));
+    flow.connect(statusPath.out("output"), fallback.in("statusPath"));
+    flow.connect(successValues.out("output"), fallback.in("successValues"));
+    flow.connect(fallback.out("primary"), report.in("in"));
+    flow.connect(fallback.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fallback_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("selected:live");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fallbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fallback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(fallbackOutput).toMatchObject({
+      mode: "status",
+      valuePath: "result.text",
+      errorPath: "meta.error",
+      statusPath: "meta.state",
+      successValues: "accepted,ready",
+      status: "primary",
+      reason: "status_match",
+      usedFallback: false,
+      value: "live",
+    });
+  });
+
   it("routes fallback to fallback when the primary value carries an error", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "fallback_error_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

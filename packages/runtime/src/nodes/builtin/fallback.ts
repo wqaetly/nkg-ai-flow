@@ -97,6 +97,11 @@ export const fallbackNode = defineNode({
     { id: "value", direction: "input", kind: "data", label: "Primary Value" },
     { id: "fallback", direction: "input", kind: "data", label: "Fallback Value" },
     { id: "error", direction: "input", kind: "data", label: "Error" },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "valuePath", direction: "input", kind: "data", label: "Value Path", schema: { type: "string" } },
+    { id: "errorPath", direction: "input", kind: "data", label: "Error Path", schema: { type: "string" } },
+    { id: "statusPath", direction: "input", kind: "data", label: "Status Path", schema: { type: "string" } },
+    { id: "successValues", direction: "input", kind: "data", label: "Success Values", schema: { type: "string" } },
     { id: "primary", direction: "output", kind: "control", label: "Primary" },
     { id: "fallback", direction: "output", kind: "control", label: "Fallback" },
     { id: "value", direction: "output", kind: "data", label: "Selected Value" },
@@ -104,6 +109,11 @@ export const fallbackNode = defineNode({
     { id: "fallbackValue", direction: "output", kind: "data", label: "Fallback Value" },
     { id: "original", direction: "output", kind: "data", label: "Original Value" },
     { id: "error", direction: "output", kind: "data", label: "Error" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "valuePath", direction: "output", kind: "data", label: "Value Path", schema: { type: "string" } },
+    { id: "errorPath", direction: "output", kind: "data", label: "Error Path", schema: { type: "string" } },
+    { id: "statusPath", direction: "output", kind: "data", label: "Status Path", schema: { type: "string" } },
+    { id: "successValues", direction: "output", kind: "data", label: "Success Values", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
     {
@@ -117,15 +127,19 @@ export const fallbackNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const original = input.value ?? input.input ?? input.in ?? null;
-    const primaryValue = selectValue(original, String(config.valuePath ?? ""));
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "present";
+    const valuePath = String(input.valuePath ?? config.valuePath ?? "");
+    const errorPath = String(input.errorPath ?? config.errorPath ?? "");
+    const statusPath = String(input.statusPath ?? config.statusPath ?? "status");
+    const successValues = String(input.successValues ?? config.successValues ?? "");
+    const primaryValue = selectValue(original, valuePath);
     const fallbackValue =
       input.fallback !== undefined ? input.fallback : config.fallbackValue ?? null;
-    const explicitError = input.error ?? readOptionalPath(original, String(config.errorPath ?? ""));
-    const mode = readMode(config.mode);
+    const explicitError = input.error ?? readOptionalPath(original, errorPath);
     const decision = decide(primaryValue, original, explicitError, {
       mode,
-      statusPath: String(config.statusPath ?? "status"),
-      successValues: parseSuccessValues(config.successValues),
+      statusPath,
+      successValues: parseSuccessValues(successValues),
     });
     const selectedValue = decision.status === "primary" ? primaryValue : fallbackValue;
 
@@ -144,6 +158,11 @@ export const fallbackNode = defineNode({
         fallbackValue,
         original,
         error: explicitError ?? null,
+        mode,
+        valuePath,
+        errorPath,
+        statusPath,
+        successValues,
         status: decision.status,
         reason: decision.reason,
         usedFallback: decision.status === "fallback",
@@ -152,8 +171,15 @@ export const fallbackNode = defineNode({
   },
 });
 
-function readMode(value: unknown): FallbackMode {
-  return value === "truthy" || value === "ok" || value === "status" ? value : "present";
+function readMode(value: unknown): FallbackMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "present" ||
+    normalized === "truthy" ||
+    normalized === "ok" ||
+    normalized === "status"
+    ? normalized
+    : undefined;
 }
 
 function selectValue(value: unknown, path: string): unknown {
