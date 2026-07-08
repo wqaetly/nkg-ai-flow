@@ -808,6 +808,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         runId: "子运行 ID",
         status: "子运行状态",
         runRecord: "子运行记录",
+        flowId: "流程 ID",
+        flowVersion: "流程版本",
         error: "子流程错误",
         contractStage: "契约阶段",
         contractIssues: "契约问题",

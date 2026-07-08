@@ -176,6 +176,8 @@ export const subflowNode = defineNode({
     { id: "runId", direction: "output", kind: "data", label: "Run Id" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     { id: "runRecord", direction: "output", kind: "data", label: "Run Record" },
+    { id: "flowId", direction: "output", kind: "data", label: "Flow Id", schema: { type: "string" } },
+    { id: "flowVersion", direction: "output", kind: "data", label: "Flow Version", schema: { type: "string" } },
     { id: "contractStage", direction: "output", kind: "data", label: "Contract Stage" },
     { id: "contractIssues", direction: "output", kind: "data", label: "Contract Issues" },
     { id: "contractIssueCount", direction: "output", kind: "data", label: "Contract Issue Count", schema: { type: "number" } },
@@ -268,6 +270,8 @@ export const subflowNode = defineNode({
         issues: inputContract.issues,
         output: null,
         runRecord: null,
+        flowId,
+        flowVersion,
         subflowDepth,
         childDepth,
         localScope,
@@ -305,6 +309,8 @@ export const subflowNode = defineNode({
       runId: result.runRecord.runId,
       status,
       runRecord: result.runRecord,
+      flowId,
+      flowVersion: result.runRecord.flowVersion,
       ...childRunTiming(result.runRecord),
       subflowDepth,
       childDepth,
@@ -336,6 +342,8 @@ export const subflowNode = defineNode({
           issues: outputContract.issues,
           output: result.output ?? null,
           runRecord: result.runRecord,
+          flowId,
+          flowVersion: result.runRecord.flowVersion,
           subflowDepth,
           childDepth,
           localScope,
@@ -420,6 +428,8 @@ function contractFailure(args: {
   issues: SchemaIssue[];
   output: unknown;
   runRecord: SubflowInvokeResult["runRecord"] | null;
+  flowId: string;
+  flowVersion: string;
   subflowDepth: number;
   childDepth: number;
   localScope: boolean;
@@ -441,6 +451,8 @@ function contractFailure(args: {
         runId: args.runRecord?.runId ?? null,
         status: "contract_failed",
         runRecord: args.runRecord,
+        flowId: args.flowId,
+        flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
         ...childRunTiming(args.runRecord),
         contractStage: args.stage,
         contractIssues: args.issues,

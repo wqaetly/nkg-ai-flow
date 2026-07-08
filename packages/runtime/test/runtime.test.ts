@@ -5769,6 +5769,8 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(childRuns[0]?.output).toBe("child:Ada");
     expect(childRuns[0]?.subflowDepth).toBe(1);
     expect(callOutput).toMatchObject({
+      flowId: "child_echo",
+      flowVersion: "1.0.0",
       childStartedAt: expect.any(String),
       childFinishedAt: expect.any(String),
       childDurationMs: expect.any(Number),
@@ -6430,6 +6432,17 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("input-contract:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_child") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(callOutput).toMatchObject({
+      status: "contract_failed",
+      flowId: "child_input_contract",
+      flowVersion: "",
+    });
     expect(await rt.runStore.listByFlow("child_input_contract")).toEqual([]);
   });
 
@@ -6482,9 +6495,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("output-contract:output");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_child") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     const childRuns = await rt.runStore.listByFlow("child_output_contract");
     expect(childRuns).toHaveLength(1);
     expect(childRuns[0]?.status).toBe("succeeded");
+    expect(callOutput).toMatchObject({
+      status: "contract_failed",
+      flowId: "child_output_contract",
+      flowVersion: "1.0.0",
+    });
   });
 
   it("writes state for downstream variable resolution with state_set", async () => {
