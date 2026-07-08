@@ -7902,6 +7902,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("checkpoint:v1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "saved",
+      name: "ORDER_CHECKPOINT",
+      label: "after payment authorization",
+      version: 1,
+      savedAt: expect.any(String),
+      loadedAt: "",
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: true,
+      savedValue: true,
+      loadedValue: false,
+      missingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
       name: "ORDER_CHECKPOINT",
       status: "saved",
@@ -7960,6 +7982,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("loaded:shipping:ready");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "loaded",
+      name: "ORDER_CHECKPOINT",
+      label: "shipping gate",
+      version: 3,
+      savedAt: new Date(now - 1000).toISOString(),
+      loadedAt: expect.any(String),
+      expiresAt: new Date(now + 60_000).toISOString(),
+      ttlMs: 61_000,
+      remainingMs: expect.any(Number),
+      stateExists: true,
+      savedValue: false,
+      loadedValue: true,
+      missingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
       status: "loaded",
       version: 3,
@@ -8003,6 +8047,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("checkpoint:missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "missing",
+      name: "ORDER_CHECKPOINT",
+      label: "",
+      version: 0,
+      savedAt: "",
+      loadedAt: "",
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: false,
+      savedValue: false,
+      loadedValue: false,
+      missingValue: true,
+      expiredValue: false,
+    });
     expect(variables.has("ORDER_CHECKPOINT")).toBe(false);
   });
 

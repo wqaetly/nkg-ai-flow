@@ -96,12 +96,24 @@ export const checkpointNode = defineNode({
     { id: "expired", direction: "output", kind: "control", label: "Expired" },
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "snapshot", direction: "output", kind: "data", label: "Snapshot" },
+    { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "label", direction: "output", kind: "data", label: "Label", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     {
       id: "version",
       direction: "output",
       kind: "data",
       label: "Version",
+      schema: { type: "number" },
+    },
+    { id: "savedAt", direction: "output", kind: "data", label: "Saved At", schema: { type: "string" } },
+    { id: "loadedAt", direction: "output", kind: "data", label: "Loaded At", schema: { type: "string" } },
+    { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
       schema: { type: "number" },
     },
     {
@@ -111,6 +123,12 @@ export const checkpointNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "stateExists", direction: "output", kind: "data", label: "State Exists", schema: { type: "boolean" } },
+    { id: "savedValue", direction: "output", kind: "data", label: "Saved", schema: { type: "boolean" } },
+    { id: "loadedValue", direction: "output", kind: "data", label: "Loaded", schema: { type: "boolean" } },
+    { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
+    { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -154,6 +172,14 @@ export const checkpointNode = defineNode({
       decision.state?.expiresAt === null || decision.state === null
         ? 0
         : Math.max(0, decision.state.expiresAt - now);
+    const state = decision.state;
+    const savedAt = state === null ? "" : new Date(state.savedAt).toISOString();
+    const loadedAt =
+      state?.loadedAt === null || state === null ? "" : new Date(state.loadedAt).toISOString();
+    const expiresAt =
+      state?.expiresAt === null || state === null ? "" : new Date(state.expiresAt).toISOString();
+    const ttlValue =
+      state?.expiresAt === null || state === null ? 0 : Math.max(0, state.expiresAt - state.savedAt);
 
     ctx.log.debug("checkpoint selected branch", {
       name,
@@ -166,11 +192,23 @@ export const checkpointNode = defineNode({
       kind: "success",
       outputs: {
         [decision.branch]: null,
-        state: decision.state,
-        snapshot: decision.state?.snapshot ?? null,
+        state,
+        snapshot: state?.snapshot ?? null,
+        name: state?.name ?? name,
+        label: state?.label ?? "",
         status: decision.branch,
-        version: decision.state?.version ?? 0,
+        version: state?.version ?? 0,
+        savedAt,
+        loadedAt,
+        expiresAt,
+        ttlMs: ttlValue,
         remainingMs,
+        stateExists: state !== null,
+        savedValue: decision.branch === "saved",
+        loadedValue: decision.branch === "loaded",
+        missingValue: decision.branch === "missing",
+        clearedValue: decision.branch === "cleared",
+        expiredValue: decision.branch === "expired",
       },
     };
   },
