@@ -9789,6 +9789,74 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("observed=");
   });
 
+  it("routes loop_begin max iteration exhaustion only to maxed", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "loop_maxed_branch_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 80 },
+      config: { value: { continue: true, label: "initial" } },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 260, y: 80 },
+      config: { checkMode: "after", maxIterations: 2 },
+    });
+    const body = flow.node("transform", {
+      id: "body",
+      position: { x: 400, y: 80 },
+      config: { value: { continue: true, label: "again" } },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 540, y: 80 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const maxedReport = flow.node("transform", {
+      id: "maxed_report",
+      position: { x: 680, y: 40 },
+      config: { template: "maxed=${input.label}" },
+    });
+    const doneReport = flow.node("transform", {
+      id: "done_report",
+      position: { x: 680, y: 140 },
+      config: { template: "done=${input.label}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 820, y: 40 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(begin.out("body"), body.in("in"));
+    flow.connect(body.out("out"), loopEnd.in("body_done"));
+    flow.connect(body.out("output"), loopEnd.in("nextState"));
+    flow.connect(loopEnd.out("maxed"), maxedReport.in("in"));
+    flow.connect(loopEnd.out("finalState"), maxedReport.in("input"));
+    flow.connect(loopEnd.out("done"), doneReport.in("in"));
+    flow.connect(loopEnd.out("finalState"), doneReport.in("input"));
+    flow.connect(maxedReport.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_maxed_branch_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("maxed=again");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(
+      events.some((event) => event.kind === "node_started" && event.nodeId === "done_report"),
+    ).toBe(false);
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",

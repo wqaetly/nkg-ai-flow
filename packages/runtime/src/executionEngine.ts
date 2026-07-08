@@ -1338,7 +1338,7 @@ export class ExecutionEngine {
         }
         if (hitLimit) {
           const maxedOutputs = withLoopErrors(
-            { done: null, maxed: null, finalState: state },
+            { maxed: null, finalState: state },
             loopErrors,
           );
           this.recordOutputs(block.endNode, maxedOutputs, executionState);
@@ -1385,7 +1385,7 @@ export class ExecutionEngine {
       }
       if (!wantsAnotherIteration || hitLimit) {
         const outputs = hitLimit
-          ? withLoopErrors({ ...endResult.outputs, done: null, maxed: null }, loopErrors)
+          ? withLoopErrors({ ...endResult.outputs, maxed: null }, loopErrors)
           : endResult.outputs;
         this.recordOutputs(block.endNode, outputs, executionState);
         this.enqueueReadyDownstream(block.endNode, outputs, queue);
