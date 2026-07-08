@@ -472,6 +472,93 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("reason:no_rules");
   });
 
+  it("routes compare_gate to matched for numeric thresholds", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "compare_gate_matched_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { order: { total: 125 } } },
+    });
+    const compare = flow.node("compare_gate", {
+      id: "compare",
+      position: { x: 280, y: 0 },
+      config: {
+        operator: "gte",
+        leftPath: "order.total",
+        rightValue: 100,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "match:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), compare.in("in"));
+    flow.connect(input.out("output"), compare.in("left"));
+    flow.connect(compare.out("matched"), report.in("in"));
+    flow.connect(compare.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compare_gate_matched_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("match:gte_matched");
+  });
+
+  it("routes compare_gate to unmatched for case-insensitive contains misses", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "compare_gate_unmatched_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { message: "Payment completed" } },
+    });
+    const compare = flow.node("compare_gate", {
+      id: "compare",
+      position: { x: 280, y: 0 },
+      config: {
+        operator: "contains",
+        leftPath: "message",
+        rightValue: "failed",
+        caseSensitive: false,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "miss:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), compare.in("in"));
+    flow.connect(input.out("output"), compare.in("left"));
+    flow.connect(compare.out("unmatched"), report.in("in"));
+    flow.connect(compare.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compare_gate_unmatched_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("miss:contains_unmatched");
+  });
+
   it("routes schema_guard to valid when the payload matches the schema", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schema_guard_valid_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

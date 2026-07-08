@@ -53,6 +53,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "熔断器",
         description: "根据持久化熔断状态路由到 closed / open / half-open 分支。",
       },
+      compare_gate: {
+        title: "比较门控",
+        description: "比较两个值，并按匹配或不匹配继续流程。",
+      },
       compensation: {
         title: "补偿动作",
         description: "登记或取出 Saga 风格的回滚补偿动作。",

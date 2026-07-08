@@ -192,6 +192,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         resetTimeoutMs: "重置等待毫秒",
         mode: "模式",
       },
+      compare_gate: {
+        operator: "比较操作符",
+        leftPath: "左值路径",
+        rightPath: "右值路径",
+        rightValue: "静态右值",
+        caseSensitive: "区分大小写",
+      },
       checkpoint: {
         name: "检查点名",
         mode: "模式",

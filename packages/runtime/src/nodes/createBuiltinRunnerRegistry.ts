@@ -37,6 +37,7 @@ import {
   cacheNode,
   checkpointNode,
   circuitBreakerNode,
+  compareGateNode,
   compensationNode,
   conditionNode,
   cooldownGateNode,
@@ -187,6 +188,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, cacheNode);
   installNode(target, checkpointNode);
   installNode(target, circuitBreakerNode);
+  installNode(target, compareGateNode);
   installNode(target, compensationNode);
   installNode(target, conditionNode);
   installNode(target, cooldownGateNode);

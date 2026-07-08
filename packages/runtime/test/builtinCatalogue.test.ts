@@ -23,6 +23,7 @@ const BUILTIN_TYPES = [
   "cache",
   "checkpoint",
   "circuit_breaker",
+  "compare_gate",
   "compensation",
   "condition",
   "cooldown_gate",

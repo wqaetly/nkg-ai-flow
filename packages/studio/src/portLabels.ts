@@ -212,6 +212,16 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         failureCount: "失败次数",
         remainingMs: "剩余毫秒",
       },
+      compare_gate: {
+        in: "输入",
+        left: "左值",
+        right: "右值",
+        matched: "已匹配",
+        unmatched: "未匹配",
+        operator: "操作符",
+        result: "结果",
+        reason: "原因",
+      },
       checkpoint: {
         in: "输入",
         snapshot: "快照",

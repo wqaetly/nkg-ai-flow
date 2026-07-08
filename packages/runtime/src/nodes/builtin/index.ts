@@ -23,6 +23,7 @@ export { batchWindowNode } from "./batchWindow.js";
 export { cacheNode } from "./cache.js";
 export { checkpointNode } from "./checkpoint.js";
 export { circuitBreakerNode } from "./circuitBreaker.js";
+export { compareGateNode } from "./compareGate.js";
 export { compensationNode } from "./compensation.js";
 export { conditionNode } from "./condition.js";
 export { cooldownGateNode } from "./cooldownGate.js";
