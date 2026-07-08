@@ -818,8 +818,20 @@ export class ExecutionEngine {
       const nodeId = localQueue.shift()!;
       if (seen.has(nodeId)) continue;
       seen.add(nodeId);
+      if (!block.bodyNodeIds.has(nodeId)) continue;
       const node = this.nodesById.get(nodeId);
       if (!node) continue;
+      const nestedSpec = loopSpecFor(node.type);
+      const nestedBlock = nestedSpec
+        ? this.findLoopBlock(node, nestedSpec.endType)
+        : undefined;
+      if (nestedBlock) {
+        executedNodeIds.add(node.id);
+        if (await this.executeLoopBlock(node, localQueue)) {
+          executedNodeIds.add(nestedBlock.endNode.id);
+          continue;
+        }
+      }
       const result = await this.executeNode(node);
       if (result.kind === "skip") continue;
       executedNodeIds.add(node.id);
@@ -896,7 +908,7 @@ export class ExecutionEngine {
     const bodyStartNodeIds: string[] = [];
     const bodyNodeIds = new Set<string>();
     let endNode: NodeInstance | undefined;
-    const pending: string[] = [];
+    const pending: Array<{ nodeId: string; depth: number }> = [];
 
     for (const edge of this.outEdges.get(beginNode.id) ?? []) {
       if (edge.from.portId !== "body") continue;
@@ -906,24 +918,31 @@ export class ExecutionEngine {
         endNode = target;
       } else {
         bodyStartNodeIds.push(target.id);
-        pending.push(target.id);
+        pending.push({ nodeId: target.id, depth: 0 });
       }
     }
 
     while (pending.length > 0) {
-      const nodeId = pending.shift()!;
+      const { nodeId, depth } = pending.shift()!;
       if (bodyNodeIds.has(nodeId)) continue;
       bodyNodeIds.add(nodeId);
+      const node = this.nodesById.get(nodeId);
+      const nextDepth =
+        node && loopSpecFor(node.type)?.endType === endType ? depth + 1 : depth;
       for (const edge of this.outEdges.get(nodeId) ?? []) {
         const fromPort = this.findPort(edge.from.nodeId, edge.from.portId);
         if (fromPort?.kind !== "control") continue;
         const target = this.nodesById.get(edge.to.nodeId);
         if (!target) continue;
         if (target.type === endType) {
-          endNode = target;
+          if (nextDepth === 0) {
+            endNode = target;
+            continue;
+          }
+          pending.push({ nodeId: target.id, depth: nextDepth - 1 });
           continue;
         }
-        pending.push(target.id);
+        pending.push({ nodeId: target.id, depth: nextDepth });
       }
     }
 

@@ -6265,6 +6265,79 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("results=item=alpha,item=gamma");
   });
 
+  it("executes nested foreach blocks independently", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "nested_foreach_block_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const outerItems = flow.node("transform", {
+      id: "outer_items",
+      position: { x: 100, y: 0 },
+      config: { value: ["outer-a", "outer-b"] },
+    });
+    const outerBegin = flow.node("foreach_begin", {
+      id: "outer_begin",
+      position: { x: 220, y: 0 },
+    });
+    const innerItems = flow.node("transform", {
+      id: "inner_items",
+      position: { x: 340, y: 0 },
+      config: { value: [1, 2] },
+    });
+    const innerBegin = flow.node("foreach_begin", {
+      id: "inner_begin",
+      position: { x: 460, y: 0 },
+    });
+    const innerBody = flow.node("transform", {
+      id: "inner_body",
+      position: { x: 580, y: 0 },
+      config: { template: "inner=${input}" },
+    });
+    const innerEnd = flow.node("foreach_end", {
+      id: "inner_end",
+      position: { x: 700, y: 0 },
+    });
+    const outerEnd = flow.node("foreach_end", {
+      id: "outer_end",
+      position: { x: 820, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 940, y: 0 },
+      config: { template: "nested=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 1060, y: 0 } });
+
+    flow.connect(start.out("out"), outerItems.in("in"));
+    flow.connect(outerItems.out("out"), outerBegin.in("in"));
+    flow.connect(outerItems.out("output"), outerBegin.in("items"));
+    flow.connect(outerBegin.out("body"), innerItems.in("in"));
+    flow.connect(innerItems.out("out"), innerBegin.in("in"));
+    flow.connect(innerItems.out("output"), innerBegin.in("items"));
+    flow.connect(innerBegin.out("body"), innerBody.in("in"));
+    flow.connect(innerBegin.out("item"), innerBody.in("input"));
+    flow.connect(innerBody.out("out"), innerEnd.in("body_done"));
+    flow.connect(innerBody.out("output"), innerEnd.in("result"));
+    flow.connect(innerEnd.out("done"), outerEnd.in("body_done"));
+    flow.connect(innerEnd.out("results"), outerEnd.in("result"));
+    flow.connect(outerEnd.out("done"), report.in("in"));
+    flow.connect(outerEnd.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "nested_foreach_block_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("nested=inner=1,inner=2,inner=1,inner=2");
+  });
+
   it("aggregates inbound values for data input ports marked multiple", async () => {
     const captureNode = defineNode({
       type: "capture_multiple",
