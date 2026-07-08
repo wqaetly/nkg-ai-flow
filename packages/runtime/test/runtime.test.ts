@@ -8373,6 +8373,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("all=2/2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const allOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "all") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(allOutput).toMatchObject({
+      status: "all_success",
+      firstSuccess: { status: "ok", label: "a" },
+      firstFailure: null,
+      hasSuccess: true,
+      hasFailure: false,
+      successRate: 1,
+      failureRate: 0,
+    });
   });
 
   it("routes all_success to failed when any branch result fails", async () => {
@@ -8416,6 +8431,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("failed=b:api timeout");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const allOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "all") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(allOutput).toMatchObject({
+      status: "failed",
+      firstSuccess: { status: "ok", label: "a" },
+      firstFailure: { status: "failed", error: "api timeout", label: "b" },
+      hasSuccess: true,
+      hasFailure: true,
+      successRate: 0.5,
+      failureRate: 0.5,
+    });
   });
 
   it("routes all_success to empty when no result has arrived", async () => {
@@ -8497,6 +8527,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("any=succeeded");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const anyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "any") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(anyOutput).toMatchObject({
+      status: "any_success",
+      value: { status: "succeeded", value: "fresh" },
+      firstSuccess: { status: "succeeded", value: "fresh" },
+      firstFailure: { status: "failed", error: "api timeout" },
+      hasSuccess: true,
+      hasFailure: true,
+      successRate: 0.5,
+      failureRate: 0.5,
+    });
   });
 
   it("routes any_success to no_success when every result fails", async () => {
@@ -8540,6 +8586,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("any=no_success");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const anyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "any") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(anyOutput).toMatchObject({
+      status: "no_success",
+      value: null,
+      firstSuccess: null,
+      firstFailure: { status: "failed", error: "api timeout" },
+      hasSuccess: false,
+      hasFailure: true,
+      successRate: 0,
+      failureRate: 1,
+    });
   });
 
   it("routes any_success to empty when no result has arrived", async () => {
