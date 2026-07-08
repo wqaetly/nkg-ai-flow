@@ -2672,6 +2672,147 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("creates a wait_timer checkpoint and routes to waiting", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_timer_waiting_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RETRY_TIMER",
+        durationMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), timer.in("in"));
+    flow.connect(timer.out("waiting"), report.in("in"));
+    flow.connect(timer.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_waiting_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:waiting");
+    expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
+      status: "waiting",
+    });
+    expect((variables.get("ORDER_RETRY_TIMER") as { dueAt?: number }).dueAt).toBeGreaterThan(
+      Date.now(),
+    );
+  });
+
+  it("routes wait_timer to due when a stored timer has reached its due time", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_RETRY_TIMER", {
+      status: "waiting",
+      requestedAt: Date.now() - 10_000,
+      dueAt: Date.now() - 1,
+      timeoutAt: null,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_timer_due_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RETRY_TIMER",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), timer.in("in"));
+    flow.connect(timer.out("due"), report.in("in"));
+    flow.connect(timer.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_due_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:due");
+    expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
+      status: "due",
+    });
+  });
+
+  it("routes wait_timer to expired when the due window is missed", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_RETRY_TIMER", {
+      status: "waiting",
+      requestedAt: Date.now() - 10_000,
+      dueAt: Date.now() - 5_000,
+      timeoutAt: Date.now() - 1,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_timer_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_RETRY_TIMER",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), timer.in("in"));
+    flow.connect(timer.out("expired"), report.in("in"));
+    flow.connect(timer.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:expired");
+    expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
+      status: "expired",
+    });
+  });
+
   it("requests a human approval and stores pending state", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({

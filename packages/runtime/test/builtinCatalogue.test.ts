@@ -79,6 +79,7 @@ const BUILTIN_TYPES = [
   "text_input",
   "wait_signal",
   "signal_resume",
+  "wait_timer",
   "llm",
   "agent",
   "event_trigger",

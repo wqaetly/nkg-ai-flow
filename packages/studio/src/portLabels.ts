@@ -801,6 +801,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         remainingMs: "剩余毫秒",
       },
+      wait_timer: {
+        in: "输入",
+        dueAt: "到期时间",
+        durationMs: "等待时长毫秒",
+        due: "已到期",
+        waiting: "等待中",
+        expired: "已过期",
+        state: "计时状态",
+        status: "状态",
+        remainingMs: "剩余毫秒",
+        overdueByMs: "超时毫秒",
+      },
     },
   },
 };

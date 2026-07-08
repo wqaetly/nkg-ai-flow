@@ -113,6 +113,7 @@ import {
   uniqueItemsNode,
   windowItemsNode,
   waitSignalNode,
+  waitTimerNode,
 } from "./builtin/index.js";
 import { createNodeAgentToolHost } from "./builtin/agentTools.node.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./llmProvider.js";
@@ -267,6 +268,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, textInputNode);
   installNode(target, waitSignalNode);
   installNode(target, signalResumeNode);
+  installNode(target, waitTimerNode);
   installNode(target, llmNode, { llmProvider });
   installNode(target, agentNode, {
     llmProvider,

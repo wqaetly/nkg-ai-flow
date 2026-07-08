@@ -561,6 +561,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         expected: "期望信号",
         timeoutMs: "超时时间（毫秒）",
       },
+      wait_timer: {
+        name: "计时状态名",
+        dueAt: "到期时间",
+        durationMs: "等待时长（毫秒）",
+        timeoutMs: "过期窗口（毫秒）",
+        reset: "重置计时器",
+      },
     },
   },
 };

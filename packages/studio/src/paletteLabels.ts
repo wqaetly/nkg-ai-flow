@@ -369,6 +369,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "等待信号",
         description: "创建或检查外部等待信号，并路由到收到、等待或过期分支。",
       },
+      wait_timer: {
+        title: "等待计时器",
+        description: "创建或检查持久化计时等待状态，到期后继续长生命周期流程。",
+      },
     },
   },
 };

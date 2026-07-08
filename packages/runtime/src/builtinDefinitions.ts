@@ -102,6 +102,7 @@ import {
   uniqueItemsNode,
   windowItemsNode,
   waitSignalNode,
+  waitTimerNode,
 } from "./nodes/builtin/index.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
 
@@ -195,6 +196,7 @@ export function getBuiltinNodeDefinitions(
     textInputNode.definition,
     waitSignalNode.definition,
     signalResumeNode.definition,
+    waitTimerNode.definition,
     llmDefined.definition,
     agentDefined.definition,
     eventTriggerNode.definition,
