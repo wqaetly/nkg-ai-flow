@@ -17590,6 +17590,97 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("unique=first,second");
   });
 
+  it("uses dynamic unique_items policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "unique_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "A", label: "first" },
+          { id: "b", label: "second" },
+          { id: "a", label: "duplicate" },
+        ],
+      },
+    });
+    const path = flow.node("transform", {
+      id: "path",
+      position: { x: 120, y: 100 },
+      config: { value: "id" },
+    });
+    const keep = flow.node("transform", {
+      id: "keep",
+      position: { x: 120, y: 180 },
+      config: { value: "last" },
+    });
+    const caseSensitive = flow.node("transform", {
+      id: "caseSensitive",
+      position: { x: 120, y: 260 },
+      config: { value: false },
+    });
+    const unique = flow.node("unique_items", {
+      id: "unique",
+      position: { x: 340, y: 0 },
+      config: {
+        path: "id",
+        keep: "first",
+        caseSensitive: true,
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 500, y: 0 },
+      config: { template: "${item.label}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 660, y: 0 },
+      config: { template: "unique=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(start.out("out"), path.in("in"));
+    flow.connect(start.out("out"), keep.in("in"));
+    flow.connect(start.out("out"), caseSensitive.in("in"));
+    flow.connect(input.out("out"), unique.in("in"));
+    flow.connect(input.out("output"), unique.in("items"));
+    flow.connect(path.out("output"), unique.in("path"));
+    flow.connect(keep.out("output"), unique.in("keep"));
+    flow.connect(caseSensitive.out("output"), unique.in("caseSensitive"));
+    flow.connect(unique.out("out"), map.in("in"));
+    flow.connect(unique.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "unique_items_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("unique=second,duplicate");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const uniqueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "unique") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(uniqueOutput).toMatchObject({
+      path: "id",
+      keep: "last",
+      caseSensitive: false,
+      count: 2,
+      duplicateCount: 1,
+      keys: ["b", "a"],
+    });
+  });
+
   it("groups array items with group_items", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "group_items_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

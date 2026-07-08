@@ -1311,6 +1311,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       unique_items: {
         items: "唯一项",
+        path: "路径",
+        keep: "保留策略",
+        caseSensitive: "大小写敏感",
         duplicates: "重复项",
         keys: "唯一键",
         count: "唯一数量",

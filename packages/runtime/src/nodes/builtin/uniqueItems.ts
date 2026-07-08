@@ -68,6 +68,15 @@ export const uniqueItemsNode = defineNode({
       label: "Items",
       schema: { type: "array" },
     },
+    { id: "path", direction: "input", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "keep", direction: "input", kind: "data", label: "Keep", schema: { type: "string" } },
+    {
+      id: "caseSensitive",
+      direction: "input",
+      kind: "data",
+      label: "Case sensitive",
+      schema: { type: "boolean" },
+    },
     {
       id: "items",
       direction: "output",
@@ -88,6 +97,15 @@ export const uniqueItemsNode = defineNode({
       kind: "data",
       label: "Unique keys",
       schema: { type: "array" },
+    },
+    { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
+    { id: "keep", direction: "output", kind: "data", label: "Keep", schema: { type: "string" } },
+    {
+      id: "caseSensitive",
+      direction: "output",
+      kind: "data",
+      label: "Case sensitive",
+      schema: { type: "boolean" },
     },
     {
       id: "count",
@@ -111,9 +129,9 @@ export const uniqueItemsNode = defineNode({
       : Array.isArray(input.input)
         ? input.input
         : [];
-    const path = String(config.path ?? "");
-    const keep = readKeep(config.keep);
-    const caseSensitive = config.caseSensitive !== false;
+    const path = String(input.path ?? config.path ?? "");
+    const keep = readKeep(input.keep ?? config.keep);
+    const caseSensitive = readBoolean(input.caseSensitive) ?? readBoolean(config.caseSensitive) ?? true;
     const { entries, duplicates } = dedupe(source, { path, keep, caseSensitive });
     const items = entries.map((entry) => entry.item);
     const keys = entries.map((entry) => entry.keyValue);
@@ -133,6 +151,9 @@ export const uniqueItemsNode = defineNode({
         items,
         duplicates,
         keys,
+        path,
+        keep,
+        caseSensitive,
         count: items.length,
         duplicateCount: duplicates.length,
       },
@@ -142,6 +163,15 @@ export const uniqueItemsNode = defineNode({
 
 function readKeep(value: unknown): KeepMode {
   return value === "last" ? "last" : "first";
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function dedupe(
