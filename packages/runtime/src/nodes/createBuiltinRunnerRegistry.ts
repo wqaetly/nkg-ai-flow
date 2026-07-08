@@ -42,6 +42,7 @@ import {
   deadlineNode,
   deadLetterNode,
   delayNode,
+  distinctUntilChangedNode,
   filterItemsNode,
   agentNode,
   endNode,
@@ -183,6 +184,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, deadlineNode);
   installNode(target, deadLetterNode);
   installNode(target, delayNode);
+  installNode(target, distinctUntilChangedNode);
   installNode(target, filterItemsNode);
   installNode(target, httpNode);
   installNode(target, idempotencyKeyNode);

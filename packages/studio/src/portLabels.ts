@@ -255,6 +255,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       delay: {
         elapsedMs: "实际等待毫秒",
       },
+      distinct_until_changed: {
+        in: "输入",
+        value: "比较值",
+        changed: "已变化",
+        unchanged: "未变化",
+        previous: "上次值",
+        status: "状态",
+        changedValue: "值是否变化",
+        fingerprint: "指纹",
+        evaluations: "评估次数",
+        changes: "变化次数",
+      },
       event_trigger: {
         event: "事件",
       },

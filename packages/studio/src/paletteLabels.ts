@@ -73,6 +73,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "延迟等待",
         description: "等待指定毫秒数后继续流程。",
       },
+      distinct_until_changed: {
+        title: "变化门控",
+        description: "仅当指定值相对上次观测发生变化时继续变化分支。",
+      },
       end: {
         title: "结束",
         description: "流程出口节点，用于聚合最终输出。",

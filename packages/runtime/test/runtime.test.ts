@@ -571,6 +571,111 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("issues:2");
   });
 
+  it("routes distinct_until_changed only when the selected value changes", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "distinct_until_changed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    start.addPort({ id: "runInput", direction: "output", kind: "data", label: "Run Input" });
+    const distinct = flow.node("distinct_until_changed", {
+      id: "distinct",
+      position: { x: 140, y: 80 },
+      config: {
+        name: "ORDER_STATUS_STREAM",
+        path: "status",
+      },
+    });
+    const changed = flow.node("transform", {
+      id: "changed",
+      position: { x: 320, y: 20 },
+      config: { template: "changed:${input}" },
+    });
+    const unchanged = flow.node("transform", {
+      id: "unchanged",
+      position: { x: 320, y: 140 },
+      config: { template: "unchanged:${input}" },
+    });
+    const merge = flow.node("merge", { id: "merge", position: { x: 500, y: 80 } });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 80 } });
+
+    flow.connect(start.out("out"), distinct.in("in"));
+    flow.connect(start.out("runInput"), distinct.in("value"));
+    flow.connect(distinct.out("changed"), changed.in("in"));
+    flow.connect(distinct.out("unchanged"), unchanged.in("in"));
+    flow.connect(distinct.out("status"), changed.in("input"));
+    flow.connect(distinct.out("status"), unchanged.in("input"));
+    flow.connect(changed.out("out"), merge.in("in"));
+    flow.connect(unchanged.out("out"), merge.in("in"));
+    flow.connect(changed.out("output"), merge.in("value"));
+    flow.connect(unchanged.out("output"), merge.in("value"));
+    flow.connect(merge.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const first = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_e2e",
+      input: { status: "open" },
+    });
+    const second = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_e2e",
+      input: { status: "open" },
+    });
+    const third = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_e2e",
+      input: { status: "closed" },
+    });
+
+    expect(first.succeeded).toBe(true);
+    expect(second.succeeded).toBe(true);
+    expect(third.succeeded).toBe(true);
+    expect(first.output).toBe("changed:changed");
+    expect(second.output).toBe("unchanged:unchanged");
+    expect(third.output).toBe("changed:changed");
+  });
+
+  it("can record the first distinct_until_changed value without emitting changed", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "distinct_until_changed_initial_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const distinct = flow.node("distinct_until_changed", {
+      id: "distinct",
+      position: { x: 140, y: 0 },
+      config: {
+        name: "BASELINE_STATUS_STREAM",
+        emitInitial: false,
+        value: "ready",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 320, y: 0 },
+      config: { template: "initial:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 480, y: 0 } });
+
+    flow.connect(start.out("out"), distinct.in("in"));
+    flow.connect(distinct.out("unchanged"), report.in("in"));
+    flow.connect(distinct.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "distinct_until_changed_initial_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("initial:unchanged");
+  });
+
   it("routes node errors through retry_policy with backoff metadata", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

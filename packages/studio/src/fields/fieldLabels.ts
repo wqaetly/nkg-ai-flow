@@ -203,6 +203,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       delay: {
         durationMs: "等待时长（毫秒）",
       },
+      distinct_until_changed: {
+        name: "状态名",
+        path: "比较字段路径",
+        mode: "比较模式",
+        emitInitial: "首次是否触发",
+        value: "静态比较值",
+      },
       event_trigger: {
         event: "触发事件",
       },

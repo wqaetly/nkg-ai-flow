@@ -26,6 +26,7 @@ const BUILTIN_TYPES = [
   "deadline",
   "dead_letter",
   "delay",
+  "distinct_until_changed",
   "filter_items",
   "http",
   "idempotency_key",
