@@ -1032,6 +1032,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         available: "可用额度",
         used: "已用额度",
         capacity: "容量",
+        mode: "模式",
+        ttlMs: "TTL 毫秒",
         remainingMs: "剩余毫秒",
       },
       set_path: {

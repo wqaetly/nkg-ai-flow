@@ -4166,6 +4166,94 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("")).toBe(false);
   });
 
+  it("routes semaphore with dynamic policy inputs to acquired", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const capacity = flow.node("transform", {
+      id: "capacity",
+      position: { x: 120, y: -120 },
+      config: { value: 3 },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 0 },
+      config: { value: "acquire" },
+    });
+    const ttl = flow.node("transform", {
+      id: "ttl",
+      position: { x: 120, y: 120 },
+      config: { value: 45_000 },
+    });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 320, y: 0 },
+      config: {
+        name: "FILE_DYNAMIC_POLICY_POOL",
+        owner: "worker-policy",
+        capacity: 1,
+        mode: "release",
+        ttlMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "semaphore:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 660, y: 0 } });
+
+    flow.connect(start.out("out"), capacity.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), ttl.in("in"));
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(capacity.out("output"), gate.in("capacity"));
+    flow.connect(mode.out("output"), gate.in("mode"));
+    flow.connect(ttl.out("output"), gate.in("ttlMs"));
+    flow.connect(gate.out("acquired"), report.in("in"));
+    flow.connect(gate.out("available"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("semaphore:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "FILE_DYNAMIC_POLICY_POOL",
+      owner: "worker-policy",
+      capacity: 3,
+      mode: "acquire",
+      ttlMs: 45_000,
+      used: 1,
+      available: 2,
+      remainingMs: expect.any(Number),
+    });
+    expect(variables.get("FILE_DYNAMIC_POLICY_POOL")).toMatchObject({
+      capacity: 3,
+      holders: [
+        {
+          owner: "worker-policy",
+          expiresAt: expect.any(Number),
+        },
+      ],
+    });
+  });
+
   it("routes semaphore to saturated when capacity is full", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();

@@ -94,6 +94,9 @@ export const semaphoreNode = defineNode({
     { id: "in", direction: "input", kind: "control", label: "Input" },
     { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "owner", direction: "input", kind: "data", label: "Owner" },
+    { id: "capacity", direction: "input", kind: "data", label: "Capacity", schema: { type: "number" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "ttlMs", direction: "input", kind: "data", label: "TTL ms", schema: { type: "number" } },
     { id: "acquired", direction: "output", kind: "control", label: "Acquired" },
     { id: "saturated", direction: "output", kind: "control", label: "Saturated" },
     { id: "released", direction: "output", kind: "control", label: "Released" },
@@ -119,6 +122,14 @@ export const semaphoreNode = defineNode({
       direction: "output",
       kind: "data",
       label: "Capacity",
+      schema: { type: "number" },
+    },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    {
+      id: "ttlMs",
+      direction: "output",
+      kind: "data",
+      label: "TTL ms",
       schema: { type: "number" },
     },
     {
@@ -151,9 +162,9 @@ export const semaphoreNode = defineNode({
 
     const now = Date.now();
     const owner = readOwner(input.owner, config.owner, `${ctx.flowId}:${ctx.runId}`);
-    const capacity = Math.max(1, Math.trunc(Number(config.capacity ?? 1)));
-    const ttlMs = Math.max(0, Math.trunc(Number(config.ttlMs ?? 300000)));
-    const mode = config.mode ?? "acquire";
+    const capacity = readPositiveInteger(input.capacity) ?? readPositiveInteger(config.capacity) ?? 1;
+    const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 300000;
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "acquire";
     const previous = normalizeState(readSemaphoreState(store.get(name)), capacity, now);
     const decision = applyMode(previous, { mode, owner, capacity, ttlMs, now });
     const used = decision.state.holders.length;
@@ -181,6 +192,8 @@ export const semaphoreNode = defineNode({
         available,
         used,
         capacity,
+        mode,
+        ttlMs,
         remainingMs,
       },
     };
@@ -324,6 +337,24 @@ function readOwner(inputOwner: unknown, configOwner: unknown, fallback: string):
 function readPositiveInteger(value: unknown): number | undefined {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.trunc(number) : undefined;
+}
+
+function readMode(value: unknown): SemaphoreMode | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "acquire" ||
+    normalized === "release" ||
+    normalized === "refresh" ||
+    normalized === "force_release"
+    ? normalized
+    : undefined;
+}
+
+function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return undefined;
+  const integer = Math.trunc(number);
+  return integer >= minimum ? integer : undefined;
 }
 
 function readTimestamp(value: unknown): number | null {
