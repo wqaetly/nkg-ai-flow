@@ -511,6 +511,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         isEmpty: "是否为空",
         reason: "原因",
       },
+      expression_eval: {
+        input: "输入",
+        expression: "表达式",
+        result: "结果",
+        truthy: "是否为真",
+      },
       error_classifier: {
         error: "错误",
         matched: "已匹配",

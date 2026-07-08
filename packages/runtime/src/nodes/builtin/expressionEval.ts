@@ -40,10 +40,24 @@ export const expressionEvalNode = defineNode({
       label: "Input",
     },
     {
+      id: "expression",
+      direction: "input",
+      kind: "data",
+      label: "Expression",
+      schema: { type: "string" },
+    },
+    {
       id: "result",
       direction: "output",
       kind: "data",
       label: "Result",
+    },
+    {
+      id: "expression",
+      direction: "output",
+      kind: "data",
+      label: "Expression",
+      schema: { type: "string" },
     },
     {
       id: "truthy",
@@ -55,7 +69,7 @@ export const expressionEvalNode = defineNode({
   ],
   validateInput: false,
   run({ input, config, ctx }) {
-    const expression = String(config.expression ?? "input");
+    const expression = String((input as Record<string, unknown>).expression ?? config.expression ?? "input");
     const result = evaluateExpression(expression, input as Record<string, unknown>);
     const truthy = Boolean(result);
 
@@ -69,6 +83,7 @@ export const expressionEvalNode = defineNode({
       outputs: {
         out: null,
         result,
+        expression,
         truthy,
       },
     };

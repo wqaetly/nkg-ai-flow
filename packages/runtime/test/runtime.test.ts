@@ -15932,6 +15932,52 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("truthy=true");
   });
 
+  it("uses dynamic expression_eval expression ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "expression_eval_dynamic_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { amount: 5, status: "ready" } },
+    });
+    const dynamicExpression = flow.node("transform", {
+      id: "dynamicExpression",
+      position: { x: 120, y: 120 },
+      config: { value: "input.amount >= 5 && input.status == 'ready'" },
+    });
+    const expression = flow.node("expression_eval", {
+      id: "expression",
+      position: { x: 320, y: 0 },
+      config: { expression: "input.amount < 0" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 480, y: 0 },
+      config: { template: "truthy=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), dynamicExpression.in("in"));
+    flow.connect(dynamicExpression.out("out"), expression.in("in"));
+    flow.connect(input.out("output"), expression.in("input"));
+    flow.connect(dynamicExpression.out("output"), expression.in("expression"));
+    flow.connect(expression.out("out"), report.in("in"));
+    flow.connect(expression.out("truthy"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "expression_eval_dynamic_expression_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("truthy=true");
+  });
+
   it("evaluates expression_eval aggregate and string helper functions", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "expression_eval_helpers_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
