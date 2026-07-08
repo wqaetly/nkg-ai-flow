@@ -184,6 +184,89 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("deadline:overdue");
   });
 
+  it("routes branch_timeout to timed_out from duration metadata", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "branch_timeout_duration_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const branch = flow.node("transform", {
+      id: "branch",
+      position: { x: 120, y: 0 },
+      config: { value: { branch: "slow-api", durationMs: 1250 } },
+    });
+    const timeout = flow.node("branch_timeout", {
+      id: "timeout",
+      position: { x: 260, y: 0 },
+      config: { timeoutMs: 1000 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "timeout:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), branch.in("in"));
+    flow.connect(branch.out("out"), timeout.in("in"));
+    flow.connect(branch.out("output"), timeout.in("branch"));
+    flow.connect(timeout.out("timed_out"), report.in("in"));
+    flow.connect(timeout.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "branch_timeout_duration_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timeout:timed_out");
+  });
+
+  it("routes branch_timeout to on_time from started and finished timestamps", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "branch_timeout_timestamps_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const branch = flow.node("transform", {
+      id: "branch",
+      position: { x: 120, y: 0 },
+      config: {
+        value: {
+          startedAt: 1_000,
+          finishedAt: 1_250,
+        },
+      },
+    });
+    const timeout = flow.node("branch_timeout", {
+      id: "timeout",
+      position: { x: 260, y: 0 },
+      config: { timeoutMs: 500 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "timeout:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), branch.in("in"));
+    flow.connect(branch.out("out"), timeout.in("in"));
+    flow.connect(branch.out("output"), timeout.in("branch"));
+    flow.connect(timeout.out("on_time"), report.in("in"));
+    flow.connect(timeout.out("elapsedMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "branch_timeout_timestamps_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timeout:250");
+  });
+
   it("routes schedule_window to open inside the configured window", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "schedule_window_open_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

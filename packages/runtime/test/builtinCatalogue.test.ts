@@ -21,6 +21,7 @@ const BUILTIN_TYPES = [
   "audit_log",
   "batch_items",
   "batch_window",
+  "branch_timeout",
   "cache",
   "checkpoint",
   "circuit_breaker",

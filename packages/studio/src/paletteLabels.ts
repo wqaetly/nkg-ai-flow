@@ -45,6 +45,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "批窗口",
         description: "累积输入项，并在达到数量或时间窗口后输出批次。",
       },
+      branch_timeout: {
+        title: "分支超时",
+        description: "按分支耗时和阈值路由到准时、超时或未知分支。",
+      },
       cache: {
         title: "缓存",
         description: "读取、写入、删除或清空命名空间下的缓存值。",

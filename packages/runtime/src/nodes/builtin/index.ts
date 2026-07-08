@@ -21,6 +21,7 @@ export { approvalNode } from "./approval.js";
 export { auditLogNode } from "./auditLog.js";
 export { batchItemsNode } from "./batchItems.js";
 export { batchWindowNode } from "./batchWindow.js";
+export { branchTimeoutNode } from "./branchTimeout.js";
 export { cacheNode } from "./cache.js";
 export { checkpointNode } from "./checkpoint.js";
 export { circuitBreakerNode } from "./circuitBreaker.js";

@@ -35,6 +35,7 @@ import {
   auditLogNode,
   batchItemsNode,
   batchWindowNode,
+  branchTimeoutNode,
   cacheNode,
   checkpointNode,
   circuitBreakerNode,
@@ -203,6 +204,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, auditLogNode);
   installNode(target, batchItemsNode);
   installNode(target, batchWindowNode);
+  installNode(target, branchTimeoutNode);
   installNode(target, cacheNode);
   installNode(target, checkpointNode);
   installNode(target, circuitBreakerNode);

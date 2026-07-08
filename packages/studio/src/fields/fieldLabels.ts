@@ -164,6 +164,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxAgeMs: "最大窗口时长（毫秒）",
         mode: "模式",
       },
+      branch_timeout: {
+        timeoutMs: "超时时间（毫秒）",
+        graceMs: "宽限时间（毫秒）",
+        durationMsPath: "耗时字段路径",
+        startedAtPath: "开始时间路径",
+        finishedAtPath: "结束时间路径",
+      },
       cache: {
         namespace: "命名空间",
         key: "缓存键",
