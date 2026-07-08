@@ -494,12 +494,22 @@ export class ExecutionEngine {
     const sandbox = this.options.runners.getSandbox(node.type, node.typeVersion);
     const ac = new AbortController();
     const timeoutMs =
-      this.options.defaultTimeoutMs ??
-      this.options.variables.getNumber("FLOW_DEFAULT_NODE_TIMEOUT_MS") ??
-      30000;
+      readRuntimeTimeoutMs(
+        inputs.__config__,
+        this.options.defaultTimeoutMs ??
+          this.options.variables.getNumber("FLOW_DEFAULT_NODE_TIMEOUT_MS") ??
+          30000,
+      );
     const onAbort = () => ac.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    let timedOut = false;
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            ac.abort();
+          }, timeoutMs)
+        : undefined;
 
     // Per-(node, attempt) channel: it allocates the seq numbers for every
     // event emitted from this node (logger, ctx.emit, ctx.stream) and
@@ -567,8 +577,28 @@ export class ExecutionEngine {
         }),
       };
     } finally {
-      clearTimeout(timer);
+      if (timer) clearTimeout(timer);
       signal?.removeEventListener("abort", onAbort);
+    }
+
+    if (timedOut && result.kind !== "error") {
+      result = {
+        kind: "error",
+        error: createRuntimeError({
+          code: "node.timeout",
+          kind: "timeout",
+          category: "system",
+          message: `node "${node.id}" exceeded runtimeTimeoutMs ${timeoutMs}ms`,
+          retryable: true,
+          source: {
+            module: "execution_engine",
+            flowId,
+            flowVersion,
+            nodeId: node.id,
+          },
+          context: { timeoutMs },
+        }),
+      };
     }
 
     // Auto-close any stream the runner left open. The reason flag tells
@@ -1592,6 +1622,18 @@ function asRecord(value: unknown): Record<string, unknown> {
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readRuntimeTimeoutMs(config: unknown, fallback: number): number {
+  const value = asRecord(config).runtimeTimeoutMs;
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : fallback;
+  if (!Number.isFinite(parsed)) return Math.max(0, Math.trunc(fallback));
+  return Math.max(0, Math.trunc(parsed));
 }
 
 function readLoopErrorPolicy(value: unknown): LoopErrorPolicy {

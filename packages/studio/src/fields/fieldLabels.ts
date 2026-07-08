@@ -94,6 +94,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       path: "字段路径",
       prompt: "提示词",
       resetTimeoutMs: "重置等待毫秒",
+      runtimeTimeoutMs: "运行超时（毫秒）",
       separator: "分隔符",
       strict: "严格模式",
       start: "起始值",

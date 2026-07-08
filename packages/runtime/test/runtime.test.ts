@@ -120,6 +120,43 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("fails a node when runtimeTimeoutMs is exceeded", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "runtime_timeout_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const delay = flow.node("delay", {
+      id: "wait",
+      position: { x: 100, y: 0 },
+      config: { durationMs: 50, runtimeTimeoutMs: 1 },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 200, y: 0 } });
+
+    flow.connect(start.out("out"), delay.in("in"));
+    flow.connect(delay.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "runtime_timeout_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(false);
+    expect(result.error?.code).toBe("node.timeout");
+    expect(result.error?.retryable).toBe(true);
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const delayError = events.find(
+      (event) => event.kind === "node_error" && event.nodeId === "wait",
+    );
+    expect(delayError?.payload).toMatchObject({
+      error: {
+        code: "node.timeout",
+        context: { timeoutMs: 1 },
+      },
+    });
+  });
+
   it("routes deadline to on_time before the deadline", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "deadline_on_time_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
