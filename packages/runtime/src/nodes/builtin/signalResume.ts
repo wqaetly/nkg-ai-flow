@@ -170,6 +170,27 @@ function applySignal(
     };
     return { status: state.status === "received" ? "resumed" : "ignored", state };
   }
+  if (previous.status === "expired") {
+    return {
+      status: "expired",
+      state: {
+        ...previous,
+        updatedAt: now,
+      },
+    };
+  }
+  if (previous.status === "received") {
+    const matchesReceivedSignal =
+      String(signal) === String(previous.signal) &&
+      String(signal) === previous.expected;
+    return {
+      status: matchesReceivedSignal ? "resumed" : "ignored",
+      state: {
+        ...previous,
+        updatedAt: now,
+      },
+    };
+  }
   if (previous.expiresAt !== null && now >= previous.expiresAt) {
     return {
       status: "expired",

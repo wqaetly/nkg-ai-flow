@@ -3657,6 +3657,86 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("keeps received signal_resume state idempotent and ignores stale mismatches", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_SIGNAL_RECEIVED", {
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      requestedAt: Date.now() - 1_000,
+      expiresAt: null,
+      updatedAt: Date.now() - 500,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+
+    const duplicateFlow = defineFlow({ id: "signal_resume_duplicate_received_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const duplicateStart = duplicateFlow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const duplicateResume = duplicateFlow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL_RECEIVED",
+        signal: "approved",
+      },
+    });
+    const duplicateReport = duplicateFlow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const duplicateEnd = duplicateFlow.node("end", { id: "e", position: { x: 400, y: 0 } });
+    duplicateFlow.connect(duplicateStart.out("out"), duplicateResume.in("in"));
+    duplicateFlow.connect(duplicateResume.out("resumed"), duplicateReport.in("in"));
+    duplicateFlow.connect(duplicateResume.out("status"), duplicateReport.in("input"));
+    duplicateFlow.connect(duplicateReport.out("out"), duplicateEnd.in("in"));
+
+    const mismatchFlow = defineFlow({ id: "signal_resume_stale_mismatch_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const mismatchStart = mismatchFlow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mismatchResume = mismatchFlow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL_RECEIVED",
+        signal: "denied",
+      },
+    });
+    const mismatchReport = mismatchFlow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const mismatchEnd = mismatchFlow.node("end", { id: "e", position: { x: 400, y: 0 } });
+    mismatchFlow.connect(mismatchStart.out("out"), mismatchResume.in("in"));
+    mismatchFlow.connect(mismatchResume.out("ignored"), mismatchReport.in("in"));
+    mismatchFlow.connect(mismatchResume.out("status"), mismatchReport.in("input"));
+    mismatchFlow.connect(mismatchReport.out("out"), mismatchEnd.in("in"));
+
+    await registerAndPromote(rt, duplicateFlow);
+    await registerAndPromote(rt, mismatchFlow);
+
+    const duplicate = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_duplicate_received_e2e",
+      input: null,
+    });
+    expect(duplicate.succeeded).toBe(true);
+    expect(duplicate.output).toBe("resume:resumed");
+
+    const mismatch = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_stale_mismatch_e2e",
+      input: null,
+    });
+    expect(mismatch.succeeded).toBe(true);
+    expect(mismatch.output).toBe("resume:ignored");
+    expect(variables.get("ORDER_APPROVAL_SIGNAL_RECEIVED")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+    });
+  });
+
   it("routes signal_resume to expired when the wait state has timed out", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL_SIGNAL", {
@@ -3705,6 +3785,58 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "expired",
       signal: "approved",
+      expected: "approved",
+    });
+  });
+
+  it("does not revive explicitly expired signal_resume state", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_SIGNAL_EXPLICIT_EXPIRED", {
+      status: "expired",
+      signal: null,
+      expected: "approved",
+      requestedAt: Date.now() - 10_000,
+      expiresAt: null,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_explicit_expired_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_SIGNAL_EXPLICIT_EXPIRED",
+        signal: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), resume.in("in"));
+    flow.connect(resume.out("expired"), report.in("in"));
+    flow.connect(resume.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_explicit_expired_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:expired");
+    expect(variables.get("ORDER_APPROVAL_SIGNAL_EXPLICIT_EXPIRED")).toMatchObject({
+      status: "expired",
+      signal: null,
       expected: "approved",
     });
   });
