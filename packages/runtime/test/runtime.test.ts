@@ -2002,6 +2002,101 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("chosen:backup");
   });
 
+  it("uses dynamic first_success policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "first_success_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 160 } });
+    const primary = flow.node("transform", {
+      id: "primary",
+      position: { x: 120, y: 40 },
+      config: { value: { ok: true, status: "pending", result: { text: "primary" } } },
+    });
+    const backup = flow.node("transform", {
+      id: "backup",
+      position: { x: 120, y: 160 },
+      config: { value: { ok: false, status: "ready", result: { text: "backup" } } },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 120, y: 280 },
+      config: { value: "status" },
+    });
+    const valuePath = flow.node("transform", {
+      id: "valuePath",
+      position: { x: 120, y: 360 },
+      config: { value: "result.text" },
+    });
+    const statusPath = flow.node("transform", {
+      id: "statusPath",
+      position: { x: 120, y: 440 },
+      config: { value: "status" },
+    });
+    const successValues = flow.node("transform", {
+      id: "successValues",
+      position: { x: 120, y: 520 },
+      config: { value: "ready" },
+    });
+    const selector = flow.node("first_success", {
+      id: "selector",
+      position: { x: 360, y: 160 },
+      config: {
+        mode: "ok",
+        valuePath: "result.staticText",
+        statusPath: "state",
+        successValues: "ok",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 160 },
+      config: { template: "chosen:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 160 } });
+
+    flow.connect(start.out("out"), primary.in("in"));
+    flow.connect(start.out("out"), backup.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(start.out("out"), valuePath.in("in"));
+    flow.connect(start.out("out"), statusPath.in("in"));
+    flow.connect(start.out("out"), successValues.in("in"));
+    flow.connect(primary.out("output"), selector.in("candidates"));
+    flow.connect(backup.out("output"), selector.in("candidates"));
+    flow.connect(mode.out("output"), selector.in("mode"));
+    flow.connect(valuePath.out("output"), selector.in("valuePath"));
+    flow.connect(statusPath.out("output"), selector.in("statusPath"));
+    flow.connect(successValues.out("output"), selector.in("successValues"));
+    flow.connect(selector.out("found"), report.in("in"));
+    flow.connect(selector.out("value"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "first_success_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("chosen:backup");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectorOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "selector") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectorOutput).toMatchObject({
+      mode: "status",
+      valuePath: "result.text",
+      statusPath: "status",
+      successValues: "ready",
+      errorPath: "error",
+      successValueCount: 1,
+      index: 1,
+      status: "found",
+      reason: "status_match",
+    });
+  });
+
   it("routes first_success to missing when no candidate passes", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "first_success_missing_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

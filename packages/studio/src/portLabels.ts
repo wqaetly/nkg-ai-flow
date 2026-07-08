@@ -579,6 +579,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       first_success: {
         candidates: "候选结果",
+        mode: "模式",
+        valuePath: "取值路径",
+        statusPath: "状态路径",
+        successValues: "成功值",
+        errorPath: "错误路径",
+        successValueCount: "成功值数量",
         found: "已找到",
         missing: "未找到",
         value: "选中值",

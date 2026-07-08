@@ -95,11 +95,40 @@ export const firstSuccessNode = defineNode({
       label: "Candidates",
       multiple: true,
     },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "valuePath", direction: "input", kind: "data", label: "Value path", schema: { type: "string" } },
+    { id: "statusPath", direction: "input", kind: "data", label: "Status path", schema: { type: "string" } },
+    {
+      id: "successValues",
+      direction: "input",
+      kind: "data",
+      label: "Success values",
+      schema: { type: "string" },
+    },
+    { id: "errorPath", direction: "input", kind: "data", label: "Error path", schema: { type: "string" } },
     { id: "found", direction: "output", kind: "control", label: "Found" },
     { id: "missing", direction: "output", kind: "control", label: "Missing" },
     { id: "value", direction: "output", kind: "data", label: "Value" },
     { id: "candidate", direction: "output", kind: "data", label: "Candidate" },
     { id: "candidates", direction: "output", kind: "data", label: "Candidates" },
+    { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
+    { id: "valuePath", direction: "output", kind: "data", label: "Value path", schema: { type: "string" } },
+    { id: "statusPath", direction: "output", kind: "data", label: "Status path", schema: { type: "string" } },
+    {
+      id: "successValues",
+      direction: "output",
+      kind: "data",
+      label: "Success values",
+      schema: { type: "string" },
+    },
+    { id: "errorPath", direction: "output", kind: "data", label: "Error path", schema: { type: "string" } },
+    {
+      id: "successValueCount",
+      direction: "output",
+      kind: "data",
+      label: "Success value count",
+      schema: { type: "number" },
+    },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
     { id: "index", direction: "output", kind: "data", label: "Index", schema: { type: "number" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
@@ -109,14 +138,18 @@ export const firstSuccessNode = defineNode({
   validateInput: false,
   run({ input, config, ctx }) {
     const candidates = normalizeCandidates(input.candidates);
-    const mode = readMode(config.mode);
-    const successValues = parseSuccessValues(config.successValues);
+    const mode = readMode(input.mode ?? config.mode);
+    const valuePath = String(input.valuePath ?? config.valuePath ?? "");
+    const statusPath = String(input.statusPath ?? config.statusPath ?? "status");
+    const successValuesSource = String(input.successValues ?? config.successValues ?? "");
+    const successValues = parseSuccessValues(successValuesSource);
+    const errorPath = String(input.errorPath ?? config.errorPath ?? "error");
     const evaluations = candidates.map((candidate, index) =>
       evaluateCandidate(candidate, index, {
         mode,
-        statusPath: String(config.statusPath ?? "status"),
+        statusPath,
         successValues,
-        errorPath: String(config.errorPath ?? "error"),
+        errorPath,
       }),
     );
     const selected = evaluations.find((evaluation) => evaluation.passed);
@@ -125,7 +158,7 @@ export const firstSuccessNode = defineNode({
     const value =
       selected === undefined
         ? null
-        : selectValue(selected.candidate, String(config.valuePath ?? ""));
+        : selectValue(selected.candidate, valuePath);
 
     ctx.log.debug("first_success evaluated candidates", {
       status,
@@ -141,6 +174,12 @@ export const firstSuccessNode = defineNode({
         value,
         candidate: selected?.candidate ?? null,
         candidates,
+        mode,
+        valuePath,
+        statusPath,
+        successValues: successValuesSource,
+        errorPath,
+        successValueCount: successValues.size,
         evaluations,
         index: selected?.index ?? -1,
         count: candidates.length,
