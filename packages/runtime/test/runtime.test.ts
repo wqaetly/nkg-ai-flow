@@ -3876,6 +3876,58 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("opens a dynamically named circuit_breaker after a recorded failure", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_dynamic_name_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const breakerName = flow.node("transform", {
+      id: "breakerName",
+      position: { x: 120, y: -80 },
+      config: { value: "PAYMENT_DYNAMIC_CIRCUIT" },
+    });
+    const recordFailure = flow.node("circuit_breaker", {
+      id: "record_failure",
+      position: { x: 260, y: 0 },
+      config: {
+        failureThreshold: 1,
+        resetTimeoutMs: 60_000,
+        mode: "record_failure",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 420, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 580, y: 0 } });
+
+    flow.connect(start.out("out"), breakerName.in("in"));
+    flow.connect(start.out("out"), recordFailure.in("in"));
+    flow.connect(breakerName.out("output"), recordFailure.in("name"));
+    flow.connect(recordFailure.out("open"), report.in("in"));
+    flow.connect(recordFailure.out("name"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_dynamic_name_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:PAYMENT_DYNAMIC_CIRCUIT");
+    expect(variables.get("PAYMENT_DYNAMIC_CIRCUIT")).toMatchObject({
+      status: "open",
+      failureCount: 1,
+    });
+    expect(variables.has("")).toBe(false);
+  });
+
   it("routes expired open circuit_breaker state to half_open", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_CIRCUIT", {

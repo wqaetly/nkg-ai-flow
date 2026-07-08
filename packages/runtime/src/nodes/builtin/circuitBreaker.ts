@@ -84,6 +84,7 @@ export const circuitBreakerNode = defineNode({
   },
   ports: [
     { id: "in", direction: "input", kind: "control", label: "Input" },
+    { id: "name", direction: "input", kind: "data", label: "Name" },
     { id: "closed", direction: "output", kind: "control", label: "Closed" },
     { id: "open", direction: "output", kind: "control", label: "Open" },
     {
@@ -93,6 +94,7 @@ export const circuitBreakerNode = defineNode({
       label: "Half-open",
     },
     { id: "state", direction: "output", kind: "data", label: "State" },
+    { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     {
       id: "failureCount",
@@ -137,12 +139,12 @@ export const circuitBreakerNode = defineNode({
     { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
   ],
   validateInput: false,
-  run({ config, ctx }) {
-    const name = String(config.name ?? "").trim();
+  run({ input, config, ctx }) {
+    const name = String(input.name ?? config.name ?? "").trim();
     if (name === "") {
       return error(
         "node.circuit_breaker.missing_name",
-        "circuit_breaker node requires config.name",
+        "circuit_breaker node requires config.name or name input",
         ctx.nodeId,
       );
     }
@@ -207,6 +209,7 @@ export const circuitBreakerNode = defineNode({
       outputs: {
         [branch]: null,
         state: next,
+        name,
         status: next.status,
         failureCount: next.failureCount,
         remainingMs,

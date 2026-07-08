@@ -288,6 +288,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       circuit_breaker: {
         in: "输入",
+        name: "熔断器名",
         closed: "关闭",
         open: "打开",
         half_open: "半开",
