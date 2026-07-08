@@ -84,6 +84,32 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("Hello, Node");
   });
 
+  it("exposes start runInput as an explicit data output port", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "start_run_input_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 120, y: 0 },
+      config: { template: "input=${input.name}:${input.count}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+
+    flow.connect(start.out("out"), report.in("in"));
+    flow.connect(start.out("runInput"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "start_run_input_e2e",
+      input: { name: "Flow", count: 3 },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("input=Flow:3");
+  });
+
   it("waits in a delay node before continuing the flow", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "delay_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
@@ -1214,7 +1240,6 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     const flow = defineFlow({ id: "cooldown_gate_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
     const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
-    start.addPort({ id: "runInput", direction: "output", kind: "data", label: "Run Input" });
     const gate = flow.node("cooldown_gate", {
       id: "gate",
       position: { x: 140, y: 80 },
@@ -1328,7 +1353,6 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     const flow = defineFlow({ id: "distinct_until_changed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
     const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
-    start.addPort({ id: "runInput", direction: "output", kind: "data", label: "Run Input" });
     const distinct = flow.node("distinct_until_changed", {
       id: "distinct",
       position: { x: 140, y: 80 },
@@ -9026,7 +9050,6 @@ describe("runtime / hello-flow end-to-end", () => {
     const rt = newRuntime({ nodes: [captureNode] });
     const flow = defineFlow({ id: "multiple_input_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
     const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
-    start.addPort({ id: "runInput", direction: "output", kind: "data", label: "Run Input" });
     const text = flow.node("text_input", {
       id: "input",
       position: { x: 100, y: 0 },

@@ -174,13 +174,19 @@ const controlOut: PortDefinition = {
   kind: "control",
   label: "下一步",
 };
+const runInputOut: PortDefinition = {
+  id: "runInput",
+  direction: "output",
+  kind: "data",
+  label: "运行输入",
+};
 
 export const BUILTIN_START: NodeTypeDefinition = {
   type: "start",
   typeVersion: "1.0.0",
   title: "开始",
   description: "流程入口伪节点。",
-  defaultPorts: [controlOut],
+  defaultPorts: [controlOut, runInputOut],
   runtime: "builtin",
 };
 

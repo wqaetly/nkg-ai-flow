@@ -85,12 +85,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const emptyWorkingDir = flow.node("text_input", {
       id: "empty_working_dir",
       position: { x: 100, y: 160 },
@@ -159,12 +153,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const agent = flow.node("agent", {
       id: "agent",
       position: { x: 100, y: 0 },
@@ -239,12 +227,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const contextSource = flow.node("transform", {
       id: "validator_context",
       position: { x: 100, y: 120 },
@@ -320,12 +302,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const contextSource = flow.node("transform", {
       id: "requirements_context",
       position: { x: 100, y: 120 },
@@ -379,12 +355,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const agent = flow.node("agent", {
       id: "agent",
       position: { x: 100, y: 0 },
@@ -682,12 +652,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const context = flow.node("test_materialization_context", {
       id: "context",
       position: { x: 100, y: 0 },
@@ -775,12 +739,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const agent = flow.node("agent", {
       id: "agent",
       position: { x: 100, y: 0 },
@@ -850,12 +808,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const agent = flow.node("agent", {
       id: "agent",
       position: { x: 100, y: 0 },
@@ -916,12 +868,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const contextSource = flow.node("transform", {
       id: "requirements_context",
       position: { x: 100, y: 120 },
@@ -1226,12 +1172,6 @@ describe("runtime / agent node", () => {
       registry: rt.nodeTypeRegistry,
     });
     const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
-    start.addPort({
-      id: "runInput",
-      direction: "output",
-      kind: "data",
-      label: "Run Input",
-    });
     const context = flow.node("test_context_source", {
       id: "context",
       position: { x: 100, y: 0 },

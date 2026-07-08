@@ -16,7 +16,15 @@ export const startNode = defineNode({
   title: "开始",
   description: "流程入口伪节点。",
   kind: "pseudo",
-  ports: [controlOut],
+  ports: [
+    controlOut,
+    {
+      id: "runInput",
+      direction: "output",
+      kind: "data",
+      label: "Run input",
+    },
+  ],
   validateInput: false,
   run({ input }) {
     const raw = input as Record<string, unknown>;

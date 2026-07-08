@@ -56,6 +56,19 @@ describe("flow-ir / registry", () => {
     }
   });
 
+  it("exposes runInput on the default start node contract", () => {
+    const r = createDefaultRegistry();
+    expect(r.get("start").defaultPorts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "runInput",
+          direction: "output",
+          kind: "data",
+        }),
+      ]),
+    );
+  });
+
   it("throws RuntimeErrorException on unknown type", () => {
     const r = createDefaultRegistry();
     expect(() => r.get("nope")).toThrow(RuntimeErrorException);
