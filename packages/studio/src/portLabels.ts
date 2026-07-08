@@ -614,6 +614,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         last: "最后一项",
         count: "数量",
       },
+      split_text: {
+        text: "文本",
+        items: "拆分项",
+        count: "数量",
+        reason: "原因",
+      },
       subflow: {
         in: "输入",
         input: "子流程输入",

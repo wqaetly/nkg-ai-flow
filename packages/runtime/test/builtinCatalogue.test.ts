@@ -56,6 +56,7 @@ const BUILTIN_TYPES = [
   "semaphore",
   "slice_items",
   "sort_items",
+  "split_text",
   "subflow",
   "switch_case",
   "tool",

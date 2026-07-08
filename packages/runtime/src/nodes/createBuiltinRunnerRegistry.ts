@@ -76,6 +76,7 @@ import {
   semaphoreNode,
   sliceItemsNode,
   sortItemsNode,
+  splitTextNode,
   subflowNode,
   switchCaseNode,
   foreachBeginNode,
@@ -227,6 +228,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, semaphoreNode);
   installNode(target, sliceItemsNode);
   installNode(target, sortItemsNode);
+  installNode(target, splitTextNode);
   installNode(target, subflowNode);
   installNode(target, switchCaseNode);
   installNode(target, toolNode);

@@ -56,6 +56,7 @@ export { schemaGuardNode } from "./schemaGuard.js";
 export { semaphoreNode } from "./semaphore.js";
 export { sliceItemsNode } from "./sliceItems.js";
 export { sortItemsNode } from "./sortItems.js";
+export { splitTextNode } from "./splitText.js";
 export { subflowNode } from "./subflow.js";
 export { switchCaseNode } from "./switchCase.js";
 export { toolNode } from "./tool.js";

@@ -407,6 +407,13 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         nulls: "空值位置",
         limit: "输出数量上限",
       },
+      split_text: {
+        mode: "拆分模式",
+        separator: "分隔符",
+        limit: "输出数量上限",
+        trimItems: "裁剪项目空白",
+        dropEmpty: "丢弃空项",
+      },
       subflow: {
         flowId: "流程 ID",
         flowVersion: "流程版本",
