@@ -74,6 +74,16 @@ export const waitSignalNode = defineNode({
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "status", direction: "output", kind: "data", label: "Status" },
     { id: "signal", direction: "output", kind: "data", label: "Signal" },
+    { id: "expected", direction: "output", kind: "data", label: "Expected", schema: { type: "string" } },
+    { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
+    { id: "expiresAt", direction: "output", kind: "data", label: "Expires At", schema: { type: "string" } },
+    {
+      id: "timeoutMs",
+      direction: "output",
+      kind: "data",
+      label: "Timeout ms",
+      schema: { type: "number" },
+    },
     {
       id: "remainingMs",
       direction: "output",
@@ -81,6 +91,9 @@ export const waitSignalNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "receivedValue", direction: "output", kind: "data", label: "Received", schema: { type: "boolean" } },
+    { id: "waitingValue", direction: "output", kind: "data", label: "Waiting", schema: { type: "boolean" } },
+    { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -110,6 +123,11 @@ export const waitSignalNode = defineNode({
     const next = evaluateState(previous, signal, expected, now);
     const remainingMs =
       next.expiresAt === null ? 0 : Math.max(0, next.expiresAt - now);
+    const requestedAtIso = new Date(next.requestedAt).toISOString();
+    const expiresAtIso =
+      next.expiresAt === null ? "" : new Date(next.expiresAt).toISOString();
+    const effectiveTimeoutMs =
+      next.expiresAt === null ? 0 : Math.max(0, next.expiresAt - next.requestedAt);
     const branch = next.status;
 
     store.set(name, toVariableValue(next), metadata(ctx.flowId));
@@ -127,7 +145,14 @@ export const waitSignalNode = defineNode({
         state: next,
         status: next.status,
         signal: next.signal,
+        expected: next.expected,
+        requestedAt: requestedAtIso,
+        expiresAt: expiresAtIso,
+        timeoutMs: effectiveTimeoutMs,
         remainingMs,
+        receivedValue: next.status === "received",
+        waitingValue: next.status === "waiting",
+        expiredValue: next.status === "expired",
       },
     };
   },

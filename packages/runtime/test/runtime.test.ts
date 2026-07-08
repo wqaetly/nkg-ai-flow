@@ -4159,6 +4159,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("signal:received");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const waitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(waitOutput).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      requestedAt: expect.any(String),
+      expiresAt: "",
+      timeoutMs: 0,
+      remainingMs: 0,
+      receivedValue: true,
+      waitingValue: false,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "received",
       signal: "approved",
@@ -4262,6 +4280,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("signal:waiting");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const waitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(waitOutput).toMatchObject({
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      requestedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      timeoutMs: 60_000,
+      remainingMs: expect.any(Number),
+      receivedValue: false,
+      waitingValue: true,
+      expiredValue: false,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "waiting",
       signal: null,
@@ -4677,6 +4713,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("signal:expired");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const waitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(waitOutput).toMatchObject({
+      status: "expired",
+      signal: null,
+      expected: "approved",
+      requestedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      timeoutMs: expect.any(Number),
+      remainingMs: 0,
+      receivedValue: false,
+      waitingValue: false,
+      expiredValue: true,
+    });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "expired",
       signal: null,
