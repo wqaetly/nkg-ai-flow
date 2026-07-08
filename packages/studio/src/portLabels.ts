@@ -384,8 +384,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         expiredValue: "是否过期",
       },
       condition: {
+        input: "输入",
+        expression: "表达式",
         true: "条件为真",
         false: "条件为假",
+        result: "条件结果",
       },
       cooldown_gate: {
         in: "输入",

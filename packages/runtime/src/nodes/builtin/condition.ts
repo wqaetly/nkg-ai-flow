@@ -37,18 +37,25 @@ export const conditionNode = defineNode({
   },
   ports: [
     controlIn,
+    { id: "input", direction: "input", kind: "data", label: "输入" },
+    { id: "expression", direction: "input", kind: "data", label: "表达式", schema: { type: "string" } },
     { id: "true", direction: "output", kind: "control", label: "是" },
     { id: "false", direction: "output", kind: "control", label: "否" },
+    { id: "input", direction: "output", kind: "data", label: "输入" },
+    { id: "expression", direction: "output", kind: "data", label: "表达式", schema: { type: "string" } },
+    { id: "result", direction: "output", kind: "data", label: "结果", schema: { type: "boolean" } },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const raw = input as Record<string, unknown>;
-    const expression = config.expression ?? "";
+    const expression = String(raw.expression ?? config.expression ?? "");
     const truthy = evaluateCondition(expression, raw);
     ctx.log.debug("condition evaluated", { expression, truthy });
     return {
       kind: "success",
-      outputs: truthy ? { true: null } : { false: null },
+      outputs: truthy
+        ? { true: null, input: raw.input ?? null, expression, result: truthy }
+        : { false: null, input: raw.input ?? null, expression, result: truthy },
     };
   },
 });

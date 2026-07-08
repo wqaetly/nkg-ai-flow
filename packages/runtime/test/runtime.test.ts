@@ -16037,6 +16037,62 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("retry");
   });
 
+  it("uses dynamic condition expression ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "condition_dynamic_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const payload = flow.node("transform", {
+      id: "payload",
+      position: { x: 120, y: 160 },
+      config: { value: { flag: true } },
+    });
+    const expression = flow.node("transform", {
+      id: "expression",
+      position: { x: 120, y: 0 },
+      config: { value: "input.flag" },
+    });
+    const condition = flow.node("condition", {
+      id: "condition",
+      position: { x: 280, y: 120 },
+      config: { expression: "input.missing" },
+    });
+    const yes = flow.node("transform", {
+      id: "yes",
+      position: { x: 440, y: 40 },
+      config: { value: "dynamic-true" },
+    });
+    const no = flow.node("transform", {
+      id: "no",
+      position: { x: 440, y: 200 },
+      config: { value: "static-false" },
+    });
+    const merge = flow.node("merge", { id: "merge", position: { x: 600, y: 120 } });
+    const end = flow.node("end", { id: "e", position: { x: 740, y: 120 } });
+
+    flow.connect(start.out("out"), payload.in("in"));
+    flow.connect(payload.out("out"), expression.in("in"));
+    flow.connect(expression.out("out"), condition.in("in"));
+    flow.connect(payload.out("output"), condition.in("input"));
+    flow.connect(expression.out("output"), condition.in("expression"));
+    flow.connect(condition.out("true"), yes.in("in"));
+    flow.connect(condition.out("false"), no.in("in"));
+    flow.connect(yes.out("out"), merge.in("in"));
+    flow.connect(no.out("out"), merge.in("in"));
+    flow.connect(yes.out("output"), merge.in("value"));
+    flow.connect(no.out("output"), merge.in("value"));
+    flow.connect(merge.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "condition_dynamic_expression_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("dynamic-true");
+  });
+
   it("filters array items with numeric expressions", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "filter_items_expression_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
