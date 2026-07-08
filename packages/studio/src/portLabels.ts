@@ -440,6 +440,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         delayMs: "等待毫秒",
         retryable: "可重试",
       },
+      schedule_window: {
+        in: "输入",
+        now: "当前时间",
+        open: "窗口开启",
+        closed: "窗口关闭",
+        status: "状态",
+        day: "星期",
+        minuteOfDay: "当天分钟",
+        nextOpenInMs: "下次开启等待毫秒",
+        startMinute: "开始分钟",
+        endMinute: "结束分钟",
+      },
       semaphore: {
         in: "输入",
         owner: "持有者",

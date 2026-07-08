@@ -39,6 +39,7 @@ const BUILTIN_TYPES = [
   "rate_limit",
   "reduce_items",
   "retry_policy",
+  "schedule_window",
   "semaphore",
   "subflow",
   "switch_case",

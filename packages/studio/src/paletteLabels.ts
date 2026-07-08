@@ -181,6 +181,10 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "重试策略",
         description: "根据错误、尝试次数和重试标记路由到重试或耗尽分支。",
       },
+      schedule_window: {
+        title: "时间窗口",
+        description: "按工作日和时间段判断当前流程是否处于允许窗口。",
+      },
       semaphore: {
         title: "信号量",
         description: "限制命名资源的最大并发持有者数量，并路由到已获得、已满或已释放分支。",

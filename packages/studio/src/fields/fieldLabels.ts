@@ -310,6 +310,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         maxDelayMs: "最大等待毫秒",
         retryableOnly: "仅重试可重试错误",
       },
+      schedule_window: {
+        startTime: "开始时间",
+        endTime: "结束时间",
+        days: "允许星期",
+        timezoneOffsetMinutes: "时区偏移分钟",
+      },
       semaphore: {
         name: "信号量状态名",
         owner: "持有者",

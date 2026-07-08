@@ -39,6 +39,7 @@ export { queueNode } from "./queue.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";
 export { retryPolicyNode } from "./retryPolicy.js";
+export { scheduleWindowNode } from "./scheduleWindow.js";
 export { semaphoreNode } from "./semaphore.js";
 export { subflowNode } from "./subflow.js";
 export { switchCaseNode } from "./switchCase.js";

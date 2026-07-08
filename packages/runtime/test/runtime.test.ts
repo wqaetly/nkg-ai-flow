@@ -184,6 +184,135 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("deadline:overdue");
   });
 
+  it("routes schedule_window to open inside the configured window", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schedule_window_open_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const now = flow.node("transform", {
+      id: "now",
+      position: { x: 120, y: 0 },
+      config: { value: Date.UTC(2026, 6, 6, 10, 0) },
+    });
+    const window = flow.node("schedule_window", {
+      id: "window",
+      position: { x: 260, y: 0 },
+      config: {
+        startTime: "09:00",
+        endTime: "17:00",
+        days: "1,2,3,4,5",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "window:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), now.in("in"));
+    flow.connect(now.out("out"), window.in("in"));
+    flow.connect(now.out("output"), window.in("now"));
+    flow.connect(window.out("open"), report.in("in"));
+    flow.connect(window.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schedule_window_open_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("window:open");
+  });
+
+  it("routes schedule_window to closed before opening and reports wait time", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schedule_window_closed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const now = flow.node("transform", {
+      id: "now",
+      position: { x: 120, y: 0 },
+      config: { value: Date.UTC(2026, 6, 6, 8, 30) },
+    });
+    const window = flow.node("schedule_window", {
+      id: "window",
+      position: { x: 260, y: 0 },
+      config: {
+        startTime: "09:00",
+        endTime: "17:00",
+        days: "1,2,3,4,5",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "wait:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), now.in("in"));
+    flow.connect(now.out("out"), window.in("in"));
+    flow.connect(now.out("output"), window.in("now"));
+    flow.connect(window.out("closed"), report.in("in"));
+    flow.connect(window.out("nextOpenInMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schedule_window_closed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("wait:1800000");
+  });
+
+  it("keeps schedule_window open for overnight windows", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "schedule_window_overnight_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const now = flow.node("transform", {
+      id: "now",
+      position: { x: 120, y: 0 },
+      config: { value: Date.UTC(2026, 6, 7, 1, 0) },
+    });
+    const window = flow.node("schedule_window", {
+      id: "window",
+      position: { x: 260, y: 0 },
+      config: {
+        startTime: "22:00",
+        endTime: "02:00",
+        days: "1",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "window:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), now.in("in"));
+    flow.connect(now.out("out"), window.in("in"));
+    flow.connect(now.out("output"), window.in("now"));
+    flow.connect(window.out("open"), report.in("in"));
+    flow.connect(window.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "schedule_window_overnight_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("window:open");
+  });
+
   it("routes node errors through retry_policy with backoff metadata", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
