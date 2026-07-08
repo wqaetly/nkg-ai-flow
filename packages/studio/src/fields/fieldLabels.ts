@@ -280,6 +280,11 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
       parallel: {
         branchCount: "分支数量",
       },
+      policy_gate: {
+        mode: "匹配模式",
+        rules: "策略规则",
+        reason: "拒绝原因",
+      },
       queue: {
         name: "队列状态名",
         mode: "模式",

@@ -35,6 +35,7 @@ const BUILTIN_TYPES = [
   "metric",
   "mutex",
   "parallel",
+  "policy_gate",
   "queue",
   "rate_limit",
   "reduce_items",

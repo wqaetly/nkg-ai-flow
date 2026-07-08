@@ -403,6 +403,17 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         branch4: "分支 4",
         value: "透传数据",
       },
+      policy_gate: {
+        in: "输入",
+        input: "策略输入",
+        allowed: "允许",
+        denied: "拒绝",
+        status: "状态",
+        passed: "通过规则",
+        failed: "失败规则",
+        results: "规则结果",
+        reason: "原因",
+      },
       queue: {
         in: "输入",
         item: "队列项",

@@ -313,6 +313,165 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("window:open");
   });
 
+  it("routes policy_gate to allowed when all rules pass", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "policy_gate_allowed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { amount: 80, tier: "gold", approved: true } },
+    });
+    const gate = flow.node("policy_gate", {
+      id: "gate",
+      position: { x: 260, y: 0 },
+      config: {
+        mode: "all",
+        rules: 'amount <= 100\ntier == "gold"\napproved',
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "policy:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), gate.in("in"));
+    flow.connect(input.out("output"), gate.in("input"));
+    flow.connect(gate.out("allowed"), report.in("in"));
+    flow.connect(gate.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "policy_gate_allowed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("policy:allowed");
+  });
+
+  it("routes policy_gate to denied and exposes failed rules", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "policy_gate_denied_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { amount: 150, tier: "silver", approved: true } },
+    });
+    const gate = flow.node("policy_gate", {
+      id: "gate",
+      position: { x: 260, y: 0 },
+      config: {
+        mode: "all",
+        rules: 'amount <= 100\ntier == "gold"\napproved',
+        reason: "manual_review_required",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "denied:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), gate.in("in"));
+    flow.connect(input.out("output"), gate.in("input"));
+    flow.connect(gate.out("denied"), report.in("in"));
+    flow.connect(gate.out("failed"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "policy_gate_denied_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe('denied:amount <= 100,tier == "gold"');
+  });
+
+  it("routes policy_gate to allowed when any rule passes", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "policy_gate_any_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: { value: { tier: "silver", beta: true } },
+    });
+    const gate = flow.node("policy_gate", {
+      id: "gate",
+      position: { x: 260, y: 0 },
+      config: {
+        mode: "any",
+        rules: 'tier == "gold"\nbeta',
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "policy:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), gate.in("in"));
+    flow.connect(input.out("output"), gate.in("input"));
+    flow.connect(gate.out("allowed"), report.in("in"));
+    flow.connect(gate.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "policy_gate_any_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("policy:allowed");
+  });
+
+  it("routes policy_gate with no rules to denied", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "policy_gate_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("policy_gate", {
+      id: "gate",
+      position: { x: 120, y: 0 },
+      config: { rules: "" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "reason:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("denied"), report.in("in"));
+    flow.connect(gate.out("reason"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "policy_gate_empty_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("reason:no_rules");
+  });
+
   it("routes node errors through retry_policy with backoff metadata", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

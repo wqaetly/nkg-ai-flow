@@ -35,6 +35,7 @@ export { mergeNode } from "./merge.js";
 export { metricNode } from "./metric.js";
 export { mutexNode } from "./mutex.js";
 export { parallelNode } from "./parallel.js";
+export { policyGateNode } from "./policyGate.js";
 export { queueNode } from "./queue.js";
 export { rateLimitNode } from "./rateLimit.js";
 export { reduceItemsNode } from "./reduceItems.js";

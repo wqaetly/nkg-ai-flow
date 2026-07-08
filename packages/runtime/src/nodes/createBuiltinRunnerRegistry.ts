@@ -55,6 +55,7 @@ import {
   metricNode,
   mutexNode,
   parallelNode,
+  policyGateNode,
   queueNode,
   rateLimitNode,
   reduceItemsNode,
@@ -190,6 +191,7 @@ export function createBuiltinRunnerRegistry(
   installNode(target, metricNode);
   installNode(target, mutexNode);
   installNode(target, parallelNode);
+  installNode(target, policyGateNode);
   installNode(target, queueNode);
   installNode(target, rateLimitNode);
   installNode(target, reduceItemsNode);
