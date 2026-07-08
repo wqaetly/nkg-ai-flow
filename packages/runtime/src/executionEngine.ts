@@ -223,7 +223,7 @@ export class ExecutionEngine {
       const node = this.nodesById.get(nodeId);
       this.remainingDeps.set(
         nodeId,
-        requiredInboundCount(node, this.inEdges.get(nodeId)?.length ?? 0),
+        requiredInboundCount(node, this.inEdges.get(nodeId) ?? []),
       );
     }
   }
@@ -1870,11 +1870,17 @@ function pushEdge(
 
 function requiredInboundCount(
   node: NodeInstance | undefined,
-  inboundCount: number,
+  inboundEdges: readonly EdgeDefinition[],
 ): number {
+  const inboundCount = inboundEdges.length;
   if (node?.type === "merge" && inboundCount > 0) return 1;
   if (node?.type === "race" && inboundCount > 0) return 1;
-  if (node?.type === "fail_fast" && inboundCount > 0) return 1;
+  if (node?.type === "fail_fast" && inboundCount > 0) {
+    const triggerCount = inboundEdges.filter(
+      (edge) => edge.to.portId === "in" || edge.to.portId === "errors",
+    ).length;
+    return triggerCount > 0 ? inboundCount - triggerCount + 1 : inboundCount;
+  }
   if (node?.type === "quorum" && inboundCount > 0) {
     const threshold = Math.max(1, Math.trunc(Number(node.config?.threshold ?? 2)));
     return Math.min(threshold, inboundCount);

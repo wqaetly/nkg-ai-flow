@@ -11622,6 +11622,86 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic fail_fast error code policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "fail_fast_dynamic_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 180 } });
+    const errors = flow.node("transform", {
+      id: "errors",
+      position: { x: 140, y: 80 },
+      config: {
+        value: [
+          { code: "E_RETRYABLE", message: "try again later" },
+          { code: "E_FATAL", message: "stop the batch" },
+        ],
+      },
+    });
+    const ignoredCodes = flow.node("transform", {
+      id: "ignored_codes",
+      position: { x: 140, y: 200 },
+      config: { value: "E_RETRYABLE" },
+    });
+    const failureCodes = flow.node("transform", {
+      id: "failure_codes",
+      position: { x: 140, y: 320 },
+      config: { value: "E_FATAL" },
+    });
+    const failFast = flow.node("fail_fast", {
+      id: "fail_fast",
+      position: { x: 380, y: 180 },
+      config: { ignoredCodes: "", failureCodes: "" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 580, y: 180 },
+      config: { template: "failed=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 780, y: 180 } });
+
+    flow.connect(start.out("out"), errors.in("in"));
+    flow.connect(start.out("out"), ignoredCodes.in("in"));
+    flow.connect(start.out("out"), failureCodes.in("in"));
+    flow.connect(errors.out("output"), failFast.in("errors"));
+    flow.connect(ignoredCodes.out("output"), failFast.in("ignoredCodes"));
+    flow.connect(failureCodes.out("output"), failFast.in("failureCodes"));
+    flow.connect(failFast.out("failed"), report.in("in"));
+    flow.connect(failFast.out("errorCode"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "fail_fast_dynamic_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed=E_FATAL");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const failFastOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fail_fast") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(failFastOutput).toMatchObject({
+      status: "failed",
+      hasFailure: true,
+      failedIndex: 1,
+      count: 1,
+      ignoredCount: 1,
+      errorCode: "E_FATAL",
+      errorMessage: "stop the batch",
+      ignoredCodes: ["E_RETRYABLE"],
+      failureCodes: ["E_FATAL"],
+      ignoredErrors: [{ code: "E_RETRYABLE", message: "try again later" }],
+      errors: [{ code: "E_FATAL", message: "stop the batch" }],
+    });
+  });
+
   it("routes fail_fast to clear when no branch errors arrive", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "fail_fast_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
