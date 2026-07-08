@@ -6476,6 +6476,88 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("invokes a dynamically selected subflow version from data inputs", async () => {
+    const rt = newRuntime();
+    const childV1 = defineFlow({ id: "dynamic_child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const childV1Start = childV1.node("start", { id: "child_v1_start", position: { x: 0, y: 0 } });
+    const childV1Transform = childV1.node("transform", {
+      id: "child_v1_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child-v1:${input.name}" },
+    });
+    const childV1End = childV1.node("end", { id: "child_v1_end", position: { x: 240, y: 0 } });
+    childV1.connect(childV1Start.out("out"), childV1Transform.in("in"));
+    childV1.connect(childV1Transform.out("out"), childV1End.in("in"));
+
+    const childV2 = defineFlow({ id: "dynamic_child_echo", version: "2.0.0", registry: rt.nodeTypeRegistry });
+    const childV2Start = childV2.node("start", { id: "child_v2_start", position: { x: 0, y: 0 } });
+    const childV2Transform = childV2.node("transform", {
+      id: "child_v2_transform",
+      position: { x: 120, y: 0 },
+      config: { template: "child-v2:${input.name}" },
+    });
+    const childV2End = childV2.node("end", { id: "child_v2_end", position: { x: 240, y: 0 } });
+    childV2.connect(childV2Start.out("out"), childV2Transform.in("in"));
+    childV2.connect(childV2Transform.out("out"), childV2End.in("in"));
+
+    const parent = defineFlow({ id: "parent_calls_dynamic_child", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = parent.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const targetId = parent.node("transform", {
+      id: "target_id",
+      position: { x: 120, y: -80 },
+      config: { value: "dynamic_child_echo" },
+    });
+    const targetVersion = parent.node("transform", {
+      id: "target_version",
+      position: { x: 120, y: 80 },
+      config: { value: "2.0.0" },
+    });
+    const call = parent.node("subflow", {
+      id: "call_child",
+      position: { x: 300, y: 0 },
+      config: { inputMode: "runInput" },
+    });
+    const report = parent.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "parent:${input}" },
+    });
+    const end = parent.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    parent.connect(start.out("out"), targetId.in("in"));
+    parent.connect(start.out("out"), targetVersion.in("in"));
+    parent.connect(start.out("out"), call.in("in"));
+    parent.connect(targetId.out("output"), call.in("flowId"));
+    parent.connect(targetVersion.out("output"), call.in("flowVersion"));
+    parent.connect(call.out("succeeded"), report.in("in"));
+    parent.connect(call.out("output"), report.in("input"));
+    parent.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, childV1);
+    await registerAndPromote(rt, childV2);
+    await registerAndPromote(rt, parent);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parent_calls_dynamic_child",
+      input: { name: "Ada" },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parent:child-v2:Ada");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const callOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "call_child") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(callOutput).toMatchObject({
+      flowId: "dynamic_child_echo",
+      flowVersion: "2.0.0",
+      status: "succeeded",
+    });
+  });
+
   it("invokes a reusable child flow with subflow_template defaults", async () => {
     const rt = newRuntime();
     const child = defineFlow({ id: "template_child_echo", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -151,6 +151,8 @@ export const subflowNode = defineNode({
   },
   ports: [
     controlIn,
+    { id: "flowId", direction: "input", kind: "data", label: "Flow Id", schema: { type: "string" } },
+    { id: "flowVersion", direction: "input", kind: "data", label: "Flow Version", schema: { type: "string" } },
     { id: "input", direction: "input", kind: "data", label: "Input" },
     { id: "out", direction: "output", kind: "control", label: "Out" },
     {
@@ -193,16 +195,16 @@ export const subflowNode = defineNode({
   ],
   validateInput: false,
   async run({ input, config, ctx }) {
-    const flowId = String(config.flowId ?? "").trim();
+    const flowId = String(input.flowId ?? config.flowId ?? "").trim();
     if (flowId === "") {
       return error(
         "node.subflow.missing_flow_id",
-        "subflow node requires config.flowId",
+        "subflow node requires config.flowId or flowId input",
         ctx.nodeId,
       );
     }
 
-    const flowVersion = String(config.flowVersion ?? "").trim();
+    const flowVersion = String(input.flowVersion ?? config.flowVersion ?? "").trim();
     if (
       flowId === ctx.flowId &&
       (flowVersion === "" || flowVersion === ctx.flowVersion)
