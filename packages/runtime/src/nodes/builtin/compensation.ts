@@ -79,6 +79,7 @@ export const compensationNode = defineNode({
   },
   ports: [
     { id: "name", direction: "input", kind: "data", label: "Name", schema: { type: "string" } },
+    { id: "mode", direction: "input", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "action", direction: "input", kind: "data", label: "Action", schema: { type: "string" } },
     { id: "payload", direction: "input", kind: "data", label: "Payload" },
     { id: "actions", direction: "output", kind: "data", label: "Actions" },
@@ -128,7 +129,7 @@ export const compensationNode = defineNode({
     }
 
     const now = Date.now();
-    const mode = config.mode ?? "register";
+    const mode = readMode(input.mode) ?? readMode(config.mode) ?? "register";
     const previous = readCompensationState(store.get(name));
     const result = applyMode(previous, {
       mode,
@@ -219,6 +220,15 @@ function applyMode(
     updatedAt: now,
   };
   return { kind: "success", state, actions: [nextAction] };
+}
+
+function readMode(value: unknown): "register" | "drain" | "clear" | undefined {
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "register" || normalized === "drain" || normalized === "clear") {
+    return normalized;
+  }
+  return undefined;
 }
 
 function readCompensationState(value: unknown): CompensationState {

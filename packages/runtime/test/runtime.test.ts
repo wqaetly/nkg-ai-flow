@@ -5054,6 +5054,84 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("drains compensation actions with dynamic mode input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "compensation_dynamic_mode_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const register = flow.node("compensation", {
+      id: "register",
+      position: { x: 140, y: 80 },
+      config: {
+        name: "ORDER_DYNAMIC_MODE_COMPENSATIONS",
+        mode: "register",
+        action: "release_inventory",
+        payload: { sku: "notebook", quantity: 3 },
+      },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 140, y: 200 },
+      config: { value: "drain" },
+    });
+    const drain = flow.node("compensation", {
+      id: "drain",
+      position: { x: 340, y: 80 },
+      config: {
+        name: "ORDER_DYNAMIC_MODE_COMPENSATIONS",
+        mode: "register",
+        action: "should_not_register",
+        payload: {},
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 520, y: 80 },
+      config: { template: "drained:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 80 } });
+
+    flow.connect(start.out("out"), register.in("in"));
+    flow.connect(start.out("out"), mode.in("in"));
+    flow.connect(register.out("out"), drain.in("in"));
+    flow.connect(mode.out("output"), drain.in("mode"));
+    flow.connect(drain.out("out"), report.in("in"));
+    flow.connect(drain.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compensation_dynamic_mode_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("drained:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const drainOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "drain") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(drainOutput).toMatchObject({
+      mode: "drain",
+      status: "drained",
+      count: 1,
+      stackCount: 0,
+      actionName: "release_inventory",
+      drainedValue: true,
+      registeredValue: false,
+      clearedValue: false,
+    });
+    expect(variables.get("ORDER_DYNAMIC_MODE_COMPENSATIONS")).toMatchObject({
+      actions: [],
+    });
+  });
+
   it("routes drained compensation actions into a rollback branch", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
