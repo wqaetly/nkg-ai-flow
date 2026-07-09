@@ -20133,6 +20133,18 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("fallback:unknown");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mergeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "merge") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mergeOutput?.summary).toMatchObject({
+      count: 2,
+      hasValue: true,
+      valueType: "string",
+      valueTypes: ["null", "string"],
+    });
   });
 
   it("filters array items with filter_items", async () => {

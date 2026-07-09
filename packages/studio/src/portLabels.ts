@@ -872,6 +872,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "到达数据",
         values: "到达数据列表",
         count: "到达数量",
+        summary: "摘要",
       },
       merge_object: {
         objects: "对象列表",

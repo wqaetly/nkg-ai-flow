@@ -51,11 +51,18 @@ export const mergeNode = defineNode({
       label: "Count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input }) {
     const values = normalizeValues(input.value);
     const value = values.find((item) => item !== null && item !== undefined) ?? null;
+    const summary = {
+      count: values.length,
+      hasValue: value !== null,
+      valueType: valueType(value),
+      valueTypes: values.map(valueType),
+    };
     return {
       kind: "success",
       outputs: {
@@ -63,6 +70,7 @@ export const mergeNode = defineNode({
         value,
         values,
         count: values.length,
+        summary,
       },
     };
   },
@@ -71,4 +79,11 @@ export const mergeNode = defineNode({
 function normalizeValues(value: unknown): unknown[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  return typeof value;
 }
