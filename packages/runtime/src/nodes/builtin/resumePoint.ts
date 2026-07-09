@@ -25,7 +25,9 @@ interface ResumePointState {
   targetNodeId: string;
   snapshot: VariableValue | null;
   reason: string;
+  sourceFlowId: string;
   sourceRunId: string;
+  sourceNodeId: string;
   version: number;
   markedAt: number;
   loadedAt: number | null;
@@ -126,7 +128,9 @@ export const resumePointNode = defineNode({
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "stateStatus", direction: "output", kind: "data", label: "State Status", schema: { type: "string" } },
+    { id: "sourceFlowId", direction: "output", kind: "data", label: "Source Flow Id", schema: { type: "string" } },
     { id: "sourceRunId", direction: "output", kind: "data", label: "Source Run Id", schema: { type: "string" } },
+    { id: "sourceNodeId", direction: "output", kind: "data", label: "Source Node Id", schema: { type: "string" } },
     { id: "version", direction: "output", kind: "data", label: "Version", schema: { type: "number" } },
     { id: "markedAt", direction: "output", kind: "data", label: "Marked At", schema: { type: "string" } },
     { id: "loadedAt", direction: "output", kind: "data", label: "Loaded At", schema: { type: "string" } },
@@ -182,7 +186,9 @@ export const resumePointNode = defineNode({
       targetNodeId: String(input.targetNodeId ?? config.targetNodeId ?? "").trim(),
       snapshot: toJsonValue(input.snapshot ?? input.input ?? input.in ?? config.snapshot ?? null),
       reason: String(input.reason ?? config.reason ?? ""),
+      sourceFlowId: ctx.flowId,
       sourceRunId: ctx.runId,
+      sourceNodeId: ctx.nodeId,
       ttlMs,
       now,
       nodeId: ctx.nodeId,
@@ -228,7 +234,9 @@ export const resumePointNode = defineNode({
         mode,
         status: decision.branch,
         stateStatus: state?.status ?? "",
+        sourceFlowId: state?.sourceFlowId ?? "",
         sourceRunId: state?.sourceRunId ?? "",
+        sourceNodeId: state?.sourceNodeId ?? "",
         version: state?.version ?? 0,
         markedAt,
         loadedAt,
@@ -254,7 +262,9 @@ function applyMode(
     targetNodeId: string;
     snapshot: VariableValue | undefined;
     reason: string;
+    sourceFlowId: string;
     sourceRunId: string;
+    sourceNodeId: string;
     ttlMs: number;
     now: number;
     nodeId: string;
@@ -262,7 +272,19 @@ function applyMode(
 ):
   | { kind: "success"; branch: ResumePointBranch; state: ResumePointState | null }
   | ReturnType<typeof error> {
-  const { name, mode, targetNodeId, snapshot, reason, sourceRunId, ttlMs, now, nodeId } = options;
+  const {
+    name,
+    mode,
+    targetNodeId,
+    snapshot,
+    reason,
+    sourceFlowId,
+    sourceRunId,
+    sourceNodeId,
+    ttlMs,
+    now,
+    nodeId,
+  } = options;
   if (mode === "clear") {
     return previous
       ? { kind: "success", branch: "cleared", state: null }
@@ -290,6 +312,9 @@ function applyMode(
       state: {
         ...previous,
         reason: reason.trim() || previous.reason,
+        sourceFlowId,
+        sourceRunId,
+        sourceNodeId,
         expiresAt: expiresAt(ttlMs, now, previous.expiresAt),
         updatedAt: now,
       },
@@ -318,7 +343,9 @@ function applyMode(
       targetNodeId,
       snapshot,
       reason: reason.trim(),
+      sourceFlowId,
       sourceRunId,
+      sourceNodeId,
       version: (previous?.version ?? 0) + 1,
       markedAt: now,
       loadedAt: null,
@@ -366,7 +393,9 @@ function readResumePoint(value: unknown): ResumePointState | null {
     targetNodeId,
     snapshot,
     reason: typeof record.reason === "string" ? record.reason : "",
+    sourceFlowId: typeof record.sourceFlowId === "string" ? record.sourceFlowId : "",
     sourceRunId: typeof record.sourceRunId === "string" ? record.sourceRunId : "",
+    sourceNodeId: typeof record.sourceNodeId === "string" ? record.sourceNodeId : "",
     version: readNonNegativeInteger(record.version),
     markedAt: readTimestamp(record.markedAt) ?? Date.now(),
     loadedAt: readTimestamp(record.loadedAt),
@@ -448,7 +477,9 @@ function toVariableValue(state: ResumePointState): VariableValue {
     targetNodeId: state.targetNodeId,
     snapshot: state.snapshot,
     reason: state.reason,
+    sourceFlowId: state.sourceFlowId,
     sourceRunId: state.sourceRunId,
+    sourceNodeId: state.sourceNodeId,
     version: state.version,
     markedAt: state.markedAt,
     loadedAt: state.loadedAt,
