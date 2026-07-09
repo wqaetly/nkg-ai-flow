@@ -127,6 +127,7 @@ export const failFastNode = defineNode({
     { id: "failureCodes", direction: "output", kind: "data", label: "Failure Codes" },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -155,6 +156,21 @@ export const failFastNode = defineNode({
     const failedIndexes = failures.map((evaluation) => evaluation.index);
     const ignoredIndexes = ignored.map((evaluation) => evaluation.index);
     const status = hasFailure ? "failed" : "clear";
+    const summary = {
+      status,
+      hasFailure,
+      failedIndex,
+      failedIndexes,
+      ignoredIndexes,
+      count: errors.length,
+      ignoredCount: ignoredErrors.length,
+      errorCode,
+      errorMessage,
+      codePath,
+      messagePath,
+      ignoredCodes: [...ignoredCodes],
+      failureCodes: [...failureCodes],
+    };
 
     ctx.log.debug("fail_fast evaluated errors", {
       status,
@@ -184,6 +200,7 @@ export const failFastNode = defineNode({
         failureCodes: [...failureCodes],
         evaluations,
         status,
+        summary,
       },
     };
   },

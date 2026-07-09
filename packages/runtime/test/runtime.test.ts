@@ -16860,6 +16860,21 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 1,
       errorCode: "branch.a_failed",
       errorMessage: "A failed",
+      summary: {
+        status: "failed",
+        hasFailure: true,
+        failedIndex: 0,
+        failedIndexes: [0],
+        ignoredIndexes: [],
+        count: 1,
+        ignoredCount: 0,
+        errorCode: "branch.a_failed",
+        errorMessage: "A failed",
+        codePath: "code",
+        messagePath: "message",
+        ignoredCodes: [],
+        failureCodes: [],
+      },
     });
   });
 
@@ -16942,6 +16957,21 @@ describe("runtime / hello-flow end-to-end", () => {
       failureCodes: ["E_FATAL"],
       ignoredErrors: [{ code: "E_RETRYABLE", message: "try again later" }],
       errors: [{ code: "E_FATAL", message: "stop the batch" }],
+      summary: {
+        status: "failed",
+        hasFailure: true,
+        failedIndex: 1,
+        failedIndexes: [1],
+        ignoredIndexes: [0],
+        count: 1,
+        ignoredCount: 1,
+        errorCode: "E_FATAL",
+        errorMessage: "stop the batch",
+        codePath: "code",
+        messagePath: "message",
+        ignoredCodes: ["E_RETRYABLE"],
+        failureCodes: ["E_FATAL"],
+      },
     });
   });
 
@@ -16989,6 +17019,21 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 0,
       errorCode: "",
       errorMessage: "",
+      summary: {
+        status: "clear",
+        hasFailure: false,
+        failedIndex: -1,
+        failedIndexes: [],
+        ignoredIndexes: [],
+        count: 0,
+        ignoredCount: 0,
+        errorCode: "",
+        errorMessage: "",
+        codePath: "code",
+        messagePath: "message",
+        ignoredCodes: [],
+        failureCodes: [],
+      },
     });
   });
 
@@ -17054,9 +17099,32 @@ describe("runtime / hello-flow end-to-end", () => {
     const slowFinished = events.findIndex(
       (event) => event.kind === "node_finished" && event.nodeId === "wait_slow",
     );
+    const failFastOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fail_fast") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     expect(reportStarted).toBeGreaterThanOrEqual(0);
     expect(slowFinished).toBeGreaterThanOrEqual(0);
     expect(reportStarted).toBeLessThan(slowFinished);
+    expect(failFastOutput).toMatchObject({
+      status: "failed",
+      summary: {
+        status: "failed",
+        hasFailure: true,
+        failedIndex: 0,
+        failedIndexes: [0],
+        ignoredIndexes: [],
+        count: 1,
+        ignoredCount: 0,
+        errorCode: "branch.a_failed",
+        errorMessage: "A failed",
+        codePath: "code",
+        messagePath: "message",
+        ignoredCodes: [],
+        failureCodes: [],
+      },
+    });
   });
 
   it("routes partial_success to partial when enough branches pass", async () => {

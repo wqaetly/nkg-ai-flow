@@ -600,6 +600,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         errorMessage: "错误信息",
         evaluations: "评估结果",
         status: "状态",
+        summary: "摘要",
       },
       fallback: {
         in: "输入",
