@@ -104,6 +104,7 @@ export const quorumNode = defineNode({
       schema: { type: "number" },
     },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -124,6 +125,19 @@ export const quorumNode = defineNode({
     const status = met ? "met" : "unmet";
     const remaining = Math.max(0, threshold - values.length);
     const quorumRate = values.length / threshold;
+    const summary = {
+      status,
+      metValue: met,
+      count: values.length,
+      presentCount: presentIndexes.length,
+      threshold,
+      remaining,
+      quorumRate,
+      presentIndexes,
+      absentIndexes,
+      firstValue: values[0] ?? null,
+      lastValue: values[values.length - 1] ?? null,
+    };
 
     ctx.log.debug("quorum evaluated arrivals", {
       threshold,
@@ -148,6 +162,7 @@ export const quorumNode = defineNode({
         remaining,
         quorumRate,
         status,
+        summary,
       },
     };
   },

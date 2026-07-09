@@ -16153,6 +16153,19 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [0, 1],
       absentIndexes: [],
+      summary: {
+        status: "met",
+        metValue: true,
+        count: 2,
+        presentCount: 2,
+        threshold: 2,
+        remaining: 0,
+        quorumRate: 1,
+        presentIndexes: [0, 1],
+        absentIndexes: [],
+        firstValue: "upper:Flow",
+        lastValue: "lower:Flow",
+      },
     });
   });
 
@@ -16226,6 +16239,19 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [0, 2],
       absentIndexes: [1],
+      summary: {
+        status: "met",
+        metValue: true,
+        count: 3,
+        presentCount: 2,
+        threshold: 3,
+        remaining: 0,
+        quorumRate: 1,
+        presentIndexes: [0, 2],
+        absentIndexes: [1],
+        firstValue: "a",
+        lastValue: "c",
+      },
     });
   });
 
@@ -16293,8 +16319,22 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [0, 1],
       absentIndexes: [],
+      summary: {
+        status: "unmet",
+        metValue: false,
+        count: 2,
+        presentCount: 2,
+        threshold: 3,
+        remaining: 1,
+        quorumRate: 2 / 3,
+        presentIndexes: [0, 1],
+        absentIndexes: [],
+        firstValue: "upper:Flow",
+        lastValue: "lower:Flow",
+      },
     });
     expect(quorumOutput?.quorumRate).toBeCloseTo(2 / 3);
+    expect((quorumOutput?.summary as { quorumRate?: number } | undefined)?.quorumRate).toBeCloseTo(2 / 3);
   });
 
   it("uses dynamic quorum threshold input", async () => {
@@ -16373,6 +16413,19 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [0, 1],
       absentIndexes: [],
+      summary: {
+        status: "met",
+        metValue: true,
+        count: 2,
+        presentCount: 2,
+        threshold: 2,
+        remaining: 0,
+        quorumRate: 1,
+        presentIndexes: [0, 1],
+        absentIndexes: [],
+        firstValue: "first:Flow",
+        lastValue: "second:Flow",
+      },
     });
   });
 

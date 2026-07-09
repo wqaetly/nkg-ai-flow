@@ -1070,6 +1070,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         remaining: "剩余数量",
         quorumRate: "达到比例",
         status: "状态",
+        summary: "摘要",
       },
       race: {
         in: "输入分支",
