@@ -836,12 +836,18 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         break: "跳出循环",
         reason: "原因",
         status: "状态",
+        iterationId: "迭代 ID",
+        iterationKey: "迭代定位键",
+        iterationSequence: "迭代序号",
       },
       loop_continue: {
         in: "输入",
         continue: "继续下一轮",
         reason: "原因",
         status: "状态",
+        iterationId: "迭代 ID",
+        iterationKey: "迭代定位键",
+        iterationSequence: "迭代序号",
       },
       loop_end: {
         body_done: "循环体完成",

@@ -535,16 +535,29 @@ export const loopBreakNode = defineNode({
   ports: [
     controlIn,
     { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "iterationId", direction: "input", kind: "data", label: "迭代 ID", schema: { type: "string" } },
+    { id: "iterationKey", direction: "input", kind: "data", label: "迭代定位键" },
+    { id: "iterationSequence", direction: "input", kind: "data", label: "迭代序号", schema: { type: "number" } },
     breakOut,
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "iterationId", direction: "output", kind: "data", label: "迭代 ID", schema: { type: "string" } },
+    { id: "iterationKey", direction: "output", kind: "data", label: "迭代定位键" },
+    { id: "iterationSequence", direction: "output", kind: "data", label: "迭代序号", schema: { type: "number" } },
   ],
   validateInput: false,
   run({ input, config }) {
     const reason = readLoopControlReason(input.reason, config.reason);
     return {
       kind: "success",
-      outputs: { break: null, reason, status: "break" },
+      outputs: {
+        break: null,
+        reason,
+        status: "break",
+        iterationId: input.iterationId ?? null,
+        iterationKey: input.iterationKey ?? null,
+        iterationSequence: input.iterationSequence ?? null,
+      },
     };
   },
 });
@@ -566,16 +579,29 @@ export const loopContinueNode = defineNode({
   ports: [
     controlIn,
     { id: "reason", direction: "input", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "iterationId", direction: "input", kind: "data", label: "迭代 ID", schema: { type: "string" } },
+    { id: "iterationKey", direction: "input", kind: "data", label: "迭代定位键" },
+    { id: "iterationSequence", direction: "input", kind: "data", label: "迭代序号", schema: { type: "number" } },
     continueOut,
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "iterationId", direction: "output", kind: "data", label: "迭代 ID", schema: { type: "string" } },
+    { id: "iterationKey", direction: "output", kind: "data", label: "迭代定位键" },
+    { id: "iterationSequence", direction: "output", kind: "data", label: "迭代序号", schema: { type: "number" } },
   ],
   validateInput: false,
   run({ input, config }) {
     const reason = readLoopControlReason(input.reason, config.reason);
     return {
       kind: "success",
-      outputs: { continue: null, reason, status: "continue" },
+      outputs: {
+        continue: null,
+        reason,
+        status: "continue",
+        iterationId: input.iterationId ?? null,
+        iterationKey: input.iterationKey ?? null,
+        iterationSequence: input.iterationSequence ?? null,
+      },
     };
   },
 });

@@ -20710,6 +20710,9 @@ describe("runtime / hello-flow end-to-end", () => {
     flow.connect(items.out("output"), begin.in("items"));
     flow.connect(begin.out("body"), body.in("in"));
     flow.connect(begin.out("item"), body.in("input"));
+    flow.connect(begin.out("iterationId"), breaker.in("iterationId"));
+    flow.connect(begin.out("iterationKey"), breaker.in("iterationKey"));
+    flow.connect(begin.out("iterationSequence"), breaker.in("iterationSequence"));
     flow.connect(body.out("out"), shouldBreak.in("in"));
     flow.connect(shouldBreak.out("true"), breaker.in("in"));
     flow.connect(shouldBreak.out("false"), end.in("body_done"));
@@ -20738,7 +20741,13 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=beta");
-    expect(breakOutput).toMatchObject({ status: "break", reason: "found_beta" });
+    expect(breakOutput).toMatchObject({
+      status: "break",
+      reason: "found_beta",
+      iterationId: "begin:1",
+      iterationKey: "foreach_begin:begin:1",
+      iterationSequence: 1,
+    });
     expect(loopOutput).toMatchObject({ status: "break", iterationCount: 2, controlReason: "found_beta" });
   });
 
@@ -20790,6 +20799,9 @@ describe("runtime / hello-flow end-to-end", () => {
     flow.connect(items.out("out"), begin.in("in"));
     flow.connect(items.out("output"), begin.in("items"));
     flow.connect(begin.out("body"), shouldSkip.in("in"));
+    flow.connect(begin.out("iterationId"), continuer.in("iterationId"));
+    flow.connect(begin.out("iterationKey"), continuer.in("iterationKey"));
+    flow.connect(begin.out("iterationSequence"), continuer.in("iterationSequence"));
     flow.connect(shouldSkip.out("true"), continuer.in("in"));
     flow.connect(shouldSkip.out("false"), emit.in("in"));
     flow.connect(begin.out("item"), emit.in("input"));
@@ -20826,7 +20838,13 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=item=alpha,item=gamma");
-    expect(continueOutput).toMatchObject({ status: "continue", reason: "skip_beta" });
+    expect(continueOutput).toMatchObject({
+      status: "continue",
+      reason: "skip_beta",
+      iterationId: "begin:1",
+      iterationKey: "foreach_begin:begin:1",
+      iterationSequence: 1,
+    });
     expect(continueProgress?.payload).toMatchObject({
       status: "continue",
       controlReason: "skip_beta",
