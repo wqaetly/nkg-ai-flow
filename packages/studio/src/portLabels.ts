@@ -225,6 +225,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         expiredValue: "是否过期",
         clearedValue: "是否清理",
         missingValue: "是否不存在",
+        summary: "摘要",
       },
       audit_log: {
         in: "输入",

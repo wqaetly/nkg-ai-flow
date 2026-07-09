@@ -176,6 +176,7 @@ export const approvalNode = defineNode({
     { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
     { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
     { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -268,10 +269,64 @@ export const approvalNode = defineNode({
         expiredValue: status === "expired",
         clearedValue: decision.branch === "cleared",
         missingValue: decision.branch === "missing",
+        summary: approvalSummary({
+          state,
+          name,
+          mode,
+          branch: decision.branch,
+          status,
+          requestedAt,
+          resolvedAt,
+          expiresAt,
+          timeoutMs,
+          remainingMs,
+        }),
       },
     };
   },
 });
+
+function approvalSummary(args: {
+  state: ApprovalState | null;
+  name: string;
+  mode: ApprovalMode;
+  branch: ApprovalBranch;
+  status: ApprovalStatus | "missing";
+  requestedAt: string;
+  resolvedAt: string;
+  expiresAt: string;
+  timeoutMs: number;
+  remainingMs: number;
+}): Record<string, unknown> {
+  return {
+    name: args.state?.name ?? args.name,
+    mode: args.mode,
+    branch: args.branch,
+    status: args.status,
+    requestFlowId: args.state?.requestFlowId ?? "",
+    requestRunId: args.state?.requestRunId ?? "",
+    requestNodeId: args.state?.requestNodeId ?? "",
+    title: args.state?.title ?? "",
+    assignee: args.state?.assignee ?? "",
+    payload: args.state?.payload ?? null,
+    decision: args.state?.decision ?? null,
+    comment: args.state?.comment ?? "",
+    requestedAt: args.requestedAt,
+    resolvedAt: args.resolvedAt,
+    expiresAt: args.expiresAt,
+    timeoutMs: args.timeoutMs,
+    remainingMs: args.remainingMs,
+    stateExists: args.state !== null,
+    requestedValue: args.branch === "requested",
+    pendingValue: args.status === "pending",
+    approvedValue: args.status === "approved",
+    rejectedValue: args.status === "rejected",
+    cancelledValue: args.status === "cancelled",
+    expiredValue: args.status === "expired",
+    clearedValue: args.branch === "cleared",
+    missingValue: args.branch === "missing",
+  };
+}
 
 function applyMode(
   previous: ApprovalState | null,
