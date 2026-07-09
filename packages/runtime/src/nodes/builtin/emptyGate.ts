@@ -16,6 +16,7 @@ type EmptyGateBranch = "empty" | "non_empty";
 
 interface EmptyGateDecision {
   branch: EmptyGateBranch;
+  mode: EmptyGateMode;
   reason: string;
   count: number;
   keys: string[];
@@ -89,6 +90,7 @@ export const emptyGateNode = defineNode({
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     { id: "isEmpty", direction: "output", kind: "data", label: "Is Empty", schema: { type: "boolean" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -101,13 +103,20 @@ export const emptyGateNode = defineNode({
       mode,
       trimStrings,
     });
-
-    ctx.log.debug("empty_gate selected branch", {
+    const summary = {
       branch: decision.branch,
-      reason: decision.reason,
-      count: decision.count,
       mode,
-    });
+      effectiveMode: decision.mode,
+      path,
+      trimStrings,
+      count: decision.count,
+      isEmpty: decision.branch === "empty",
+      reason: decision.reason,
+      itemCount: decision.items.length,
+      keyCount: decision.keys.length,
+    };
+
+    ctx.log.debug("empty_gate selected branch", summary);
 
     return {
       kind: "success",
@@ -123,6 +132,7 @@ export const emptyGateNode = defineNode({
         count: decision.count,
         isEmpty: decision.branch === "empty",
         reason: decision.reason,
+        summary,
       },
     };
   },
@@ -158,10 +168,15 @@ function decide(
   },
 ): EmptyGateDecision {
   const mode = options.mode === "auto" ? inferMode(value) : options.mode;
-  if (mode === "array") return decideArray(value);
-  if (mode === "object") return decideObject(value);
-  if (mode === "string") return decideString(value, options.trimStrings);
-  return decidePresent(value);
+  const decision =
+    mode === "array"
+      ? decideArray(value)
+      : mode === "object"
+        ? decideObject(value)
+        : mode === "string"
+          ? decideString(value, options.trimStrings)
+          : decidePresent(value);
+  return { ...decision, mode };
 }
 
 function inferMode(value: unknown): EmptyGateMode {
@@ -175,6 +190,7 @@ function decideArray(value: unknown): EmptyGateDecision {
   const items = Array.isArray(value) ? value : [];
   return {
     branch: items.length === 0 ? "empty" : "non_empty",
+    mode: "array",
     reason: items.length === 0 ? "array_empty" : "array_non_empty",
     count: items.length,
     keys: [],
@@ -189,6 +205,7 @@ function decideObject(value: unknown): EmptyGateDecision {
   const keys = Object.keys(record);
   return {
     branch: keys.length === 0 ? "empty" : "non_empty",
+    mode: "object",
     reason: keys.length === 0 ? "object_empty" : "object_non_empty",
     count: keys.length,
     keys,
@@ -201,6 +218,7 @@ function decideString(value: unknown, trimStrings: boolean): EmptyGateDecision {
   const normalized = trimStrings ? text.trim() : text;
   return {
     branch: normalized.length === 0 ? "empty" : "non_empty",
+    mode: "string",
     reason: normalized.length === 0 ? "string_empty" : "string_non_empty",
     count: normalized.length,
     keys: [],
@@ -212,6 +230,7 @@ function decidePresent(value: unknown): EmptyGateDecision {
   const present = value !== undefined && value !== null;
   return {
     branch: present ? "non_empty" : "empty",
+    mode: "present",
     reason: present ? "value_present" : "value_missing",
     count: present ? 1 : 0,
     keys: [],

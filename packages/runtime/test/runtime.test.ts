@@ -3327,6 +3327,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("count:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput?.summary).toMatchObject({
+      branch: "non_empty",
+      mode: "auto",
+      effectiveMode: "array",
+      path: "items",
+      trimStrings: true,
+      count: 2,
+      isEmpty: false,
+      reason: "array_non_empty",
+      itemCount: 2,
+      keyCount: 0,
+    });
   });
 
   it("uses dynamic empty_gate policy inputs", async () => {
@@ -3404,6 +3422,18 @@ describe("runtime / hello-flow end-to-end", () => {
       selected: "   ",
       isEmpty: false,
       reason: "string_non_empty",
+      summary: {
+        branch: "non_empty",
+        mode: "string",
+        effectiveMode: "string",
+        path: "label",
+        trimStrings: false,
+        count: 3,
+        isEmpty: false,
+        reason: "string_non_empty",
+        itemCount: 1,
+        keyCount: 0,
+      },
     });
   });
 
@@ -3444,6 +3474,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("empty:array_empty");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput?.summary).toMatchObject({
+      branch: "empty",
+      mode: "auto",
+      effectiveMode: "array",
+      path: "items",
+      trimStrings: true,
+      count: 0,
+      isEmpty: true,
+      reason: "array_empty",
+      itemCount: 0,
+      keyCount: 0,
+    });
   });
 
   it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {

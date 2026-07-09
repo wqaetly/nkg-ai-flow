@@ -570,6 +570,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "数量",
         isEmpty: "是否为空",
         reason: "原因",
+        summary: "摘要",
       },
       expression_eval: {
         input: "输入",
