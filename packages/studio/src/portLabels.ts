@@ -514,6 +514,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         entry: "死信条目",
         state: "死信状态",
         count: "数量",
+        summary: "摘要",
       },
       delete_path: {
         source: "来源数据",

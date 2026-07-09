@@ -101,6 +101,7 @@ export const deadLetterNode = defineNode({
       label: "Count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -142,12 +143,21 @@ export const deadLetterNode = defineNode({
       store.delete(name);
     }
 
-    ctx.log.debug("dead_letter selected branch", {
+    const summary = {
       name,
       mode,
       branch: decision.branch,
       count: decision.entries.length,
-    });
+      retainedCount: decision.state.entries.length,
+      reason,
+      maxItems,
+      firstEntryId: decision.entries[0]?.id ?? "",
+      hasPayload: decision.entries[0]?.payload !== null && decision.entries[0]?.payload !== undefined,
+      hasError: decision.entries[0]?.error !== null && decision.entries[0]?.error !== undefined,
+      persisted: decision.persist,
+      updatedAt: decision.state.updatedAt,
+    };
+    ctx.log.debug("dead_letter selected branch", summary);
 
     return {
       kind: "success",
@@ -161,6 +171,7 @@ export const deadLetterNode = defineNode({
         maxItems,
         count: decision.entries.length,
         state: decision.state,
+        summary,
       },
     };
   },

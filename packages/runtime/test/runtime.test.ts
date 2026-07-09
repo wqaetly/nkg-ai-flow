@@ -14888,6 +14888,26 @@ describe("runtime / hello-flow end-to-end", () => {
         },
       ],
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadLetterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "dead_letter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadLetterOutput?.summary).toMatchObject({
+      name: "ORDER_DEAD_LETTERS",
+      mode: "enqueue",
+      branch: "recorded",
+      count: 1,
+      retainedCount: 1,
+      reason: "payment http failed",
+      maxItems: 1000,
+      firstEntryId: expect.any(String),
+      hasPayload: false,
+      hasError: true,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("records payloads into a dynamically named dead_letter", async () => {
@@ -15061,6 +15081,20 @@ describe("runtime / hello-flow end-to-end", () => {
       maxItems: 2,
       count: 1,
     });
+    expect(deadLetterOutput?.summary).toMatchObject({
+      name: "ORDER_DEAD_LETTERS",
+      mode: "enqueue",
+      branch: "recorded",
+      count: 1,
+      retainedCount: 2,
+      reason: "dynamic worker failure",
+      maxItems: 2,
+      firstEntryId: expect.any(String),
+      hasPayload: true,
+      hasError: false,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("drains existing dead_letter entries", async () => {
@@ -15120,6 +15154,26 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("drained:2");
     expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadLetterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "dead_letter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadLetterOutput?.summary).toMatchObject({
+      name: "ORDER_DEAD_LETTERS",
+      mode: "drain",
+      branch: "drained",
+      count: 2,
+      retainedCount: 0,
+      reason: "",
+      maxItems: 1000,
+      firstEntryId: "entry-1",
+      hasPayload: true,
+      hasError: true,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes empty dead_letter drains to empty", async () => {
@@ -15160,6 +15214,26 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("empty:0");
     expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadLetterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "dead_letter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadLetterOutput?.summary).toMatchObject({
+      name: "ORDER_DEAD_LETTERS",
+      mode: "drain",
+      branch: "empty",
+      count: 0,
+      retainedCount: 0,
+      reason: "",
+      maxItems: 1000,
+      firstEntryId: "",
+      hasPayload: false,
+      hasError: false,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("pushes items into queue", async () => {
