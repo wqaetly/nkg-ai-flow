@@ -12,6 +12,16 @@ import { readPath } from "./_helpers.js";
 
 type ReduceItemsMode = "count" | "sum" | "average" | "min" | "max" | "first" | "last" | "join";
 
+interface NumericEntry {
+  index: number;
+  value: number;
+}
+
+interface ReduceResult {
+  result: unknown;
+  resultIndex: number | null;
+}
+
 const reduceItemsConfig = z
   .object({
     mode: z
@@ -90,6 +100,20 @@ export const reduceItemsNode = defineNode({
       label: "Numeric count",
       schema: { type: "number" },
     },
+    {
+      id: "numericIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Numeric indexes",
+      schema: { type: "array" },
+    },
+    {
+      id: "resultIndex",
+      direction: "output",
+      kind: "data",
+      label: "Result index",
+      schema: { type: ["number", "null"] },
+    },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -102,14 +126,14 @@ export const reduceItemsNode = defineNode({
     const path = String(input.path ?? config.path ?? "");
     const separator = String(input.separator ?? config.separator ?? ",");
     const values = source.map((item) => valueAtPath(item, path));
-    const numbers = values.flatMap((value) => {
+    const numericEntries = values.flatMap<NumericEntry>((value, index) => {
       const number = numberOrUndefined(value);
-      return number === undefined ? [] : [number];
+      return number === undefined ? [] : [{ index, value: number }];
     });
-    const result = reduceValues({
+    const reduced = reduceValues({
       mode,
       values,
-      numbers,
+      numericEntries,
       separator,
       sourceCount: source.length,
     });
@@ -118,12 +142,14 @@ export const reduceItemsNode = defineNode({
       kind: "success",
       outputs: {
         out: null,
-        result,
+        result: reduced.result,
+        resultIndex: reduced.resultIndex,
         mode,
         path,
         separator,
         count: source.length,
-        numericCount: numbers.length,
+        numericCount: numericEntries.length,
+        numericIndexes: numericEntries.map((entry) => entry.index),
       },
     };
   },
@@ -148,23 +174,63 @@ function valueAtPath(item: unknown, path: string): unknown {
 function reduceValues(options: {
   mode: string;
   values: unknown[];
-  numbers: number[];
+  numericEntries: NumericEntry[];
   separator: string;
   sourceCount: number;
-}): unknown {
-  const { mode, values, numbers, separator, sourceCount } = options;
-  if (mode === "sum") return numbers.reduce<number>((total, value) => total + value, 0);
-  if (mode === "average") {
-    return numbers.length > 0
-      ? numbers.reduce<number>((total, value) => total + value, 0) / numbers.length
-      : null;
+}): ReduceResult {
+  const { mode, values, numericEntries, separator, sourceCount } = options;
+  const numbers = numericEntries.map((entry) => entry.value);
+  if (mode === "sum") {
+    return {
+      result: numbers.reduce<number>((total, value) => total + value, 0),
+      resultIndex: null,
+    };
   }
-  if (mode === "min") return numbers.length > 0 ? Math.min(...numbers) : null;
-  if (mode === "max") return numbers.length > 0 ? Math.max(...numbers) : null;
-  if (mode === "first") return values.length > 0 ? values[0] : null;
-  if (mode === "last") return values.length > 0 ? values[values.length - 1] : null;
-  if (mode === "join") return values.map((value) => valueToString(value)).join(separator);
-  return sourceCount;
+  if (mode === "average") {
+    return {
+      result: numbers.length > 0
+        ? numbers.reduce<number>((total, value) => total + value, 0) / numbers.length
+        : null,
+      resultIndex: null,
+    };
+  }
+  if (mode === "min") {
+    return numericEntries.reduce<ReduceResult>(
+      (best, entry) =>
+        best.result === null || entry.value < Number(best.result)
+          ? { result: entry.value, resultIndex: entry.index }
+          : best,
+      { result: null, resultIndex: null },
+    );
+  }
+  if (mode === "max") {
+    return numericEntries.reduce<ReduceResult>(
+      (best, entry) =>
+        best.result === null || entry.value > Number(best.result)
+          ? { result: entry.value, resultIndex: entry.index }
+          : best,
+      { result: null, resultIndex: null },
+    );
+  }
+  if (mode === "first") {
+    return {
+      result: values.length > 0 ? values[0] : null,
+      resultIndex: values.length > 0 ? 0 : null,
+    };
+  }
+  if (mode === "last") {
+    return {
+      result: values.length > 0 ? values[values.length - 1] : null,
+      resultIndex: values.length > 0 ? values.length - 1 : null,
+    };
+  }
+  if (mode === "join") {
+    return {
+      result: values.map((value) => valueToString(value)).join(separator),
+      resultIndex: null,
+    };
+  }
+  return { result: sourceCount, resultIndex: null };
 }
 
 function numberOrUndefined(value: unknown): number | undefined {

@@ -19873,6 +19873,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("sum=10");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const reduceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "reduce") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(reduceOutput).toMatchObject({
+      result: 10,
+      count: 3,
+      numericCount: 3,
+      numericIndexes: [0, 1, 2],
+      resultIndex: null,
+    });
   });
 
   it("uses dynamic reduce_items policy inputs", async () => {
@@ -19956,6 +19969,8 @@ describe("runtime / hello-flow end-to-end", () => {
       result: "alpha|beta|gamma",
       count: 3,
       numericCount: 0,
+      numericIndexes: [],
+      resultIndex: null,
     });
   });
 
@@ -20032,11 +20047,41 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("avg=4");
-    expect(outputFor("average")).toMatchObject({ result: 4, count: 4, numericCount: 3 });
-    expect(outputFor("min")).toMatchObject({ result: 2, count: 4, numericCount: 3 });
-    expect(outputFor("max")).toMatchObject({ result: 6, count: 4, numericCount: 3 });
-    expect(outputFor("first")).toMatchObject({ result: "first", count: 4, numericCount: 0 });
-    expect(outputFor("last")).toMatchObject({ result: "last", count: 4, numericCount: 0 });
+    expect(outputFor("average")).toMatchObject({
+      result: 4,
+      count: 4,
+      numericCount: 3,
+      numericIndexes: [0, 1, 2],
+      resultIndex: null,
+    });
+    expect(outputFor("min")).toMatchObject({
+      result: 2,
+      count: 4,
+      numericCount: 3,
+      numericIndexes: [0, 1, 2],
+      resultIndex: 0,
+    });
+    expect(outputFor("max")).toMatchObject({
+      result: 6,
+      count: 4,
+      numericCount: 3,
+      numericIndexes: [0, 1, 2],
+      resultIndex: 2,
+    });
+    expect(outputFor("first")).toMatchObject({
+      result: "first",
+      count: 4,
+      numericCount: 0,
+      numericIndexes: [],
+      resultIndex: 0,
+    });
+    expect(outputFor("last")).toMatchObject({
+      result: "last",
+      count: 4,
+      numericCount: 0,
+      numericIndexes: [],
+      resultIndex: 3,
+    });
   });
 
   it("executes every item in a foreach begin/end block", async () => {
