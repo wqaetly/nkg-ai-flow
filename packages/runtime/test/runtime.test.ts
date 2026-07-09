@@ -1353,6 +1353,22 @@ describe("runtime / hello-flow end-to-end", () => {
       waitMs: 0,
       dueValue: true,
       notDueValue: false,
+      summary: {
+        status: "due",
+        cron: "30 9 * * 1",
+        timezoneOffsetMinutes: 0,
+        now: Date.UTC(2026, 0, 5, 9, 30),
+        nextAt: Date.UTC(2026, 0, 5, 9, 30),
+        nextAtIso: new Date(Date.UTC(2026, 0, 5, 9, 30)).toISOString(),
+        waitMs: 0,
+        minute: 30,
+        hour: 9,
+        dayOfMonth: 5,
+        month: 1,
+        dayOfWeek: 1,
+        dueValue: true,
+        notDueValue: false,
+      },
     });
   });
 
@@ -1428,6 +1444,22 @@ describe("runtime / hello-flow end-to-end", () => {
       waitMs: 0,
       dueValue: true,
       notDueValue: false,
+      summary: {
+        status: "due",
+        cron: "30 9 * * 1",
+        timezoneOffsetMinutes: 0,
+        now: nowValue,
+        nextAt: nowValue,
+        nextAtIso: new Date(nowValue).toISOString(),
+        waitMs: 0,
+        minute: 30,
+        hour: 9,
+        dayOfMonth: 5,
+        month: 1,
+        dayOfWeek: 1,
+        dueValue: true,
+        notDueValue: false,
+      },
     });
   });
 
@@ -1477,6 +1509,22 @@ describe("runtime / hello-flow end-to-end", () => {
       waitMs: 60_000,
       dueValue: false,
       notDueValue: true,
+      summary: {
+        status: "not_due",
+        cron: "30 9 * * 1",
+        timezoneOffsetMinutes: 0,
+        now: Date.UTC(2026, 0, 5, 9, 29),
+        nextAt: Date.UTC(2026, 0, 5, 9, 30),
+        nextAtIso: new Date(Date.UTC(2026, 0, 5, 9, 30)).toISOString(),
+        waitMs: 60_000,
+        minute: 29,
+        hour: 9,
+        dayOfMonth: 5,
+        month: 1,
+        dayOfWeek: 1,
+        dueValue: false,
+        notDueValue: true,
+      },
     });
   });
 

@@ -99,6 +99,7 @@ export const cronScheduleNode = defineNode({
     },
     { id: "dueValue", direction: "output", kind: "data", label: "Due", schema: { type: "boolean" } },
     { id: "notDueValue", direction: "output", kind: "data", label: "Not Due", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -118,6 +119,7 @@ export const cronScheduleNode = defineNode({
     const local = localParts(now, offsetMinutes);
     const due = matchesCron(local, spec);
     const nextAt = due ? now : findNextAt(now, offsetMinutes, spec);
+    const nextAtIso = new Date(nextAt).toISOString();
     const waitMs = Math.max(0, nextAt - now);
     const status = due ? "due" : "not_due";
 
@@ -137,7 +139,7 @@ export const cronScheduleNode = defineNode({
         timezoneOffsetMinutes: offsetMinutes,
         now,
         nextAt,
-        nextAtIso: new Date(nextAt).toISOString(),
+        nextAtIso,
         waitMs,
         minute: local.minute,
         hour: local.hour,
@@ -146,6 +148,22 @@ export const cronScheduleNode = defineNode({
         dayOfWeek: local.dayOfWeek,
         dueValue: due,
         notDueValue: !due,
+        summary: {
+          status,
+          cron,
+          timezoneOffsetMinutes: offsetMinutes,
+          now,
+          nextAt,
+          nextAtIso,
+          waitMs,
+          minute: local.minute,
+          hour: local.hour,
+          dayOfMonth: local.dayOfMonth,
+          month: local.month,
+          dayOfWeek: local.dayOfWeek,
+          dueValue: due,
+          notDueValue: !due,
+        },
       },
     };
   },

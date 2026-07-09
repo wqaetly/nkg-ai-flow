@@ -471,6 +471,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         dayOfWeek: "星期",
         dueValue: "是否到期",
         notDueValue: "是否未到期",
+        summary: "摘要",
       },
       deadline: {
         in: "输入",
