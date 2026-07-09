@@ -11543,6 +11543,85 @@ describe("runtime / hello-flow end-to-end", () => {
     );
   });
 
+  it("creates a wait_timer checkpoint with a dynamic dueAt input", async () => {
+    const variables = new InMemoryVariableStore();
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const dueAt = Date.now() + 45_000;
+    const flow = defineFlow({ id: "wait_timer_dynamic_due_at_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const due = flow.node("transform", {
+      id: "due",
+      position: { x: 120, y: 0 },
+      config: { value: dueAt },
+    });
+    const timer = flow.node("wait_timer", {
+      id: "timer",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_RETRY_TIMER_DYNAMIC_DUE",
+        durationMs: 1,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "timer:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), due.in("in"));
+    flow.connect(due.out("out"), timer.in("in"));
+    flow.connect(due.out("output"), timer.in("dueAt"));
+    flow.connect(timer.out("waiting"), report.in("in"));
+    flow.connect(timer.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_timer_dynamic_due_at_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timer:waiting");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timer") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timerOutput).toMatchObject({
+      status: "waiting",
+      dueAt: new Date(dueAt).toISOString(),
+      timeoutAt: "",
+      timeoutMs: 0,
+      reset: false,
+      remainingMs: expect.any(Number),
+      overdueByMs: 0,
+      waitingValue: true,
+      dueValue: false,
+      expiredValue: false,
+      summary: {
+        name: "ORDER_RETRY_TIMER_DYNAMIC_DUE",
+        status: "waiting",
+        dueAt: new Date(dueAt).toISOString(),
+        timeoutAt: "",
+        timeoutMs: 0,
+        reset: false,
+        overdueByMs: 0,
+        waitingValue: true,
+        dueValue: false,
+        expiredValue: false,
+      },
+    });
+    expect(Number(timerOutput?.remainingMs)).toBeGreaterThan(0);
+    expect((variables.get("ORDER_RETRY_TIMER_DYNAMIC_DUE") as { dueAt?: number }).dueAt).toBe(dueAt);
+  });
+
   it("resets a wait_timer checkpoint with dynamic reset and timeout inputs", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_RETRY_TIMER_DYNAMIC_RESET", {
