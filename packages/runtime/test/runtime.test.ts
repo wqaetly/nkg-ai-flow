@@ -6644,6 +6644,86 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("force releases a mutex held by another owner", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_FORCE_LOCK", {
+      locked: true,
+      owner: "worker-1",
+      acquiredAt: now,
+      expiresAt: now + 60_000,
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "mutex_force_release_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const mutex = flow.node("mutex", {
+      id: "force_unlock",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_FORCE_LOCK",
+        owner: "admin",
+        mode: "force_release",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "force:${input.locked}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), mutex.in("in"));
+    flow.connect(mutex.out("released"), report.in("in"));
+    flow.connect(mutex.out("state"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "mutex_force_release_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("force:false");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const unlockOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "force_unlock") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(unlockOutput).toMatchObject({
+      name: "ORDER_FORCE_LOCK",
+      owner: null,
+      mode: "force_release",
+      remainingMs: 0,
+      expiresAt: null,
+      summary: {
+        name: "ORDER_FORCE_LOCK",
+        mode: "force_release",
+        branch: "released",
+        owner: null,
+        requestedOwner: "admin",
+        locked: false,
+        ttlMs: 300_000,
+        remainingMs: 0,
+        expiresAt: null,
+        acquiredAt: null,
+        updatedAt: expect.any(Number),
+      },
+    });
+    expect(variables.get("ORDER_FORCE_LOCK")).toMatchObject({
+      locked: false,
+      owner: null,
+      acquiredAt: null,
+      expiresAt: null,
+    });
+  });
+
   it("routes semaphore to acquired and records a permit holder", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
