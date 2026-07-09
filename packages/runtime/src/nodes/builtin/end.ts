@@ -16,13 +16,28 @@ export const endNode = defineNode({
   title: "结束",
   description: "流程出口伪节点；汇总最终输出。",
   kind: "pseudo",
-  ports: [controlIn],
+  ports: [
+    controlIn,
+    { id: "result", direction: "output", kind: "data", label: "Result" },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
+  ],
   validateInput: false,
   run({ input }) {
     const raw = input as Record<string, unknown>;
+    const result = raw.in ?? null;
+    const summary = {
+      resultType: valueType(result),
+      isNull: result === null,
+    };
     return {
       kind: "success",
-      outputs: { result: raw.in ?? null },
+      outputs: { result, summary },
     };
   },
 });
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  return typeof value;
+}

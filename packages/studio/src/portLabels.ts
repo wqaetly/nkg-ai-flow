@@ -642,6 +642,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         source: "来源",
         summary: "摘要",
       },
+      end: {
+        in: "输入",
+        result: "结果",
+        summary: "摘要",
+      },
       feature_flag: {
         in: "输入",
         name: "开关名",

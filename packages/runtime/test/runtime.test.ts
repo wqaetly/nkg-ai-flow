@@ -126,6 +126,15 @@ describe("runtime / hello-flow end-to-end", () => {
       hasTemplate: true,
       hasExpression: false,
     });
+    const endOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "node_end_01") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(endOutput?.summary).toMatchObject({
+      resultType: "string",
+      isNull: false,
+    });
   });
 
   it("evaluates safe transform expressions with expr prefix", async () => {
