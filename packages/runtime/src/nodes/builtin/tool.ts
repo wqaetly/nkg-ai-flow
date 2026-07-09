@@ -67,6 +67,7 @@ export const toolNode = defineNodeFactory<ToolNodeDeps>(
         { id: "ok", direction: "output", kind: "data", label: "OK", schema: { type: "boolean" } },
         { id: "errorMessage", direction: "output", kind: "data", label: "Error message", schema: { type: "string" } },
         { id: "changedFiles", direction: "output", kind: "data", label: "Changed files", schema: { type: "array" } },
+        { id: "summary", direction: "output", kind: "data", label: "Summary" },
       ],
       validateInput: false,
       async run({ input, config, ctx }) {
@@ -139,15 +140,28 @@ export const toolNode = defineNodeFactory<ToolNodeDeps>(
           );
         }
 
+        const output = result.output ?? null;
+        const changedFiles = result.changedFiles ?? [];
+        const summary = {
+          tool,
+          branch: result.ok ? "success" : "failed",
+          ok: result.ok,
+          resultType: valueType(output),
+          changedFileCount: changedFiles.length,
+          hasError: Boolean(result.error),
+          failOnError: cfg.failOnError,
+        };
+
         return {
           kind: "success",
           outputs: {
             [result.ok ? "success" : "failed"]: null,
-            out: result.output ?? null,
-            result: result.output ?? null,
+            out: output,
+            result: output,
             ok: result.ok,
             errorMessage: result.error ?? "",
-            changedFiles: result.changedFiles ?? [],
+            changedFiles,
+            summary,
           },
         };
       },
@@ -181,6 +195,13 @@ function readAllowedTools(
 
 function stringOr(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  return typeof value;
 }
 
 function nodeError(

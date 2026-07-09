@@ -1611,6 +1611,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         ok: "是否成功",
         errorMessage: "错误信息",
         changedFiles: "变更文件",
+        summary: "摘要",
       },
       unique_items: {
         items: "唯一项",

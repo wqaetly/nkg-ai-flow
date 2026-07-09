@@ -307,6 +307,20 @@ describe("runtime / hello-flow end-to-end", () => {
         events.find((event) => event.kind === "tool_call_finished" && event.nodeId === "read_tool")
           ?.payload,
       ).toMatchObject({ toolName: "read_file", ok: true });
+      const toolOutput = (
+        events.find((event) => event.kind === "node_finished" && event.nodeId === "read_tool") as
+          | { payload?: { output?: Record<string, unknown> } }
+          | undefined
+      )?.payload?.output;
+      expect(toolOutput?.summary).toMatchObject({
+        tool: "read_file",
+        branch: "success",
+        ok: true,
+        resultType: "object",
+        changedFileCount: 0,
+        hasError: false,
+        failOnError: true,
+      });
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }
@@ -356,6 +370,20 @@ describe("runtime / hello-flow end-to-end", () => {
         events.find((event) => event.kind === "tool_call_finished" && event.nodeId === "read_missing")
           ?.payload,
       ).toMatchObject({ toolName: "read_file", ok: false });
+      const toolOutput = (
+        events.find((event) => event.kind === "node_finished" && event.nodeId === "read_missing") as
+          | { payload?: { output?: Record<string, unknown> } }
+          | undefined
+      )?.payload?.output;
+      expect(toolOutput?.summary).toMatchObject({
+        tool: "read_file",
+        branch: "failed",
+        ok: false,
+        resultType: "null",
+        changedFileCount: 0,
+        hasError: true,
+        failOnError: false,
+      });
     } finally {
       await rm(tmp, { recursive: true, force: true });
     }
