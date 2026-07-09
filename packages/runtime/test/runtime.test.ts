@@ -5974,6 +5974,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(checkOutput).toMatchObject({
       status: "open",
+      previousStatus: "open",
+      statusChanged: false,
+      transitionReason: "circuit_open",
       circuitFlowId: "circuit_breaker_e2e",
       circuitRunId: result.runRecord.runId,
       circuitNodeId: "record_failure",
@@ -6181,6 +6184,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(checkOutput).toMatchObject({
       status: "half_open",
+      previousStatus: "open",
+      statusChanged: true,
+      transitionReason: "reset_timeout_elapsed",
       circuitFlowId: "circuit_breaker_half_open_e2e",
       circuitRunId: result.runRecord.runId,
       circuitNodeId: "check",

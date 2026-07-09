@@ -134,6 +134,9 @@ export const circuitBreakerNode = defineNode({
     { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
+    { id: "previousStatus", direction: "output", kind: "data", label: "Previous Status" },
+    { id: "statusChanged", direction: "output", kind: "data", label: "Status Changed", schema: { type: "boolean" } },
+    { id: "transitionReason", direction: "output", kind: "data", label: "Transition Reason", schema: { type: "string" } },
     { id: "circuitFlowId", direction: "output", kind: "data", label: "Circuit Flow Id", schema: { type: "string" } },
     { id: "circuitRunId", direction: "output", kind: "data", label: "Circuit Run Id", schema: { type: "string" } },
     { id: "circuitNodeId", direction: "output", kind: "data", label: "Circuit Node Id", schema: { type: "string" } },
@@ -251,11 +254,22 @@ export const circuitBreakerNode = defineNode({
     const isClosed = next.status === "closed";
     const canPass = isClosed || isHalfOpen;
     const remainingFailures = Math.max(0, failureThreshold - next.failureCount);
+    const previousStatus = previous.status;
+    const statusChanged = previousStatus !== next.status;
+    const transitionReason = circuitTransitionReason({
+      mode,
+      previous,
+      next,
+      statusChanged,
+    });
 
     ctx.log.debug("circuit_breaker selected branch", {
       name,
       mode,
       branch,
+      previousStatus,
+      statusChanged,
+      transitionReason,
       failureCount: next.failureCount,
       failureThreshold,
       failureWindowMs,
@@ -270,6 +284,9 @@ export const circuitBreakerNode = defineNode({
         name,
         mode,
         status: next.status,
+        previousStatus,
+        statusChanged,
+        transitionReason,
         circuitFlowId: next.circuitFlowId,
         circuitRunId: next.circuitRunId,
         circuitNodeId: next.circuitNodeId,
@@ -363,6 +380,28 @@ function closed(
     lastFailureAt: null,
     updatedAt: now,
   };
+}
+
+function circuitTransitionReason(input: {
+  mode: "check" | "record_failure" | "record_success" | "reset";
+  previous: CircuitState;
+  next: CircuitState;
+  statusChanged: boolean;
+}): string {
+  if (input.mode === "reset") return "reset";
+  if (input.mode === "record_success") return "success_recorded";
+  if (input.mode === "record_failure" && input.next.status === "open") {
+    return input.previous.status === "half_open"
+      ? "half_open_probe_failed"
+      : "failure_threshold_reached";
+  }
+  if (input.mode === "record_failure") return "failure_recorded";
+  if (input.mode === "check" && input.statusChanged && input.next.status === "half_open") {
+    return "reset_timeout_elapsed";
+  }
+  if (input.mode === "check" && input.next.status === "open") return "circuit_open";
+  if (input.mode === "check" && input.next.status === "half_open") return "half_open_probe";
+  return "circuit_closed";
 }
 
 function readCircuitState(
