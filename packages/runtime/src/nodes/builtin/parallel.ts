@@ -19,6 +19,13 @@ interface ParallelBranchDescriptor {
   parallelNodeId: string;
 }
 
+interface ParallelBranchBatch {
+  index: number;
+  branchIds: string[];
+  branchIndexes: number[];
+  branchNumbers: number[];
+}
+
 const parallelConfig = z
   .object({
     branchCount: z
@@ -94,6 +101,20 @@ export const parallelNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "concurrencyLimited",
+      direction: "output",
+      kind: "data",
+      label: "Concurrency Limited",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "batchCount",
+      direction: "output",
+      kind: "data",
+      label: "Batch Count",
+      schema: { type: "number" },
+    },
+    {
       id: "branchIds",
       direction: "output",
       kind: "data",
@@ -120,6 +141,12 @@ export const parallelNode = defineNode({
       kind: "data",
       label: "Branches",
     },
+    {
+      id: "branchBatches",
+      direction: "output",
+      kind: "data",
+      label: "Branch Batches",
+    },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -133,14 +160,18 @@ export const parallelNode = defineNode({
       number: index + 1,
       parallelNodeId: ctx.nodeId,
     }));
+    const branchBatches = buildBranchBatches(branches, concurrency);
     const outputs: Record<string, unknown> = {
       value,
       branchCount,
       concurrency,
+      concurrencyLimited: concurrency < branchCount,
+      batchCount: branchBatches.length,
       branchIds,
       branchIndexes: branches.map((branch) => branch.index),
       branchNumbers: branches.map((branch) => branch.number),
       branches,
+      branchBatches,
     };
     for (let index = 1; index <= branchCount; index++) {
       outputs[`branch${index}`] = null;
@@ -162,4 +193,18 @@ function clampConcurrency(value: unknown, branchCount: number): number {
   const number = Number(value);
   if (!Number.isFinite(number)) return branchCount;
   return Math.min(branchCount, Math.max(1, Math.trunc(number)));
+}
+
+function buildBranchBatches(branches: ParallelBranchDescriptor[], concurrency: number): ParallelBranchBatch[] {
+  const batches: ParallelBranchBatch[] = [];
+  for (let start = 0; start < branches.length; start += concurrency) {
+    const batchBranches = branches.slice(start, start + concurrency);
+    batches.push({
+      index: batches.length,
+      branchIds: batchBranches.map((branch) => branch.id),
+      branchIndexes: batchBranches.map((branch) => branch.index),
+      branchNumbers: batchBranches.map((branch) => branch.number),
+    });
+  }
+  return batches;
 }

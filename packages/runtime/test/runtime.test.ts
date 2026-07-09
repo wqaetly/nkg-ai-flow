@@ -16427,12 +16427,22 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(fanoutOutput).toMatchObject({
       branchCount: 2,
       concurrency: 2,
+      concurrencyLimited: false,
+      batchCount: 1,
       branchIds: ["branch1", "branch2"],
       branchIndexes: [0, 1],
       branchNumbers: [1, 2],
       branches: [
         { id: "branch1", index: 0, number: 1, parallelNodeId: "fanout" },
         { id: "branch2", index: 1, number: 2, parallelNodeId: "fanout" },
+      ],
+      branchBatches: [
+        {
+          index: 0,
+          branchIds: ["branch1", "branch2"],
+          branchIndexes: [0, 1],
+          branchNumbers: [1, 2],
+        },
       ],
     });
     expect(joinOutput).toMatchObject({
@@ -16662,6 +16672,32 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe("parallel=upper:Flow,lower:Flow");
 
     const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fanoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fanout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(fanoutOutput).toMatchObject({
+      branchCount: 2,
+      concurrency: 1,
+      concurrencyLimited: true,
+      batchCount: 2,
+      branchIds: ["branch1", "branch2"],
+      branchBatches: [
+        {
+          index: 0,
+          branchIds: ["branch1"],
+          branchIndexes: [0],
+          branchNumbers: [1],
+        },
+        {
+          index: 1,
+          branchIds: ["branch2"],
+          branchIndexes: [1],
+          branchNumbers: [2],
+        },
+      ],
+    });
     const waitEvents = events.filter(
       (event) =>
         (event.nodeId === "wait_a" || event.nodeId === "wait_b") &&
@@ -16767,7 +16803,23 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(fanoutOutput).toMatchObject({
       branchCount: 2,
       concurrency: 1,
+      concurrencyLimited: true,
+      batchCount: 2,
       branchIds: ["branch1", "branch2"],
+      branchBatches: [
+        {
+          index: 0,
+          branchIds: ["branch1"],
+          branchIndexes: [0],
+          branchNumbers: [1],
+        },
+        {
+          index: 1,
+          branchIds: ["branch2"],
+          branchIndexes: [1],
+          branchNumbers: [2],
+        },
+      ],
     });
     const waitEvents = events.filter(
       (event) =>

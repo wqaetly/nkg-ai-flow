@@ -921,10 +921,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "透传数据",
         branchCount: "分支数量",
         concurrency: "并发上限",
+        concurrencyLimited: "是否限流",
+        batchCount: "批次数量",
         branchIds: "分支端口",
         branchIndexes: "分支索引",
         branchNumbers: "分支序号",
         branches: "分支元数据",
+        branchBatches: "分支批次",
       },
       parse_json: {
         text: "文本",
