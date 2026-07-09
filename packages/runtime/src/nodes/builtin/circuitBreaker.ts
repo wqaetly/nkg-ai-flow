@@ -19,6 +19,9 @@ type CircuitStatus = "closed" | "open" | "half_open";
 
 interface CircuitState {
   status: CircuitStatus;
+  circuitFlowId: string;
+  circuitRunId: string;
+  circuitNodeId: string;
   failureCount: number;
   openedAt: number | null;
   lastFailureAt: number | null;
@@ -131,6 +134,9 @@ export const circuitBreakerNode = defineNode({
     { id: "name", direction: "output", kind: "data", label: "Name" },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
+    { id: "circuitFlowId", direction: "output", kind: "data", label: "Circuit Flow Id", schema: { type: "string" } },
+    { id: "circuitRunId", direction: "output", kind: "data", label: "Circuit Run Id", schema: { type: "string" } },
+    { id: "circuitNodeId", direction: "output", kind: "data", label: "Circuit Node Id", schema: { type: "string" } },
     {
       id: "failureCount",
       direction: "output",
@@ -215,12 +221,14 @@ export const circuitBreakerNode = defineNode({
       readIntegerAtLeast(config.failureWindowMs, 0) ??
       0;
     const mode = readMode(input.mode) ?? readMode(config.mode) ?? "check";
-    const previous = readCircuitState(store.get(name));
+    const locator = { circuitFlowId: ctx.flowId, circuitRunId: ctx.runId, circuitNodeId: ctx.nodeId };
+    const previous = readCircuitState(store.get(name), locator);
     const next = applyMode(previous, {
       mode,
       failureThreshold,
       resetTimeoutMs,
       failureWindowMs,
+      locator,
       now,
     });
     const remainingMs =
@@ -262,6 +270,9 @@ export const circuitBreakerNode = defineNode({
         name,
         mode,
         status: next.status,
+        circuitFlowId: next.circuitFlowId,
+        circuitRunId: next.circuitRunId,
+        circuitNodeId: next.circuitNodeId,
         failureCount: next.failureCount,
         remainingMs,
         failureThreshold,
@@ -287,11 +298,12 @@ function applyMode(
     failureThreshold: number;
     resetTimeoutMs: number;
     failureWindowMs: number;
+    locator: { circuitFlowId: string; circuitRunId: string; circuitNodeId: string };
     now: number;
   },
 ): CircuitState {
-  const { mode, failureThreshold, resetTimeoutMs, failureWindowMs, now } = options;
-  if (mode === "reset" || mode === "record_success") return closed(now);
+  const { mode, failureThreshold, resetTimeoutMs, failureWindowMs, locator, now } = options;
+  if (mode === "reset" || mode === "record_success") return closed(now, locator);
   if (mode === "record_failure") {
     const previousFailureCount =
       failureWindowMs > 0 &&
@@ -303,6 +315,9 @@ function applyMode(
     if (failureCount >= failureThreshold) {
       return {
         status: "open",
+        circuitFlowId: locator.circuitFlowId,
+        circuitRunId: locator.circuitRunId,
+        circuitNodeId: locator.circuitNodeId,
         failureCount,
         openedAt: now,
         lastFailureAt: now,
@@ -311,6 +326,9 @@ function applyMode(
     }
     return {
       status: "closed",
+      circuitFlowId: locator.circuitFlowId,
+      circuitRunId: locator.circuitRunId,
+      circuitNodeId: locator.circuitNodeId,
       failureCount,
       openedAt: null,
       lastFailureAt: now,
@@ -331,9 +349,15 @@ function applyMode(
   return { ...previous, updatedAt: now };
 }
 
-function closed(now: number): CircuitState {
+function closed(
+  now: number,
+  locator: { circuitFlowId: string; circuitRunId: string; circuitNodeId: string },
+): CircuitState {
   return {
     status: "closed",
+    circuitFlowId: locator.circuitFlowId,
+    circuitRunId: locator.circuitRunId,
+    circuitNodeId: locator.circuitNodeId,
     failureCount: 0,
     openedAt: null,
     lastFailureAt: null,
@@ -341,12 +365,18 @@ function closed(now: number): CircuitState {
   };
 }
 
-function readCircuitState(value: unknown): CircuitState {
+function readCircuitState(
+  value: unknown,
+  locator: { circuitFlowId: string; circuitRunId: string; circuitNodeId: string },
+): CircuitState {
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
     const status = readStatus(record.status);
     return {
       status,
+      circuitFlowId: readString(record.circuitFlowId) ?? locator.circuitFlowId,
+      circuitRunId: readString(record.circuitRunId) ?? locator.circuitRunId,
+      circuitNodeId: readString(record.circuitNodeId) ?? locator.circuitNodeId,
       failureCount: readNonNegativeInteger(record.failureCount),
       openedAt:
         typeof record.openedAt === "number" && Number.isFinite(record.openedAt)
@@ -362,7 +392,7 @@ function readCircuitState(value: unknown): CircuitState {
           : Date.now(),
     };
   }
-  return closed(Date.now());
+  return closed(Date.now(), locator);
 }
 
 function readStatus(value: unknown): CircuitStatus {
@@ -374,6 +404,10 @@ function readStatus(value: unknown): CircuitStatus {
 function readNonNegativeInteger(value: unknown): number {
   const number = Number(value);
   return Number.isFinite(number) && number > 0 ? Math.trunc(number) : 0;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function readIntegerAtLeast(value: unknown, minimum: number): number | undefined {
@@ -411,6 +445,9 @@ function asMutableVariableStore(value: unknown): MutableVariableStore | undefine
 function toVariableValue(state: CircuitState): VariableValue {
   return {
     status: state.status,
+    circuitFlowId: state.circuitFlowId,
+    circuitRunId: state.circuitRunId,
+    circuitNodeId: state.circuitNodeId,
     failureCount: state.failureCount,
     openedAt: state.openedAt,
     lastFailureAt: state.lastFailureAt,

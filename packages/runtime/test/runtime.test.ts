@@ -5910,6 +5910,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(checkOutput).toMatchObject({
       status: "open",
+      circuitFlowId: "circuit_breaker_e2e",
+      circuitRunId: result.runRecord.runId,
+      circuitNodeId: "record_failure",
       failureCount: 1,
       failureThreshold: 1,
       remainingFailures: 0,
@@ -5922,6 +5925,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
       status: "open",
+      circuitFlowId: "circuit_breaker_e2e",
+      circuitRunId: result.runRecord.runId,
+      circuitNodeId: "record_failure",
       failureCount: 1,
     });
   });
@@ -6111,6 +6117,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(checkOutput).toMatchObject({
       status: "half_open",
+      circuitFlowId: "circuit_breaker_half_open_e2e",
+      circuitRunId: result.runRecord.runId,
+      circuitNodeId: "check",
       failureCount: 2,
       failureThreshold: 3,
       remainingFailures: 1,
@@ -6123,6 +6132,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("PAYMENT_CIRCUIT")).toMatchObject({
       status: "half_open",
+      circuitFlowId: "circuit_breaker_half_open_e2e",
+      circuitRunId: result.runRecord.runId,
+      circuitNodeId: "check",
       failureCount: 2,
     });
   });
