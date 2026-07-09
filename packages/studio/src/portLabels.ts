@@ -267,6 +267,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         registeredValue: "是否注册",
         drainedValue: "是否排空",
         clearedValue: "是否清除",
+        summary: "摘要",
         state: "补偿状态",
       },
       batch_items: {

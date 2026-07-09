@@ -6776,6 +6776,38 @@ describe("runtime / hello-flow end-to-end", () => {
       registeredValue: false,
       drainedValue: true,
       clearedValue: false,
+      summary: {
+        name: "ORDER_COMPENSATIONS",
+        mode: "drain",
+        status: "drained",
+        count: 2,
+        stackCount: 0,
+        updatedAt: expect.any(String),
+        actionName: "refund_payment",
+        registeredFlowId: "compensation_e2e",
+        registeredFlowVersion: "1.0.0",
+        registeredRunId: result.runRecord.runId,
+        registeredNodeId: "second",
+        actions: [
+          {
+            action: "refund_payment",
+            registeredFlowId: "compensation_e2e",
+            registeredFlowVersion: "1.0.0",
+            registeredRunId: result.runRecord.runId,
+            registeredNodeId: "second",
+          },
+          {
+            action: "release_inventory",
+            registeredFlowId: "compensation_e2e",
+            registeredFlowVersion: "1.0.0",
+            registeredRunId: result.runRecord.runId,
+            registeredNodeId: "first",
+          },
+        ],
+        registeredValue: false,
+        drainedValue: true,
+        clearedValue: false,
+      },
     });
     expect(variables.get("ORDER_COMPENSATIONS")).toMatchObject({
       actions: [],
@@ -6833,6 +6865,53 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("comp:release_dynamic_inventory");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const registerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "register") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(registerOutput).toMatchObject({
+      name: "ORDER_DYNAMIC_COMPENSATIONS",
+      mode: "register",
+      status: "registered",
+      count: 1,
+      stackCount: 1,
+      actionName: "release_dynamic_inventory",
+      registeredFlowId: "compensation_dynamic_inputs_e2e",
+      registeredFlowVersion: "1.0.0",
+      registeredRunId: result.runRecord.runId,
+      registeredNodeId: "register",
+      registeredValue: true,
+      drainedValue: false,
+      clearedValue: false,
+      summary: {
+        name: "ORDER_DYNAMIC_COMPENSATIONS",
+        mode: "register",
+        status: "registered",
+        count: 1,
+        stackCount: 1,
+        updatedAt: expect.any(String),
+        actionName: "release_dynamic_inventory",
+        registeredFlowId: "compensation_dynamic_inputs_e2e",
+        registeredFlowVersion: "1.0.0",
+        registeredRunId: result.runRecord.runId,
+        registeredNodeId: "register",
+        actions: [
+          {
+            action: "release_dynamic_inventory",
+            payload: { sku: "pen", quantity: 2 },
+            registeredFlowId: "compensation_dynamic_inputs_e2e",
+            registeredFlowVersion: "1.0.0",
+            registeredRunId: result.runRecord.runId,
+            registeredNodeId: "register",
+          },
+        ],
+        registeredValue: true,
+        drainedValue: false,
+        clearedValue: false,
+      },
+    });
     expect(variables.get("ORDER_DYNAMIC_COMPENSATIONS")).toMatchObject({
       actions: [
         {

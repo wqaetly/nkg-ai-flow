@@ -114,6 +114,7 @@ export const compensationNode = defineNode({
     { id: "registeredValue", direction: "output", kind: "data", label: "Registered", schema: { type: "boolean" } },
     { id: "drainedValue", direction: "output", kind: "data", label: "Drained", schema: { type: "boolean" } },
     { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
     { id: "state", direction: "output", kind: "data", label: "State" },
   ],
   validateInput: false,
@@ -180,11 +181,45 @@ export const compensationNode = defineNode({
         registeredValue: status === "registered",
         drainedValue: status === "drained",
         clearedValue: status === "cleared",
+        summary: compensationSummary({
+          name,
+          mode,
+          status,
+          actions: result.actions,
+          state: result.state,
+        }),
         state: result.state,
       },
     };
   },
 });
+
+function compensationSummary(args: {
+  name: string;
+  mode: "register" | "drain" | "clear";
+  status: "registered" | "drained" | "cleared";
+  actions: CompensationAction[];
+  state: CompensationState;
+}): Record<string, unknown> {
+  const first = args.actions[0];
+  return {
+    name: args.name,
+    mode: args.mode,
+    status: args.status,
+    count: args.actions.length,
+    stackCount: args.state.actions.length,
+    updatedAt: new Date(args.state.updatedAt).toISOString(),
+    actionName: first?.action ?? "",
+    registeredFlowId: first?.registeredFlowId ?? "",
+    registeredFlowVersion: first?.registeredFlowVersion ?? "",
+    registeredRunId: first?.registeredRunId ?? "",
+    registeredNodeId: first?.registeredNodeId ?? "",
+    actions: args.actions,
+    registeredValue: args.status === "registered",
+    drainedValue: args.status === "drained",
+    clearedValue: args.status === "cleared",
+  };
+}
 
 function applyMode(
   previous: CompensationState,
