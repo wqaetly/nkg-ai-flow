@@ -142,6 +142,7 @@ export const cacheNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -288,6 +289,20 @@ function success(
     remainingMs: number;
   },
 ) {
+  const summary = {
+    namespace: values.namespace,
+    key: values.key,
+    storeKey: values.storeKey,
+    mode: values.mode,
+    branch,
+    ttlMs: values.ttlMs,
+    count: values.count,
+    hasValue: values.value !== null,
+    hasEntry: values.entry !== null,
+    hits: values.entry?.hits ?? 0,
+    expiresAt: values.expiresAt,
+    remainingMs: values.remainingMs,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -302,6 +317,7 @@ function success(
       count: values.count,
       expiresAt: values.expiresAt,
       remainingMs: values.remainingMs,
+      summary,
     },
   };
 }

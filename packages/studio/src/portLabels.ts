@@ -341,6 +341,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "数量",
         expiresAt: "过期时间",
         remainingMs: "剩余毫秒",
+        summary: "摘要",
       },
       code_synthesizer: {
         skill_def: "Skill 定义",

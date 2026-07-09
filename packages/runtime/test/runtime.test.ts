@@ -15646,6 +15646,26 @@ describe("runtime / hello-flow end-to-end", () => {
       value: { status: "ready", source: "http" },
       hits: 0,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/1",
+      storeKey: "CACHE:http:GET:/orders/1",
+      mode: "set",
+      branch: "stored",
+      ttlMs: 60_000,
+      count: 1,
+      hasValue: true,
+      hasEntry: true,
+      hits: 0,
+      expiresAt: expect.any(Number),
+      remainingMs: expect.any(Number),
+    });
   });
 
   it("stores cache entries with a dynamic namespace input", async () => {
@@ -15788,6 +15808,20 @@ describe("runtime / hello-flow end-to-end", () => {
       remainingMs: expect.any(Number),
       value: { status: "ready", source: "dynamic-policy" },
     });
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/dynamic-policy",
+      storeKey: "CACHE:http:GET:/orders/dynamic-policy",
+      mode: "set",
+      branch: "stored",
+      ttlMs: 120_000,
+      count: 1,
+      hasValue: true,
+      hasEntry: true,
+      hits: 0,
+      expiresAt: expect.any(Number),
+      remainingMs: expect.any(Number),
+    });
     expect(variables.get("CACHE:http:GET:/orders/dynamic-policy")).toMatchObject({
       value: { status: "ready", source: "dynamic-policy" },
       hits: 0,
@@ -15842,6 +15876,26 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.get("CACHE:http:GET:/orders/1")).toMatchObject({
       hits: 2,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/1",
+      storeKey: "CACHE:http:GET:/orders/1",
+      mode: "get",
+      branch: "hit",
+      ttlMs: 0,
+      count: 1,
+      hasValue: true,
+      hasEntry: true,
+      hits: 2,
+      expiresAt: expect.any(Number),
+      remainingMs: expect.any(Number),
+    });
   });
 
   it("routes missing cache entries to miss", async () => {
@@ -15881,6 +15935,26 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("miss:0");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/2",
+      storeKey: "CACHE:http:GET:/orders/2",
+      mode: "get",
+      branch: "miss",
+      ttlMs: 0,
+      count: 0,
+      hasValue: false,
+      hasEntry: false,
+      hits: 0,
+      expiresAt: null,
+      remainingMs: 0,
+    });
   });
 
   it("routes expired cache entries to expired and deletes them", async () => {
@@ -15928,6 +16002,26 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("expired:stale");
     expect(variables.has("CACHE:http:GET:/orders/1")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "GET:/orders/1",
+      storeKey: "CACHE:http:GET:/orders/1",
+      mode: "get",
+      branch: "expired",
+      ttlMs: 0,
+      count: 0,
+      hasValue: true,
+      hasEntry: true,
+      hits: 3,
+      expiresAt: expect.any(Number),
+      remainingMs: 0,
+    });
   });
 
   it("clears cache entries by namespace", async () => {
@@ -15991,6 +16085,26 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("CACHE:http:GET:/orders/1")).toBe(false);
     expect(variables.has("CACHE:http:GET:/orders/2")).toBe(false);
     expect(variables.has("CACHE:llm:summary")).toBe(true);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const cacheOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "cache") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(cacheOutput?.summary).toMatchObject({
+      namespace: "http",
+      key: "",
+      storeKey: "CACHE:http:",
+      mode: "clear",
+      branch: "cleared",
+      ttlMs: 0,
+      count: 2,
+      hasValue: false,
+      hasEntry: false,
+      hits: 0,
+      expiresAt: null,
+      remainingMs: 0,
+    });
   });
 
   it("saves a checkpoint snapshot for later recovery", async () => {
