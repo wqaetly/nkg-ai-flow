@@ -229,6 +229,7 @@ export const subflowTemplateNode = defineNode({
     { id: "failOnError", direction: "output", kind: "data", label: "Fail On Error", schema: { type: "boolean" } },
     { id: "localVariableCount", direction: "output", kind: "data", label: "Local Variable Count", schema: { type: "number" } },
     { id: "localScope", direction: "output", kind: "data", label: "Local Scope", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
     errorOut,
   ],
   validateInput: false,
@@ -287,6 +288,23 @@ export const subflowTemplateNode = defineNode({
           failOnError: policy.failOnError,
           localScope: false,
           localVariableCount: 0,
+          summary: subflowTemplateSummary({
+            status: "missing",
+            templateId,
+            flowId: "",
+            flowVersion: "",
+            runId: null,
+            childTraceId,
+            parentLocator,
+            subflowDepth,
+            childDepth: subflowDepth,
+            inputMode: policy.inputMode,
+            contractMode: policy.contractMode,
+            maxDepth: policy.maxDepth,
+            failOnError: policy.failOnError,
+            localScope: false,
+            localVariableCount: 0,
+          }),
         },
       };
     }
@@ -411,6 +429,23 @@ export const subflowTemplateNode = defineNode({
       localScope,
       localVariableCount: localVariables.length,
     };
+    outputs.summary = subflowTemplateSummary({
+      status,
+      templateId,
+      flowId: template.flowId,
+      flowVersion: result.runRecord.flowVersion,
+      runId: result.runRecord.runId,
+      childTraceId,
+      parentLocator,
+      subflowDepth,
+      childDepth,
+      inputMode: policy.inputMode,
+      contractMode: policy.contractMode,
+      maxDepth,
+      failOnError: policy.failOnError,
+      localScope,
+      localVariableCount: localVariables.length,
+    });
 
     if (status === "succeeded" || !policy.failOnError) {
       if (status === "succeeded") {
@@ -664,6 +699,25 @@ function contractFailure(args: {
         failOnError: args.policy.failOnError,
         localScope: args.localScope,
         localVariableCount: args.localVariableCount,
+        summary: subflowTemplateSummary({
+          status: "contract_failed",
+          templateId: args.templateId,
+          flowId: args.flowId,
+          flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
+          runId: args.runRecord?.runId ?? null,
+          childTraceId: args.childTraceId,
+          parentLocator: args.parentLocator,
+          subflowDepth: args.subflowDepth,
+          childDepth: args.childDepth,
+          inputMode: args.policy.inputMode,
+          contractMode: args.policy.contractMode,
+          maxDepth: args.policy.maxDepth,
+          failOnError: args.policy.failOnError,
+          localScope: args.localScope,
+          localVariableCount: args.localVariableCount,
+          contractStage: args.stage,
+          contractIssueCount: args.issues.length,
+        }),
       },
     };
   }
@@ -688,6 +742,51 @@ function childRunTiming(runRecord: SubflowInvokeResult["runRecord"] | null): {
       ? Math.max(0, finishedMs - startedMs)
       : null;
   return { childStartedAt, childFinishedAt, childDurationMs };
+}
+
+function subflowTemplateSummary(args: {
+  status: string;
+  templateId: string;
+  flowId: string;
+  flowVersion: string;
+  runId: string | null;
+  childTraceId: string;
+  parentLocator: {
+    parentFlowId: string;
+    parentFlowVersion: string;
+    parentRunId: string;
+    parentNodeId: string;
+  };
+  subflowDepth: number;
+  childDepth: number;
+  inputMode: string;
+  contractMode: string;
+  maxDepth: number;
+  failOnError: boolean;
+  localScope: boolean;
+  localVariableCount: number;
+  contractStage?: string;
+  contractIssueCount?: number;
+}): Record<string, unknown> {
+  return {
+    status: args.status,
+    templateId: args.templateId,
+    flowId: args.flowId,
+    flowVersion: args.flowVersion,
+    runId: args.runId,
+    childTraceId: args.childTraceId,
+    ...args.parentLocator,
+    subflowDepth: args.subflowDepth,
+    childDepth: args.childDepth,
+    inputMode: args.inputMode,
+    contractMode: args.contractMode,
+    maxDepth: args.maxDepth,
+    failOnError: args.failOnError,
+    localScope: args.localScope,
+    localVariableCount: args.localVariableCount,
+    contractStage: args.contractStage ?? "",
+    contractIssueCount: args.contractIssueCount ?? 0,
+  };
 }
 
 function readInputMode(
