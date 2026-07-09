@@ -19331,6 +19331,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("batches=0:a,b,1:c,d,2:e");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput).toMatchObject({
+      count: 3,
+      itemCount: 5,
+      hasPartial: true,
+      ranges: [
+        { index: 0, start: 0, end: 2, count: 2, partial: false },
+        { index: 1, start: 2, end: 4, count: 2, partial: false },
+        { index: 2, start: 4, end: 5, count: 1, partial: true },
+      ],
+    });
   });
 
   it("can drop partial batches with batch_items", async () => {
@@ -19373,6 +19389,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("count=2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput).toMatchObject({
+      count: 2,
+      itemCount: 5,
+      hasPartial: true,
+      ranges: [
+        { index: 0, start: 0, end: 2, count: 2, partial: false },
+        { index: 1, start: 2, end: 4, count: 2, partial: false },
+      ],
+    });
   });
 
   it("uses dynamic batch_items policy inputs", async () => {
@@ -19442,6 +19473,11 @@ describe("runtime / hello-flow end-to-end", () => {
       itemCount: 5,
       hasPartial: true,
       batches: [["a", "b"], ["c", "d"], ["e"]],
+      ranges: [
+        { index: 0, start: 0, end: 2, count: 2, partial: false },
+        { index: 1, start: 2, end: 4, count: 2, partial: false },
+        { index: 2, start: 4, end: 5, count: 1, partial: true },
+      ],
     });
   });
 

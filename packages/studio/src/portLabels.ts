@@ -269,6 +269,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         size: "批大小",
         includePartial: "包含不完整批次",
         batches: "批次列表",
+        ranges: "批次范围",
         count: "批次数量",
         itemCount: "项目数量",
         hasPartial: "存在不完整批次",

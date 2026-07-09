@@ -8,6 +8,14 @@
 import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
 
+interface BatchRange {
+  index: number;
+  start: number;
+  end: number;
+  count: number;
+  partial: boolean;
+}
+
 const batchItemsConfig = z
   .object({
     size: z
@@ -92,6 +100,13 @@ export const batchItemsNode = defineNode({
       schema: { type: "boolean" },
     },
     {
+      id: "ranges",
+      direction: "output",
+      kind: "data",
+      label: "Ranges",
+      schema: { type: "array" },
+    },
+    {
       id: "count",
       direction: "output",
       kind: "data",
@@ -123,11 +138,19 @@ export const batchItemsNode = defineNode({
     const size = readPositiveInteger(input.size, 0) ?? readPositiveInteger(config.size, 10) ?? 10;
     const includePartial = readBoolean(input.includePartial) ?? readBoolean(config.includePartial) ?? true;
     const batches: unknown[][] = [];
+    const ranges: BatchRange[] = [];
 
-    for (let index = 0; index < source.length; index += size) {
-      const batch = source.slice(index, index + size);
+    for (let start = 0; start < source.length; start += size) {
+      const batch = source.slice(start, start + size);
       if (batch.length === size || includePartial) {
         batches.push(batch);
+        ranges.push({
+          index: ranges.length,
+          start,
+          end: start + batch.length,
+          count: batch.length,
+          partial: batch.length < size,
+        });
       }
     }
 
@@ -149,6 +172,7 @@ export const batchItemsNode = defineNode({
         items: batches,
         size,
         includePartial,
+        ranges,
         count: batches.length,
         itemCount: source.length,
         hasPartial,
