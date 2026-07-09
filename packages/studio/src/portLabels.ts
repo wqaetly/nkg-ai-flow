@@ -389,6 +389,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         caseSensitive: "区分大小写",
         result: "结果",
         reason: "原因",
+        summary: "摘要",
       },
       concat_items: {
         items: "合并项",

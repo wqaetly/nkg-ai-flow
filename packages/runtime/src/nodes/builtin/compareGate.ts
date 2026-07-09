@@ -135,6 +135,7 @@ export const compareGateNode = defineNode({
     { id: "caseSensitive", direction: "output", kind: "data", label: "Case sensitive", schema: { type: "boolean" } },
     { id: "result", direction: "output", kind: "data", label: "Result", schema: { type: "boolean" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -154,12 +155,20 @@ export const compareGateNode = defineNode({
       caseSensitive,
     });
     const branch = result.matched ? "matched" : "unmatched";
-
-    ctx.log.debug("compare_gate selected branch", {
+    const summary = {
       branch,
+      left,
+      right,
       operator,
+      leftPath,
+      rightPath,
+      rightValue,
+      caseSensitive,
+      result: result.matched,
       reason: result.reason,
-    });
+    };
+
+    ctx.log.debug("compare_gate selected branch", summary);
 
     return {
       kind: "success",
@@ -174,6 +183,7 @@ export const compareGateNode = defineNode({
         caseSensitive,
         result: result.matched,
         reason: result.reason,
+        summary,
       },
     };
   },

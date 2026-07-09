@@ -1929,6 +1929,35 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("match:gte_matched");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const compareOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "compare") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(compareOutput).toMatchObject({
+      left: 125,
+      right: 100,
+      operator: "gte",
+      leftPath: "order.total",
+      rightPath: "",
+      rightValue: 100,
+      caseSensitive: true,
+      result: true,
+      reason: "gte_matched",
+      summary: {
+        branch: "matched",
+        left: 125,
+        right: 100,
+        operator: "gte",
+        leftPath: "order.total",
+        rightPath: "",
+        rightValue: 100,
+        caseSensitive: true,
+        result: true,
+        reason: "gte_matched",
+      },
+    });
   });
 
   it("routes compare_gate to unmatched for case-insensitive contains misses", async () => {
@@ -1973,6 +2002,35 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("miss:contains_unmatched");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const compareOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "compare") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(compareOutput).toMatchObject({
+      left: "Payment completed",
+      right: "failed",
+      operator: "contains",
+      leftPath: "message",
+      rightPath: "",
+      rightValue: "failed",
+      caseSensitive: false,
+      result: false,
+      reason: "contains_unmatched",
+      summary: {
+        branch: "unmatched",
+        left: "Payment completed",
+        right: "failed",
+        operator: "contains",
+        leftPath: "message",
+        rightPath: "",
+        rightValue: "failed",
+        caseSensitive: false,
+        result: false,
+        reason: "contains_unmatched",
+      },
+    });
   });
 
   it("uses dynamic compare_gate operator paths value and case policy ahead of static config", async () => {
@@ -2045,6 +2103,35 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("match:contains_matched");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const compareOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "compare") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(compareOutput).toMatchObject({
+      left: "Payment Completed",
+      right: "completed",
+      operator: "contains",
+      leftPath: "message",
+      rightPath: "",
+      rightValue: "completed",
+      caseSensitive: false,
+      result: true,
+      reason: "contains_matched",
+      summary: {
+        branch: "matched",
+        left: "Payment Completed",
+        right: "completed",
+        operator: "contains",
+        leftPath: "message",
+        rightPath: "",
+        rightValue: "completed",
+        caseSensitive: false,
+        result: true,
+        reason: "contains_matched",
+      },
+    });
   });
 
   it("uses dynamic compare_gate rightPath ahead of static config", async () => {
@@ -2102,6 +2189,33 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("match:gte_matched");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const compareOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "compare") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(compareOutput).toMatchObject({
+      left: 125,
+      right: 100,
+      operator: "gte",
+      leftPath: "order.total",
+      rightPath: "thresholds.min",
+      caseSensitive: true,
+      result: true,
+      reason: "gte_matched",
+      summary: {
+        branch: "matched",
+        left: 125,
+        right: 100,
+        operator: "gte",
+        leftPath: "order.total",
+        rightPath: "thresholds.min",
+        caseSensitive: true,
+        result: true,
+        reason: "gte_matched",
+      },
+    });
   });
 
   it("routes schema_guard to valid when the payload matches the schema", async () => {
