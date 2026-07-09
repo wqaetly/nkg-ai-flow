@@ -2113,6 +2113,18 @@ describe("runtime / hello-flow end-to-end", () => {
         { targetPath: "state", sourceExpr: "status", usedDefault: false, value: "active" },
         { targetPath: "kind", sourceExpr: "\"customer\"", usedDefault: false, value: "customer" },
       ],
+      summary: {
+        status: "transformed",
+        includeSource: false,
+        requireAll: false,
+        hasDefaultValue: false,
+        ruleCount: 4,
+        mappedCount: 4,
+        missingCount: 0,
+        mappedTargets: ["user.id", "user.name", "state", "kind"],
+        missingTargets: [],
+        defaultedTargets: [],
+      },
     });
   });
 
@@ -2176,6 +2188,18 @@ describe("runtime / hello-flow end-to-end", () => {
       missingMappings: [
         { targetPath: "user.email", sourceExpr: "email", reason: "source_missing" },
       ],
+      summary: {
+        status: "missing",
+        includeSource: false,
+        requireAll: true,
+        hasDefaultValue: false,
+        ruleCount: 2,
+        mappedCount: 1,
+        missingCount: 1,
+        mappedTargets: ["user.id"],
+        missingTargets: ["user.email"],
+        defaultedTargets: [],
+      },
     });
   });
 
@@ -2294,6 +2318,18 @@ describe("runtime / hello-flow end-to-end", () => {
           name: "Ada",
           email: "unknown",
         },
+      },
+      summary: {
+        status: "transformed",
+        includeSource: true,
+        requireAll: false,
+        hasDefaultValue: true,
+        ruleCount: 4,
+        mappedCount: 4,
+        missingCount: 0,
+        mappedTargets: ["user.id", "user.name", "user.email", "state"],
+        missingTargets: [],
+        defaultedTargets: ["user.email"],
       },
     });
   });

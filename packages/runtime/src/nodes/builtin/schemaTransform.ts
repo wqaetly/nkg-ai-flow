@@ -107,6 +107,7 @@ export const schemaTransformNode = defineNode({
     { id: "mappedCount", direction: "output", kind: "data", label: "Mapped count", schema: { type: "number" } },
     { id: "missingCount", direction: "output", kind: "data", label: "Missing count", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -149,6 +150,11 @@ export const schemaTransformNode = defineNode({
 
     const missingCount = missingMappings.length;
     const status = requireAll && missingCount > 0 ? "missing" : "transformed";
+    const mappedTargets = mappedMappings.map((mapping) => mapping.targetPath);
+    const missingTargets = missingMappings.map((mapping) => mapping.targetPath);
+    const defaultedTargets = mappedMappings
+      .filter((mapping) => mapping.usedDefault)
+      .map((mapping) => mapping.targetPath);
 
     ctx.log.debug("schema_transform mapped payload", {
       status,
@@ -168,11 +174,23 @@ export const schemaTransformNode = defineNode({
         hasDefaultValue,
         ruleCount: rules.length,
         mappedMappings,
-        mappedTargets: mappedMappings.map((mapping) => mapping.targetPath),
+        mappedTargets,
         missingMappings,
         mappedCount,
         missingCount,
         status,
+        summary: {
+          status,
+          includeSource,
+          requireAll,
+          hasDefaultValue,
+          ruleCount: rules.length,
+          mappedCount,
+          missingCount,
+          mappedTargets,
+          missingTargets,
+          defaultedTargets,
+        },
       },
     };
   },

@@ -1295,6 +1295,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         mappedCount: "映射数量",
         missingCount: "缺失数量",
         status: "状态",
+        summary: "摘要",
       },
       select_path: {
         value: "数据",
