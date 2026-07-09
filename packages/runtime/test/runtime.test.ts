@@ -7660,6 +7660,103 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("resets an open circuit_breaker to closed state", async () => {
+    const openedAt = Date.now() - 30_000;
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_RESET_CIRCUIT", {
+      status: "open",
+      failureCount: 4,
+      openedAt,
+      lastFailureAt: openedAt,
+      updatedAt: openedAt,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "circuit_breaker_reset_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const reset = flow.node("circuit_breaker", {
+      id: "reset",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_RESET_CIRCUIT",
+        failureThreshold: 5,
+        resetTimeoutMs: 60_000,
+        mode: "reset",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "circuit:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), reset.in("in"));
+    flow.connect(reset.out("closed"), report.in("in"));
+    flow.connect(reset.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "circuit_breaker_reset_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("circuit:closed");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resetOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "reset") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resetOutput).toMatchObject({
+      mode: "reset",
+      status: "closed",
+      previousStatus: "open",
+      statusChanged: true,
+      transitionReason: "reset",
+      failureCount: 0,
+      failureThreshold: 5,
+      remainingFailures: 5,
+      resetTimeoutMs: 60_000,
+      isOpen: false,
+      isHalfOpen: false,
+      isClosed: true,
+      canPass: true,
+      openedAt: "",
+      lastFailureAt: "",
+      summary: {
+        status: "closed",
+        previousStatus: "open",
+        statusChanged: true,
+        transitionReason: "reset",
+        mode: "reset",
+        name: "PAYMENT_RESET_CIRCUIT",
+        failureCount: 0,
+        failureThreshold: 5,
+        remainingFailures: 5,
+        resetTimeoutMs: 60_000,
+        isOpen: false,
+        isHalfOpen: false,
+        isClosed: true,
+        canPass: true,
+      },
+    });
+    expect(variables.get("PAYMENT_RESET_CIRCUIT")).toMatchObject({
+      status: "closed",
+      circuitFlowId: "circuit_breaker_reset_e2e",
+      circuitRunId: result.runRecord.runId,
+      circuitNodeId: "reset",
+      failureCount: 0,
+      openedAt: null,
+      lastFailureAt: null,
+    });
+  });
+
   it("routes expired open circuit_breaker state to half_open", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_CIRCUIT", {
