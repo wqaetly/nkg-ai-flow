@@ -12,6 +12,13 @@ import { controlIn } from "./_helpers.js";
 
 const MAX_BRANCHES = 4;
 
+interface ParallelBranchDescriptor {
+  id: string;
+  index: number;
+  number: number;
+  parallelNodeId: string;
+}
+
 const parallelConfig = z
   .object({
     branchCount: z
@@ -93,14 +100,48 @@ export const parallelNode = defineNode({
       label: "Branch IDs",
       schema: { type: "array", items: { type: "string" } },
     },
+    {
+      id: "branchIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Branch Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
+      id: "branchNumbers",
+      direction: "output",
+      kind: "data",
+      label: "Branch Numbers",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
+      id: "branches",
+      direction: "output",
+      kind: "data",
+      label: "Branches",
+    },
   ],
   validateInput: false,
-  run({ input, config }) {
+  run({ input, config, ctx }) {
     const branchCount = clampBranchCount(input.branchCount ?? config.branchCount);
     const concurrency = clampConcurrency(input.concurrency ?? config.concurrency, branchCount);
     const value = input.input ?? input.in ?? input.__runInput__ ?? null;
     const branchIds = Array.from({ length: branchCount }, (_, index) => `branch${index + 1}`);
-    const outputs: Record<string, unknown> = { value, branchCount, concurrency, branchIds };
+    const branches: ParallelBranchDescriptor[] = branchIds.map((id, index) => ({
+      id,
+      index,
+      number: index + 1,
+      parallelNodeId: ctx.nodeId,
+    }));
+    const outputs: Record<string, unknown> = {
+      value,
+      branchCount,
+      concurrency,
+      branchIds,
+      branchIndexes: branches.map((branch) => branch.index),
+      branchNumbers: branches.map((branch) => branch.number),
+      branches,
+    };
     for (let index = 1; index <= branchCount; index++) {
       outputs[`branch${index}`] = null;
     }

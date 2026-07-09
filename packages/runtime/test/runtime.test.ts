@@ -16036,6 +16036,12 @@ describe("runtime / hello-flow end-to-end", () => {
       branchCount: 2,
       concurrency: 2,
       branchIds: ["branch1", "branch2"],
+      branchIndexes: [0, 1],
+      branchNumbers: [1, 2],
+      branches: [
+        { id: "branch1", index: 0, number: 1, parallelNodeId: "fanout" },
+        { id: "branch2", index: 1, number: 2, parallelNodeId: "fanout" },
+      ],
     });
     expect(joinOutput).toMatchObject({
       status: "joined",

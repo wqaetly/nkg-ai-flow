@@ -893,6 +893,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         branchCount: "分支数量",
         concurrency: "并发上限",
         branchIds: "分支端口",
+        branchIndexes: "分支索引",
+        branchNumbers: "分支序号",
+        branches: "分支元数据",
       },
       parse_json: {
         text: "文本",
