@@ -32,10 +32,11 @@
 npx tsc --noEmit -p packages/runtime/tsconfig.json
 git diff --check
 npm test -w @ai-native-flow/runtime
+npm test
 npm run typecheck
 ```
 
-截至本收敛点，runtime 全量测试通过 `9` 个 test files、`447` 个 tests。`git diff --check` 只允许出现当前 Windows 工作区的 LF/CRLF 提示，不允许 whitespace error。
+截至本收敛点，runtime 全量测试通过 `9` 个 test files、`448` 个 tests；全仓测试通过 `42` 个 test files、`731` 个 tests。`git diff --check` 只允许出现当前 Windows 工作区的 LF/CRLF 提示，不允许 whitespace error。
 
 ## 后续只处理的缺口
 

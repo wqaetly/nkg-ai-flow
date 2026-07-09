@@ -107,12 +107,6 @@ export function buildSkillToFlowFlow(): FlowBuilder {
     label: "End",
     position: { x: 2750, y: 0 },
   });
-  start.addPort({
-    id: "runInput",
-    direction: "output",
-    kind: "data",
-    label: "Run Input",
-  });
 
   /* -- Pipeline nodes ----------------------------------------------------- */
 

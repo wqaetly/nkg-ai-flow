@@ -222,6 +222,7 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         name: "熔断状态名",
         failureThreshold: "失败阈值",
         resetTimeoutMs: "重置等待毫秒",
+        failureWindowMs: "失败统计窗口毫秒",
         mode: "模式",
       },
       compare_gate: {
@@ -306,6 +307,12 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         statusPath: "状态字段路径",
         successValues: "成功状态值",
         errorPath: "错误字段路径",
+      },
+      fail_fast: {
+        codePath: "错误码路径",
+        messagePath: "错误消息路径",
+        ignoredCodes: "忽略错误码",
+        failureCodes: "失败错误码",
       },
       group_items: {
         path: "分组字段路径",

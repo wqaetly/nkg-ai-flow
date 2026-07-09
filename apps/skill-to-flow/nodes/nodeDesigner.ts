@@ -25,6 +25,7 @@ import {
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
+  getBuiltinNodeDefinitions,
 } from "@ai-native-flow/runtime";
 import { z } from "zod";
 
@@ -59,25 +60,7 @@ const nodeDesignerConfig = z
   .passthrough();
 type NodeDesignerConfig = z.infer<typeof nodeDesignerConfig>;
 
-const RUNTIME_BUILTIN_NODE_TYPES = [
-  "start",
-  "end",
-  "transform",
-  "condition",
-  "http",
-  "tool",
-  "text_input",
-  "llm",
-  "agent",
-  "event_trigger",
-  "send_event",
-  "foreach_begin",
-  "foreach_end",
-  "for_begin",
-  "for_end",
-  "loop_begin",
-  "loop_end",
-] as const;
+const RUNTIME_BUILTIN_NODE_TYPES = getBuiltinNodeDefinitions().map((definition) => definition.type);
 
 /* -------------------------------------------------------------------------- */
 /* node                                                                       */

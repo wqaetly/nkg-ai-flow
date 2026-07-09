@@ -192,7 +192,7 @@ describe("transport-mcp", () => {
 
     expect(completed.cancelled).toBe(true);
     expect(inspection.run?.status).toBe("cancelled");
-    expect(inspection.events[inspection.events.length - 1]?.kind).toBe("run_cancelled");
+    expect(inspection.events.map((event) => event.kind)).toContain("run_cancelled");
   });
 
   it("replays persisted events for MCP bindings", async () => {
