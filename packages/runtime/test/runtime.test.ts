@@ -18166,6 +18166,15 @@ describe("runtime / hello-flow end-to-end", () => {
       total: 3,
       keptIndexes: [0, 2],
       rejectedIndexes: [1],
+      summary: {
+        status: "filtered",
+        condition: "item == \"keep\"",
+        count: 2,
+        rejectedCount: 1,
+        total: 3,
+        keptIndexes: [0, 2],
+        rejectedIndexes: [1],
+      },
     });
   });
 

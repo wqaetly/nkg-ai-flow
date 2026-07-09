@@ -645,6 +645,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "保留数量",
         rejectedCount: "剔除数量",
         total: "总数量",
+        summary: "摘要",
       },
       flatten_items: {
         items: "展平项",

@@ -92,6 +92,7 @@ export const filterItemsNode = defineNode({
       label: "Total",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -129,6 +130,15 @@ export const filterItemsNode = defineNode({
         count: kept.length,
         rejectedCount: rejected.length,
         total: source.length,
+        summary: {
+          status: "filtered",
+          condition,
+          count: kept.length,
+          rejectedCount: rejected.length,
+          total: source.length,
+          keptIndexes,
+          rejectedIndexes,
+        },
       },
     };
   },
