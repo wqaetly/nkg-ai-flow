@@ -658,6 +658,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         rolloutPercent: "灰度比例",
         description: "描述",
         evaluations: "评估次数",
+        summary: "摘要",
       },
       filter_items: {
         condition: "条件",

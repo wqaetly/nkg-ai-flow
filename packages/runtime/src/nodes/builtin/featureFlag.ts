@@ -129,6 +129,7 @@ export const featureFlagNode = defineNode({
       label: "Evaluations",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -209,6 +210,20 @@ function success(
   bucket: number | null,
   mode: FeatureFlagMode,
 ) {
+  const enabledValue = branch === "enabled" || (branch === "updated" && state.enabled);
+  const summary = {
+    name: state.name,
+    mode,
+    branch,
+    key,
+    enabledValue,
+    globalEnabled: state.enabled,
+    bucket,
+    rolloutPercent: state.rolloutPercent,
+    description: state.description,
+    evaluations: state.evaluations,
+    updatedAt: state.updatedAt,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -217,11 +232,12 @@ function success(
       name: state.name,
       mode,
       key,
-      enabledValue: branch === "enabled" || (branch === "updated" && state.enabled),
+      enabledValue,
       bucket,
       rolloutPercent: state.rolloutPercent,
       description: state.description,
       evaluations: state.evaluations,
+      summary,
     },
   };
 }

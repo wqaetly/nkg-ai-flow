@@ -12506,6 +12506,25 @@ describe("runtime / hello-flow end-to-end", () => {
       rolloutPercent: 25,
       description: "Checkout v2 gradual rollout",
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flagOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flag") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flagOutput?.summary).toMatchObject({
+      name: "CHECKOUT_V2",
+      mode: "set",
+      branch: "updated",
+      key: "",
+      enabledValue: true,
+      globalEnabled: true,
+      bucket: null,
+      rolloutPercent: 25,
+      description: "Checkout v2 gradual rollout",
+      evaluations: 0,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("sets a dynamically named feature_flag state", async () => {
@@ -12648,6 +12667,19 @@ describe("runtime / hello-flow end-to-end", () => {
       enabledValue: false,
       rolloutPercent: 35,
       description: "Dynamic checkout rollout",
+      summary: {
+        name: "CHECKOUT_DYNAMIC_POLICY",
+        mode: "set",
+        branch: "updated",
+        key: "",
+        enabledValue: false,
+        globalEnabled: false,
+        bucket: null,
+        rolloutPercent: 35,
+        description: "Dynamic checkout rollout",
+        evaluations: 0,
+        updatedAt: expect.any(Number),
+      },
     });
   });
 
@@ -12702,6 +12734,25 @@ describe("runtime / hello-flow end-to-end", () => {
       evaluations: 1,
       lastKey: "tenant-a",
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flagOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flag") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flagOutput?.summary).toMatchObject({
+      name: "CHECKOUT_V2",
+      mode: "evaluate",
+      branch: "enabled",
+      key: "tenant-a",
+      enabledValue: true,
+      globalEnabled: true,
+      bucket: expect.any(Number),
+      rolloutPercent: 100,
+      description: "all users",
+      evaluations: 1,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes zero-percent feature_flag rollouts to disabled", async () => {
@@ -12755,6 +12806,25 @@ describe("runtime / hello-flow end-to-end", () => {
       evaluations: 1,
       lastKey: "tenant-a",
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flagOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flag") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flagOutput?.summary).toMatchObject({
+      name: "CHECKOUT_V2",
+      mode: "evaluate",
+      branch: "disabled",
+      key: "tenant-a",
+      enabledValue: false,
+      globalEnabled: true,
+      bucket: expect.any(Number),
+      rolloutPercent: 0,
+      description: "disabled rollout",
+      evaluations: 1,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("clears feature_flag state", async () => {
@@ -12805,6 +12875,25 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("flag:0");
     expect(variables.has("CHECKOUT_V2")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flagOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flag") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flagOutput?.summary).toMatchObject({
+      name: "CHECKOUT_V2",
+      mode: "clear",
+      branch: "cleared",
+      key: "",
+      enabledValue: false,
+      globalEnabled: true,
+      bucket: null,
+      rolloutPercent: 100,
+      description: "",
+      evaluations: 0,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("invokes a registered child flow with subflow and returns its output", async () => {
