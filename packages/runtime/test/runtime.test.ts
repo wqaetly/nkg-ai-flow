@@ -5490,6 +5490,26 @@ describe("runtime / hello-flow end-to-end", () => {
       (variables.get("PAYMENT_API_LIMIT") as { timestamps?: unknown[] })
         .timestamps,
     ).toHaveLength(1);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const limitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "limit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(limitOutput?.summary).toMatchObject({
+      name: "PAYMENT_API_LIMIT",
+      branch: "allowed",
+      allowed: true,
+      limit: 2,
+      windowMs: 60_000,
+      cost: 1,
+      usedBefore: 0,
+      used: 1,
+      remaining: 1,
+      retryAfterMs: 0,
+      windowStart: expect.any(Number),
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes a dynamically named rate_limit to allowed", async () => {
@@ -5630,6 +5650,20 @@ describe("runtime / hello-flow end-to-end", () => {
       remaining: 0,
       retryAfterMs: 0,
     });
+    expect(limitOutput?.summary).toMatchObject({
+      name: "PAYMENT_DYNAMIC_POLICY_LIMIT",
+      branch: "allowed",
+      allowed: true,
+      limit: 3,
+      windowMs: 120_000,
+      cost: 2,
+      usedBefore: 1,
+      used: 3,
+      remaining: 0,
+      retryAfterMs: 0,
+      windowStart: expect.any(Number),
+      updatedAt: expect.any(Number),
+    });
     expect(variables.get("PAYMENT_DYNAMIC_POLICY_LIMIT")).toMatchObject({
       limit: 3,
       windowMs: 120_000,
@@ -5691,6 +5725,26 @@ describe("runtime / hello-flow end-to-end", () => {
     };
     expect(state.timestamps).toHaveLength(1);
     expect(state.updatedAt).toBeGreaterThan(0);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const limitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "limit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(limitOutput?.summary).toMatchObject({
+      name: "PAYMENT_API_LIMIT",
+      branch: "limited",
+      allowed: false,
+      limit: 1,
+      windowMs: 60_000,
+      cost: 1,
+      usedBefore: 1,
+      used: 1,
+      remaining: 0,
+      retryAfterMs: expect.any(Number),
+      windowStart: expect.any(Number),
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes mutex to acquired and records the lock owner", async () => {

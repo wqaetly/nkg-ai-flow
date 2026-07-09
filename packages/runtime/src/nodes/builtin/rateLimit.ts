@@ -99,6 +99,7 @@ export const rateLimitNode = defineNode({
       label: "Retry after ms",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -144,14 +145,21 @@ export const rateLimitNode = defineNode({
 
     store.set(name, toVariableValue(state), metadata(ctx.flowId));
     const branch = allowed ? "allowed" : "limited";
-    ctx.log.debug("rate_limit selected branch", {
+    const summary = {
       name,
       branch,
+      allowed,
       limit,
+      windowMs,
+      cost,
+      usedBefore,
       used,
       remaining,
       retryAfterMs,
-    });
+      windowStart: state.windowStart,
+      updatedAt: state.updatedAt,
+    };
+    ctx.log.debug("rate_limit selected branch", summary);
 
     return {
       kind: "success",
@@ -165,6 +173,7 @@ export const rateLimitNode = defineNode({
         remaining,
         used,
         retryAfterMs,
+        summary,
       },
     };
   },

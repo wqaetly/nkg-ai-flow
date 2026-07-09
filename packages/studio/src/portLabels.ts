@@ -1109,6 +1109,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         remaining: "剩余额度",
         used: "已用额度",
         retryAfterMs: "重试等待毫秒",
+        summary: "摘要",
       },
       reduce_items: {
         items: "数组",
