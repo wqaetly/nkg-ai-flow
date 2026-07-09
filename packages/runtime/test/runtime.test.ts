@@ -7125,6 +7125,98 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("force releases all semaphore holders", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("FILE_FORCE_WORKER_POOL", {
+      capacity: 3,
+      holders: [
+        {
+          owner: "worker-1",
+          acquiredAt: now,
+          expiresAt: now + 60_000,
+          updatedAt: now,
+        },
+        {
+          owner: "worker-2",
+          acquiredAt: now,
+          expiresAt: now + 60_000,
+          updatedAt: now,
+        },
+      ],
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "semaphore_force_release_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const gate = flow.node("semaphore", {
+      id: "gate",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "FILE_FORCE_WORKER_POOL",
+        owner: "admin",
+        capacity: 3,
+        mode: "force_release",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "available:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), gate.in("in"));
+    flow.connect(gate.out("released"), report.in("in"));
+    flow.connect(gate.out("available"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "semaphore_force_release_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("available:3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "FILE_FORCE_WORKER_POOL",
+      owner: "admin",
+      capacity: 3,
+      used: 0,
+      available: 3,
+      mode: "force_release",
+      remainingMs: 0,
+      summary: {
+        name: "FILE_FORCE_WORKER_POOL",
+        mode: "force_release",
+        branch: "released",
+        owner: "admin",
+        capacity: 3,
+        used: 0,
+        available: 3,
+        ttlMs: 300_000,
+        remainingMs: 0,
+        holderOwners: [],
+        updatedAt: expect.any(Number),
+      },
+    });
+    expect(variables.get("FILE_FORCE_WORKER_POOL")).toMatchObject({
+      capacity: 3,
+      holders: [],
+    });
+  });
+
   it("routes idempotency_key to started for a new business key", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
