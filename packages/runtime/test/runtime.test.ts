@@ -7405,6 +7405,30 @@ describe("runtime / hello-flow end-to-end", () => {
       readyValue: false,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_RESUME_POINT",
+        mode: "mark",
+        status: "marked",
+        stateStatus: "ready",
+        targetNodeId: "charge_payment",
+        snapshot: { orderId: "order-1", step: "charge_payment" },
+        reason: "payment timeout",
+        sourceFlowId: "resume_point_mark_e2e",
+        sourceRunId: marked.runRecord.runId,
+        sourceNodeId: "mark",
+        version: 1,
+        markedAt: expect.any(String),
+        loadedAt: "",
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: true,
+        markedValue: true,
+        readyValue: false,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
       status: "ready",
@@ -7448,6 +7472,30 @@ describe("runtime / hello-flow end-to-end", () => {
       readyValue: true,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_RESUME_POINT",
+        mode: "load",
+        status: "ready",
+        stateStatus: "ready",
+        targetNodeId: "charge_payment",
+        snapshot: { orderId: "order-1", step: "charge_payment" },
+        reason: "payment timeout",
+        sourceFlowId: "resume_point_mark_e2e",
+        sourceRunId: marked.runRecord.runId,
+        sourceNodeId: "mark",
+        version: 1,
+        markedAt: expect.any(String),
+        loadedAt: expect.any(String),
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: true,
+        markedValue: false,
+        readyValue: true,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
   });
 
@@ -7756,6 +7804,30 @@ describe("runtime / hello-flow end-to-end", () => {
       readyValue: false,
       missingValue: true,
       expiredValue: false,
+      summary: {
+        name: "MISSING_RESUME_POINT",
+        mode: "load",
+        status: "missing",
+        stateStatus: "",
+        targetNodeId: "",
+        snapshot: null,
+        reason: "",
+        sourceFlowId: "",
+        sourceRunId: "",
+        sourceNodeId: "",
+        version: 0,
+        markedAt: "",
+        loadedAt: "",
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: false,
+        markedValue: false,
+        readyValue: false,
+        missingValue: true,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
   });
 
@@ -7809,6 +7881,49 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("resume:expired");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const loadOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "load") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(loadOutput).toMatchObject({
+      status: "expired",
+      stateStatus: "expired",
+      name: "ORDER_RESUME_POINT",
+      targetNodeId: "charge_payment",
+      snapshot: { orderId: "order-1" },
+      reason: "payment timeout",
+      sourceRunId: "run_1",
+      version: 1,
+      remainingMs: 0,
+      stateExists: true,
+      expiredValue: true,
+      summary: {
+        name: "ORDER_RESUME_POINT",
+        mode: "load",
+        status: "expired",
+        stateStatus: "expired",
+        targetNodeId: "charge_payment",
+        snapshot: { orderId: "order-1" },
+        reason: "payment timeout",
+        sourceFlowId: "",
+        sourceRunId: "run_1",
+        sourceNodeId: "",
+        version: 1,
+        markedAt: expect.any(String),
+        loadedAt: "",
+        expiresAt: expect.any(String),
+        ttlMs: expect.any(Number),
+        remainingMs: 0,
+        stateExists: true,
+        markedValue: false,
+        readyValue: false,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: true,
+      },
+    });
     expect(variables.get("ORDER_RESUME_POINT")).toMatchObject({
       status: "expired",
       targetNodeId: "charge_payment",

@@ -155,6 +155,7 @@ export const resumePointNode = defineNode({
     { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
     { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
     { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -249,10 +250,58 @@ export const resumePointNode = defineNode({
         missingValue: decision.branch === "missing",
         clearedValue: decision.branch === "cleared",
         expiredValue: decision.branch === "expired",
+        summary: resumePointSummary({
+          state,
+          name,
+          mode,
+          status: decision.branch,
+          markedAt,
+          loadedAt,
+          expiresAt,
+          ttlMs: ttlValue,
+          remainingMs,
+        }),
       },
     };
   },
 });
+
+function resumePointSummary(args: {
+  state: ResumePointState | null;
+  name: string;
+  mode: ResumePointMode;
+  status: ResumePointBranch;
+  markedAt: string;
+  loadedAt: string;
+  expiresAt: string;
+  ttlMs: number;
+  remainingMs: number;
+}): Record<string, unknown> {
+  return {
+    name: args.state?.name ?? args.name,
+    mode: args.mode,
+    status: args.status,
+    stateStatus: args.state?.status ?? "",
+    targetNodeId: args.state?.targetNodeId ?? "",
+    snapshot: args.state?.snapshot ?? null,
+    reason: args.state?.reason ?? "",
+    sourceFlowId: args.state?.sourceFlowId ?? "",
+    sourceRunId: args.state?.sourceRunId ?? "",
+    sourceNodeId: args.state?.sourceNodeId ?? "",
+    version: args.state?.version ?? 0,
+    markedAt: args.markedAt,
+    loadedAt: args.loadedAt,
+    expiresAt: args.expiresAt,
+    ttlMs: args.ttlMs,
+    remainingMs: args.remainingMs,
+    stateExists: args.state !== null,
+    markedValue: args.status === "marked",
+    readyValue: args.status === "ready",
+    missingValue: args.status === "missing",
+    clearedValue: args.status === "cleared",
+    expiredValue: args.status === "expired",
+  };
+}
 
 function applyMode(
   previous: ResumePointState | null,
