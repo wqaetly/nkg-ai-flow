@@ -24557,6 +24557,23 @@ describe("runtime / string event triggers", () => {
     });
 
     expect(senderResult.succeeded).toBe(true);
+    const senderEvents = await rt.eventBus.store.read(senderResult.runRecord.runId);
+    const sendOutput = (
+      senderEvents.find((event) => event.kind === "node_finished" && event.nodeId === "send_order_created") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sendOutput).toMatchObject({
+      event: "order.created",
+      triggeredRuns: 1,
+      source: "config",
+      summary: {
+        event: "order.created",
+        configuredEvent: "order.created",
+        source: "config",
+        triggeredRuns: 1,
+      },
+    });
     const receiverRuns = await rt.runStore.listByFlow("event_receiver");
     expect(receiverRuns).toHaveLength(1);
     const receiverRun = receiverRuns[0];

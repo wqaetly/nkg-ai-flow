@@ -50,16 +50,21 @@ export const sendEventNode = defineNode({
       label: "Triggered Runs",
       schema: { type: "number" },
     },
+    {
+      id: "source",
+      direction: "output",
+      kind: "data",
+      label: "Source",
+      schema: { type: "string" },
+    },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   async run({ input, config, ctx }) {
     const raw = input as Record<string, unknown>;
-    const event =
-      typeof raw.event === "string" && raw.event.length > 0
-        ? raw.event
-        : typeof config.event === "string"
-          ? config.event
-          : "";
+    const configuredEvent = typeof config.event === "string" ? config.event : "";
+    const source = typeof raw.event === "string" && raw.event.length > 0 ? "input" : "config";
+    const event = source === "input" ? String(raw.event) : configuredEvent;
 
     if (event.length === 0) {
       return {
@@ -78,7 +83,18 @@ export const sendEventNode = defineNode({
     const triggeredRuns = Array.isArray(triggered) ? triggered.length : 0;
     return {
       kind: "success",
-      outputs: { out: null, event, triggeredRuns },
+      outputs: {
+        out: null,
+        event,
+        triggeredRuns,
+        source,
+        summary: {
+          event,
+          configuredEvent,
+          source,
+          triggeredRuns,
+        },
+      },
     };
   },
 });

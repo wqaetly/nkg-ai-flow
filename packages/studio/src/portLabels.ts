@@ -1502,8 +1502,12 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         plan: "执行计划",
       },
       send_event: {
+        in: "输入",
+        out: "下一步",
         event: "事件",
         triggeredRuns: "触发运行数",
+        source: "来源",
+        summary: "摘要",
       },
       signal_resume: {
         in: "输入",
