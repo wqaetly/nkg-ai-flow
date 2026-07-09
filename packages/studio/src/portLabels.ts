@@ -817,6 +817,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       http: {
         response: "响应",
+        summary: "摘要",
       },
       idempotency_key: {
         in: "输入",

@@ -5,6 +5,7 @@
  */
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -386,6 +387,66 @@ describe("runtime / hello-flow end-to-end", () => {
       });
     } finally {
       await rm(tmp, { recursive: true, force: true });
+    }
+  });
+
+  it("calls a local HTTP endpoint and exposes a response summary", async () => {
+    const server = createServer((_req, res) => {
+      res.setHeader("content-type", "application/json");
+      res.end(JSON.stringify({ ok: true, source: "local-http" }));
+    });
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+    try {
+      const address = server.address();
+      if (!address || typeof address === "string") throw new Error("HTTP test server did not bind to a TCP port.");
+      const rt = newRuntime();
+      const flow = defineFlow({ id: "http_success_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+      const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+      const http = flow.node("http", {
+        id: "http",
+        position: { x: 120, y: 0 },
+        config: { url: `http://127.0.0.1:${address.port}/status`, method: "GET" },
+      });
+      const report = flow.node("transform", {
+        id: "report",
+        position: { x: 260, y: 0 },
+        config: { template: "http=${input.status}:${input.body.source}" },
+      });
+      const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+      flow.connect(start.out("out"), http.in("in"));
+      flow.connect(http.out("out"), report.in("in"));
+      flow.connect(http.out("response"), report.in("input"));
+      flow.connect(report.out("out"), end.in("in"));
+
+      await registerAndPromote(rt, flow);
+
+      const result = await rt.invocationRouter.invoke({
+        flowId: "http_success_e2e",
+        input: null,
+      });
+
+      expect(result.succeeded).toBe(true);
+      expect(result.output).toBe("http=200:local-http");
+      const events = await rt.eventBus.store.read(result.runRecord.runId);
+      const httpOutput = (
+        events.find((event) => event.kind === "node_finished" && event.nodeId === "http") as
+          | { payload?: { output?: Record<string, unknown> } }
+          | undefined
+      )?.payload?.output;
+      expect(httpOutput?.summary).toMatchObject({
+        method: "GET",
+        status: 200,
+        ok: true,
+        bodyType: "object",
+        headerCount: expect.any(Number),
+        timeoutMs: 30000,
+      });
+      expect(String((httpOutput?.summary as { url?: unknown } | undefined)?.url)).toContain("/status");
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        server.close((error) => (error ? reject(error) : resolve()));
+      });
     }
   });
 

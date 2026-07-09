@@ -58,6 +58,7 @@ export const httpNode = defineNode({
       label: "Response",
       schema: { type: "object" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   async run({ input, config, ctx }) {
@@ -110,15 +111,26 @@ export const httpNode = defineNode({
       } catch {
         /* keep as text */
       }
+      const responseHeaders = Object.fromEntries(res.headers.entries());
+      const summary = {
+        url,
+        method,
+        status: res.status,
+        ok: res.ok,
+        bodyType: valueType(parsed),
+        headerCount: Object.keys(responseHeaders).length,
+        timeoutMs,
+      };
       return {
         kind: "success",
         outputs: {
           out: null,
           response: {
             status: res.status,
-            headers: Object.fromEntries(res.headers.entries()),
+            headers: responseHeaders,
             body: parsed,
           },
+          summary,
         },
       };
     } catch (cause) {
@@ -139,3 +151,10 @@ export const httpNode = defineNode({
     }
   },
 });
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  if (value === undefined) return "undefined";
+  return typeof value;
+}
