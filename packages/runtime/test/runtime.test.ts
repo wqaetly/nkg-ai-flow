@@ -25979,6 +25979,247 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("skips the current for item when loop_continue runs inside the body", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "for_continue_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const begin = flow.node("for_begin", {
+      id: "begin",
+      position: { x: 120, y: 0 },
+      config: { start: 0, end: 4, step: 1 },
+    });
+    const shouldSkip = flow.node("condition", {
+      id: "should_skip",
+      position: { x: 260, y: 0 },
+      config: { expression: "input == 2" },
+    });
+    const continuer = flow.node("loop_continue", {
+      id: "continue",
+      position: { x: 400, y: -80 },
+      config: { reason: "skip_two" },
+    });
+    const emit = flow.node("transform", {
+      id: "emit",
+      position: { x: 400, y: 80 },
+      config: { template: "i=${input}" },
+    });
+    const loopEnd = flow.node("for_end", {
+      id: "loop_end",
+      position: { x: 540, y: 80 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 680, y: 0 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 820, y: 0 } });
+
+    flow.connect(start.out("out"), begin.in("in"));
+    flow.connect(begin.out("body"), shouldSkip.in("in"));
+    flow.connect(begin.out("index"), shouldSkip.in("input"));
+    flow.connect(begin.out("iterationId"), continuer.in("iterationId"));
+    flow.connect(begin.out("iterationKey"), continuer.in("iterationKey"));
+    flow.connect(begin.out("iterationSequence"), continuer.in("iterationSequence"));
+    flow.connect(shouldSkip.out("true"), continuer.in("in"));
+    flow.connect(shouldSkip.out("false"), emit.in("in"));
+    flow.connect(begin.out("index"), emit.in("input"));
+    flow.connect(emit.out("out"), loopEnd.in("body_done"));
+    flow.connect(emit.out("output"), loopEnd.in("result"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "for_continue_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const loopOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "loop_end") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    const continueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "continue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=i=0,i=1,i=3");
+    expect(continueOutput).toMatchObject({
+      status: "continue",
+      reason: "skip_two",
+      iterationId: "begin:2",
+      iterationKey: "for_begin:begin:2",
+      iterationSequence: 2,
+      summary: {
+        status: "continue",
+        reason: "skip_two",
+        iterationId: "begin:2",
+        iterationKey: "for_begin:begin:2",
+        iterationSequence: 2,
+      },
+    });
+    expect(loopOutput).toMatchObject({
+      status: "done",
+      iterationCount: 4,
+      iterationIds: ["begin:0", "begin:1", "begin:2", "begin:3"],
+      iterationKeys: [
+        "for_begin:begin:0",
+        "for_begin:begin:1",
+        "for_begin:begin:2",
+        "for_begin:begin:3",
+      ],
+      iterationSequences: [0, 1, 2, 3],
+    });
+    expect(progress[5]?.payload).toMatchObject({
+      iteration: 2,
+      status: "continue",
+      controlReason: "skip_two",
+    });
+  });
+
+  it("stops a loop_begin block when loop_break runs inside the body", async () => {
+    const stepNode = defineNode({
+      type: "loop_break_step",
+      typeVersion: "1.0.0",
+      title: "Loop Break Step",
+      ports: [
+        { id: "state", direction: "input", kind: "data", label: "State" },
+        { id: "nextState", direction: "output", kind: "data", label: "Next State" },
+      ],
+      validateInput: false,
+      run({ input }) {
+        const state =
+          input.state && typeof input.state === "object"
+            ? (input.state as Record<string, unknown>)
+            : {};
+        const step = Number(state.step ?? 0) + 1;
+        return {
+          kind: "success",
+          outputs: {
+            out: null,
+            nextState: {
+              continue: true,
+              label: `step-${step}`,
+              step,
+            },
+          },
+        };
+      },
+    });
+    const rt = newRuntime({ nodes: [stepNode] });
+    const flow = defineFlow({
+      id: "loop_break_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const initial = flow.node("transform", {
+      id: "initial",
+      position: { x: 120, y: 0 },
+      config: { value: { continue: true, label: "initial", step: 0 } },
+    });
+    const begin = flow.node("loop_begin", {
+      id: "begin",
+      position: { x: 260, y: 0 },
+      config: { checkMode: "after", maxIterations: 5 },
+    });
+    const step = flow.node("loop_break_step", {
+      id: "step",
+      position: { x: 400, y: 0 },
+    });
+    const shouldBreak = flow.node("condition", {
+      id: "should_break",
+      position: { x: 540, y: 0 },
+      config: { expression: "input.step == 2" },
+    });
+    const breaker = flow.node("loop_break", {
+      id: "break",
+      position: { x: 680, y: -80 },
+      config: { reason: "stop_at_second_step" },
+    });
+    const loopEnd = flow.node("loop_end", {
+      id: "loop_end",
+      position: { x: 820, y: 0 },
+      config: { condition: "nextState.continue == true" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 960, y: 0 },
+      config: { template: "break=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 1100, y: 0 } });
+
+    flow.connect(start.out("out"), initial.in("in"));
+    flow.connect(initial.out("out"), begin.in("in"));
+    flow.connect(initial.out("output"), begin.in("initialState"));
+    flow.connect(begin.out("body"), step.in("in"));
+    flow.connect(begin.out("state"), step.in("state"));
+    flow.connect(begin.out("iterationId"), breaker.in("iterationId"));
+    flow.connect(begin.out("iterationKey"), breaker.in("iterationKey"));
+    flow.connect(begin.out("iterationSequence"), breaker.in("iterationSequence"));
+    flow.connect(step.out("out"), shouldBreak.in("in"));
+    flow.connect(step.out("nextState"), shouldBreak.in("input"));
+    flow.connect(step.out("nextState"), loopEnd.in("nextState"));
+    flow.connect(shouldBreak.out("true"), breaker.in("in"));
+    flow.connect(shouldBreak.out("false"), loopEnd.in("body_done"));
+    flow.connect(loopEnd.out("done"), report.in("in"));
+    flow.connect(loopEnd.out("controlReason"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "loop_break_e2e",
+      input: null,
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const breakOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "break") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("break=stop_at_second_step");
+    expect(breakOutput).toMatchObject({
+      status: "break",
+      reason: "stop_at_second_step",
+      iterationId: "begin:1",
+      iterationKey: "loop_begin:begin:1",
+      iterationSequence: 1,
+      summary: {
+        status: "break",
+        reason: "stop_at_second_step",
+        iterationId: "begin:1",
+        iterationKey: "loop_begin:begin:1",
+        iterationSequence: 1,
+      },
+    });
+    expect(progress.at(-1)?.payload).toMatchObject({
+      iteration: 1,
+      status: "break",
+      controlReason: "stop_at_second_step",
+    });
+    expect(
+      events.filter((event) => event.kind === "node_started" && event.nodeId === "step"),
+    ).toHaveLength(2);
+  });
+
   it("executes nested foreach blocks independently", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
