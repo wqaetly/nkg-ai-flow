@@ -198,6 +198,17 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("input=Flow:3");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const startOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "s") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(startOutput?.summary).toMatchObject({
+      inputType: "object",
+      isNull: false,
+      keyCount: 2,
+    });
   });
 
   it("propagates traceId onto persisted run, node, and node-channel events", async () => {

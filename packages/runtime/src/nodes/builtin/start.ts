@@ -24,13 +24,31 @@ export const startNode = defineNode({
       kind: "data",
       label: "Run input",
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input }) {
     const raw = input as Record<string, unknown>;
+    const runInput = raw.runInput ?? null;
+    const summary = {
+      inputType: valueType(runInput),
+      isNull: runInput === null,
+      keyCount: keyCount(runInput),
+    };
     return {
       kind: "success",
-      outputs: { out: null, runInput: raw.runInput ?? null },
+      outputs: { out: null, runInput, summary },
     };
   },
 });
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === null) return "null";
+  return typeof value;
+}
+
+function keyCount(value: unknown): number {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 0;
+  return Object.keys(value).length;
+}
