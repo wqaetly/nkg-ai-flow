@@ -20,6 +20,10 @@ interface CompensationAction {
   action: string;
   payload: VariableValue;
   registeredAt: number;
+  registeredFlowId: string;
+  registeredFlowVersion: string;
+  registeredRunId: string;
+  registeredNodeId: string;
 }
 
 interface CompensationState {
@@ -103,6 +107,10 @@ export const compensationNode = defineNode({
       schema: { type: "number" },
     },
     { id: "updatedAt", direction: "output", kind: "data", label: "Updated At", schema: { type: "string" } },
+    { id: "registeredFlowId", direction: "output", kind: "data", label: "Registered Flow Id", schema: { type: "string" } },
+    { id: "registeredFlowVersion", direction: "output", kind: "data", label: "Registered Flow Version", schema: { type: "string" } },
+    { id: "registeredRunId", direction: "output", kind: "data", label: "Registered Run Id", schema: { type: "string" } },
+    { id: "registeredNodeId", direction: "output", kind: "data", label: "Registered Node Id", schema: { type: "string" } },
     { id: "registeredValue", direction: "output", kind: "data", label: "Registered", schema: { type: "boolean" } },
     { id: "drainedValue", direction: "output", kind: "data", label: "Drained", schema: { type: "boolean" } },
     { id: "clearedValue", direction: "output", kind: "data", label: "Cleared", schema: { type: "boolean" } },
@@ -136,6 +144,9 @@ export const compensationNode = defineNode({
       action: String(input.action ?? config.action ?? "").trim(),
       payload: input.payload ?? config.payload ?? input.input ?? null,
       now,
+      flowId: ctx.flowId,
+      flowVersion: ctx.flowVersion,
+      runId: ctx.runId,
       nodeId: ctx.nodeId,
     });
     if (result.kind === "error") return result;
@@ -162,6 +173,10 @@ export const compensationNode = defineNode({
         count: result.actions.length,
         stackCount: result.state.actions.length,
         updatedAt: new Date(result.state.updatedAt).toISOString(),
+        registeredFlowId: result.actions[0]?.registeredFlowId ?? "",
+        registeredFlowVersion: result.actions[0]?.registeredFlowVersion ?? "",
+        registeredRunId: result.actions[0]?.registeredRunId ?? "",
+        registeredNodeId: result.actions[0]?.registeredNodeId ?? "",
         registeredValue: status === "registered",
         drainedValue: status === "drained",
         clearedValue: status === "cleared",
@@ -178,12 +193,15 @@ function applyMode(
     action: string;
     payload: unknown;
     now: number;
+    flowId: string;
+    flowVersion: string;
+    runId: string;
     nodeId: string;
   },
 ):
   | { kind: "success"; state: CompensationState; actions: CompensationAction[] }
   | ReturnType<typeof error> {
-  const { mode, action, payload, now, nodeId } = options;
+  const { mode, action, payload, now, flowId, flowVersion, runId, nodeId } = options;
   if (mode === "clear") {
     return { kind: "success", state: emptyState(now), actions: [] };
   }
@@ -214,6 +232,10 @@ function applyMode(
     action,
     payload: converted,
     registeredAt: now,
+    registeredFlowId: flowId,
+    registeredFlowVersion: flowVersion,
+    registeredRunId: runId,
+    registeredNodeId: nodeId,
   };
   const state = {
     actions: [...previous.actions, nextAction],
@@ -264,6 +286,11 @@ function readAction(value: unknown): CompensationAction | undefined {
     action: record.action,
     payload,
     registeredAt: record.registeredAt,
+    registeredFlowId: typeof record.registeredFlowId === "string" ? record.registeredFlowId : "",
+    registeredFlowVersion:
+      typeof record.registeredFlowVersion === "string" ? record.registeredFlowVersion : "",
+    registeredRunId: typeof record.registeredRunId === "string" ? record.registeredRunId : "",
+    registeredNodeId: typeof record.registeredNodeId === "string" ? record.registeredNodeId : "",
   };
 }
 
@@ -316,6 +343,10 @@ function toVariableValue(state: CompensationState): VariableValue {
       action: action.action,
       payload: action.payload,
       registeredAt: action.registeredAt,
+      registeredFlowId: action.registeredFlowId,
+      registeredFlowVersion: action.registeredFlowVersion,
+      registeredRunId: action.registeredRunId,
+      registeredNodeId: action.registeredNodeId,
     })),
     updatedAt: state.updatedAt,
   };

@@ -6451,6 +6451,26 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 2,
       stackCount: 0,
       updatedAt: expect.any(String),
+      registeredFlowId: "compensation_e2e",
+      registeredFlowVersion: "1.0.0",
+      registeredRunId: result.runRecord.runId,
+      registeredNodeId: "second",
+      actions: [
+        {
+          action: "refund_payment",
+          registeredFlowId: "compensation_e2e",
+          registeredFlowVersion: "1.0.0",
+          registeredRunId: result.runRecord.runId,
+          registeredNodeId: "second",
+        },
+        {
+          action: "release_inventory",
+          registeredFlowId: "compensation_e2e",
+          registeredFlowVersion: "1.0.0",
+          registeredRunId: result.runRecord.runId,
+          registeredNodeId: "first",
+        },
+      ],
       registeredValue: false,
       drainedValue: true,
       clearedValue: false,
@@ -6516,6 +6536,10 @@ describe("runtime / hello-flow end-to-end", () => {
         {
           action: "release_dynamic_inventory",
           payload: { sku: "pen", quantity: 2 },
+          registeredFlowId: "compensation_dynamic_inputs_e2e",
+          registeredFlowVersion: "1.0.0",
+          registeredRunId: result.runRecord.runId,
+          registeredNodeId: "register",
         },
       ],
     });
