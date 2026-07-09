@@ -1584,6 +1584,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         receivedValue: "是否收到",
         waitingValue: "是否等待中",
         expiredValue: "是否过期",
+        summary: "摘要",
       },
       wait_timer: {
         in: "输入",

@@ -104,6 +104,7 @@ export const waitSignalNode = defineNode({
     { id: "receivedValue", direction: "output", kind: "data", label: "Received", schema: { type: "boolean" } },
     { id: "waitingValue", direction: "output", kind: "data", label: "Waiting", schema: { type: "boolean" } },
     { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -168,6 +169,14 @@ export const waitSignalNode = defineNode({
         receivedValue: next.status === "received",
         waitingValue: next.status === "waiting",
         expiredValue: next.status === "expired",
+        summary: waitSignalSummary({
+          name,
+          state: next,
+          requestedAtIso,
+          expiresAtIso,
+          timeoutMs: effectiveTimeoutMs,
+          remainingMs,
+        }),
       },
     };
   },
@@ -264,6 +273,32 @@ function readStatus(value: unknown): WaitStatus {
   return value === "received" || value === "expired" || value === "waiting"
     ? value
     : "waiting";
+}
+
+function waitSignalSummary(args: {
+  name: string;
+  state: WaitSignalState;
+  requestedAtIso: string;
+  expiresAtIso: string;
+  timeoutMs: number;
+  remainingMs: number;
+}): Record<string, unknown> {
+  return {
+    name: args.name,
+    status: args.state.status,
+    signal: args.state.signal,
+    expected: args.state.expected,
+    waitFlowId: args.state.waitFlowId,
+    waitRunId: args.state.waitRunId,
+    waitNodeId: args.state.waitNodeId,
+    requestedAt: args.requestedAtIso,
+    expiresAt: args.expiresAtIso,
+    timeoutMs: args.timeoutMs,
+    remainingMs: args.remainingMs,
+    receivedValue: args.state.status === "received",
+    waitingValue: args.state.status === "waiting",
+    expiredValue: args.state.status === "expired",
+  };
 }
 
 function readTimestamp(value: unknown): number | undefined {
