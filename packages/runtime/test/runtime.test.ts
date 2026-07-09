@@ -16516,6 +16516,18 @@ describe("runtime / hello-flow end-to-end", () => {
       indexedValues: [{ index: 0, value: "fast", present: true }],
       presentIndexes: [0],
       absentIndexes: [],
+      summary: {
+        status: "winner",
+        hasWinner: true,
+        emptyValue: false,
+        winnerIndex: 0,
+        index: 0,
+        count: 1,
+        presentCount: 1,
+        presentIndexes: [0],
+        absentIndexes: [],
+        value: "fast",
+      },
     });
   });
 
@@ -16572,6 +16584,18 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [],
       absentIndexes: [0],
+      summary: {
+        status: "empty",
+        hasWinner: false,
+        emptyValue: true,
+        winnerIndex: -1,
+        index: -1,
+        count: 1,
+        presentCount: 0,
+        presentIndexes: [],
+        absentIndexes: [0],
+        value: null,
+      },
     });
   });
 
@@ -16636,9 +16660,29 @@ describe("runtime / hello-flow end-to-end", () => {
     const slowFinished = events.findIndex(
       (event) => event.kind === "node_finished" && event.nodeId === "wait_slow",
     );
+    const raceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "race") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
     expect(reportStarted).toBeGreaterThanOrEqual(0);
     expect(slowFinished).toBeGreaterThanOrEqual(0);
     expect(reportStarted).toBeLessThan(slowFinished);
+    expect(raceOutput).toMatchObject({
+      status: "winner",
+      summary: {
+        status: "winner",
+        hasWinner: true,
+        emptyValue: false,
+        winnerIndex: 0,
+        index: 0,
+        count: 1,
+        presentCount: 1,
+        presentIndexes: [0],
+        absentIndexes: [],
+        value: "fast",
+      },
+    });
   });
 
   it("routes race to empty when no value has arrived", async () => {
@@ -16685,6 +16729,18 @@ describe("runtime / hello-flow end-to-end", () => {
       indexedValues: [],
       presentIndexes: [],
       absentIndexes: [],
+      summary: {
+        status: "empty",
+        hasWinner: false,
+        emptyValue: true,
+        winnerIndex: -1,
+        index: -1,
+        count: 0,
+        presentCount: 0,
+        presentIndexes: [],
+        absentIndexes: [],
+        value: null,
+      },
     });
   });
 

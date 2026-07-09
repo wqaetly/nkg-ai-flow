@@ -102,6 +102,7 @@ export const raceNode = defineNode({
       label: "Status",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, ctx }) {
@@ -121,6 +122,18 @@ export const raceNode = defineNode({
     const found = index >= 0;
     const status = found ? "winner" : "empty";
     const value = found ? values[index] : null;
+    const summary = {
+      status,
+      hasWinner: found,
+      emptyValue: !found,
+      winnerIndex: index,
+      index,
+      count: values.length,
+      presentCount: presentIndexes.length,
+      presentIndexes,
+      absentIndexes,
+      value,
+    };
 
     ctx.log.debug("race selected first arrived value", {
       status,
@@ -144,6 +157,7 @@ export const raceNode = defineNode({
         count: values.length,
         presentCount: presentIndexes.length,
         status,
+        summary,
       },
     };
   },

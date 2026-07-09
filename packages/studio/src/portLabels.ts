@@ -1087,6 +1087,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "到达数量",
         presentCount: "有效数量",
         status: "状态",
+        summary: "摘要",
       },
       rate_limit: {
         in: "输入",
