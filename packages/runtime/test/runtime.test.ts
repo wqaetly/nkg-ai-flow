@@ -16372,6 +16372,91 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("clears existing dead_letter entries without draining them", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_DEAD_LETTERS", {
+      entries: [
+        {
+          id: "entry-1",
+          payload: { orderId: "order-1" },
+          error: { code: "payment.declined" },
+          reason: "card declined",
+          recordedAt: Date.now(),
+        },
+      ],
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "dead_letter_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const deadLetter = flow.node("dead_letter", {
+      id: "dead_letter",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_DEAD_LETTERS",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "cleared:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), deadLetter.in("in"));
+    flow.connect(deadLetter.out("cleared"), report.in("in"));
+    flow.connect(deadLetter.out("count"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "dead_letter_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cleared:0");
+    expect(variables.has("ORDER_DEAD_LETTERS")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deadLetterOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "dead_letter") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deadLetterOutput).toMatchObject({
+      entries: [],
+      entry: null,
+      name: "ORDER_DEAD_LETTERS",
+      mode: "clear",
+      reason: "",
+      maxItems: 1000,
+      count: 0,
+      state: {
+        entries: [],
+        updatedAt: expect.any(Number),
+      },
+      summary: {
+        name: "ORDER_DEAD_LETTERS",
+        mode: "clear",
+        branch: "cleared",
+        count: 0,
+        retainedCount: 0,
+        reason: "",
+        maxItems: 1000,
+        firstEntryId: "",
+        hasPayload: false,
+        hasError: false,
+        persisted: false,
+        updatedAt: expect.any(Number),
+      },
+    });
+  });
+
   it("routes empty dead_letter drains to empty", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
