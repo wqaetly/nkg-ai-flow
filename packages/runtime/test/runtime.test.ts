@@ -15622,6 +15622,12 @@ describe("runtime / hello-flow end-to-end", () => {
       remainingSuccess: 0,
       firstSuccess: { status: "ok", label: "a" },
       firstFailure: { status: "failed", error: "branch failed", label: "b" },
+      firstSuccessIndex: 0,
+      firstFailureIndex: 1,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: 1,
+      },
     });
     expect(partialOutput?.successRate).toBeCloseTo(2 / 3);
   });
@@ -15690,7 +15696,13 @@ describe("runtime / hello-flow end-to-end", () => {
       remainingSuccess: 1,
       firstSuccess: { ok: true, label: "a" },
       firstFailure: { ok: false, error: "bad", label: "b" },
+      firstSuccessIndex: 0,
+      firstFailureIndex: 1,
       successRate: 0.5,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: 1,
+      },
     });
   });
 
@@ -15807,6 +15819,12 @@ describe("runtime / hello-flow end-to-end", () => {
       remainingSuccess: 0,
       firstSuccess: { state: "ready", label: "a" },
       firstFailure: { state: "blocked", failure: "api timeout", label: "b" },
+      firstSuccessIndex: 0,
+      firstFailureIndex: 1,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: 1,
+      },
     });
     expect(partialOutput?.successRate).toBeCloseTo(2 / 3);
   });
