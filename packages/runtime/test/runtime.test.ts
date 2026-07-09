@@ -14714,6 +14714,28 @@ describe("runtime / hello-flow end-to-end", () => {
       loadedValue: false,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_CHECKPOINT",
+        mode: "save",
+        status: "saved",
+        label: "after payment authorization",
+        snapshot: { step: "payment", status: "authorized" },
+        checkpointFlowId: "checkpoint_save_e2e",
+        checkpointRunId: result.runRecord.runId,
+        checkpointNodeId: "checkpoint",
+        version: 1,
+        savedAt: expect.any(String),
+        loadedAt: "",
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: true,
+        savedValue: true,
+        loadedValue: false,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
       name: "ORDER_CHECKPOINT",
@@ -14959,6 +14981,28 @@ describe("runtime / hello-flow end-to-end", () => {
       loadedValue: true,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+        status: "loaded",
+        label: "shipping gate",
+        snapshot: { step: "shipping", status: "ready" },
+        checkpointFlowId: "",
+        checkpointRunId: "",
+        checkpointNodeId: "",
+        version: 3,
+        savedAt: new Date(now - 1000).toISOString(),
+        loadedAt: expect.any(String),
+        expiresAt: new Date(now + 60_000).toISOString(),
+        ttlMs: 61_000,
+        remainingMs: expect.any(Number),
+        stateExists: true,
+        savedValue: false,
+        loadedValue: true,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
       status: "loaded",
@@ -15024,6 +15068,28 @@ describe("runtime / hello-flow end-to-end", () => {
       loadedValue: false,
       missingValue: true,
       expiredValue: false,
+      summary: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+        status: "missing",
+        label: "",
+        snapshot: null,
+        checkpointFlowId: "",
+        checkpointRunId: "",
+        checkpointNodeId: "",
+        version: 0,
+        savedAt: "",
+        loadedAt: "",
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: false,
+        savedValue: false,
+        loadedValue: false,
+        missingValue: true,
+        clearedValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.has("ORDER_CHECKPOINT")).toBe(false);
   });
@@ -15077,6 +15143,47 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("checkpoint:stale");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "expired",
+      name: "ORDER_CHECKPOINT",
+      label: "payment gate",
+      snapshot: { step: "payment", status: "stale" },
+      version: 2,
+      savedAt: new Date(now - 120_000).toISOString(),
+      loadedAt: "",
+      expiresAt: new Date(now - 1).toISOString(),
+      remainingMs: 0,
+      stateExists: true,
+      expiredValue: true,
+      summary: {
+        name: "ORDER_CHECKPOINT",
+        mode: "load",
+        status: "expired",
+        label: "payment gate",
+        snapshot: { step: "payment", status: "stale" },
+        checkpointFlowId: "",
+        checkpointRunId: "",
+        checkpointNodeId: "",
+        version: 2,
+        savedAt: new Date(now - 120_000).toISOString(),
+        loadedAt: "",
+        expiresAt: new Date(now - 1).toISOString(),
+        ttlMs: 119_999,
+        remainingMs: 0,
+        stateExists: true,
+        savedValue: false,
+        loadedValue: false,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: true,
+      },
+    });
     expect(variables.get("ORDER_CHECKPOINT")).toMatchObject({
       status: "expired",
       version: 2,

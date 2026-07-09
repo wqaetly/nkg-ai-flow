@@ -423,6 +423,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         missingValue: "是否缺失",
         clearedValue: "是否清除",
         expiredValue: "是否过期",
+        summary: "摘要",
       },
       condition: {
         input: "输入",
