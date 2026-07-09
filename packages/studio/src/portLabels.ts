@@ -1571,6 +1571,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "窗口数量",
         itemCount: "项目数量",
         hasPartial: "存在不足窗口",
+        summary: "摘要",
       },
       transform: {
         input: "输入",

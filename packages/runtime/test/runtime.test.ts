@@ -20775,6 +20775,34 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("count=2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const windowOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "window") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(windowOutput).toMatchObject({
+      size: 2,
+      step: 2,
+      includePartial: false,
+      count: 2,
+      itemCount: 5,
+      hasPartial: true,
+      summary: {
+        status: "windowed",
+        size: 2,
+        step: 2,
+        includePartial: false,
+        count: 2,
+        itemCount: 5,
+        hasPartial: true,
+        droppedPartial: true,
+        ranges: [
+          { index: 0, start: 0, end: 2, count: 2, partial: false },
+          { index: 1, start: 2, end: 4, count: 2, partial: false },
+        ],
+      },
+    });
   });
 
   it("uses dynamic window_items policy inputs", async () => {
@@ -20853,6 +20881,21 @@ describe("runtime / hello-flow end-to-end", () => {
       itemCount: 5,
       hasPartial: true,
       windows: [["a", "b"], ["c", "d"], ["e"]],
+      summary: {
+        status: "windowed",
+        size: 2,
+        step: 2,
+        includePartial: true,
+        count: 3,
+        itemCount: 5,
+        hasPartial: true,
+        droppedPartial: false,
+        ranges: [
+          { index: 0, start: 0, end: 2, count: 2, partial: false },
+          { index: 1, start: 2, end: 4, count: 2, partial: false },
+          { index: 2, start: 4, end: 5, count: 1, partial: true },
+        ],
+      },
     });
   });
 

@@ -152,6 +152,7 @@ export const windowItemsNode = defineNode({
       label: "Has partial",
       schema: { type: "boolean" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -204,6 +205,17 @@ export const windowItemsNode = defineNode({
         count: windows.length,
         itemCount: source.length,
         hasPartial,
+        summary: {
+          status: "windowed",
+          size,
+          step,
+          includePartial,
+          count: windows.length,
+          itemCount: source.length,
+          hasPartial,
+          droppedPartial: hasPartial && !includePartial,
+          ranges,
+        },
       },
     };
   },
