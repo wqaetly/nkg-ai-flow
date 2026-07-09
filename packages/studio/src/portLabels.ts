@@ -1415,6 +1415,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         items: "拆分项",
         count: "数量",
         reason: "原因",
+        summary: "摘要",
       },
       subflow: {
         in: "输入",

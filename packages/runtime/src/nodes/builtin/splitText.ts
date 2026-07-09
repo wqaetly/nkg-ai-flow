@@ -120,6 +120,7 @@ export const splitTextNode = defineNode({
       label: "Reason",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -135,6 +136,19 @@ export const splitTextNode = defineNode({
       .map((item) => (trimItems ? item.trim() : item))
       .filter((item) => !dropEmpty || item !== "");
     const items = limit > 0 ? normalized.slice(0, limit) : normalized;
+    const summary = {
+      mode,
+      separator,
+      limit,
+      trimItems,
+      dropEmpty,
+      reason: split.reason,
+      textLength: text.length,
+      rawCount: split.items.length,
+      normalizedCount: normalized.length,
+      count: items.length,
+      truncated: limit > 0 && normalized.length > items.length,
+    };
 
     ctx.log.debug("split_text split text", {
       count: items.length,
@@ -156,6 +170,7 @@ export const splitTextNode = defineNode({
         trimItems,
         dropEmpty,
         reason: split.reason,
+        summary,
       },
     };
   },

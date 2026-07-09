@@ -20676,6 +20676,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("split=0:alpha,1:beta,2:gamma");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const splitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "split") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(splitOutput?.summary).toMatchObject({
+      mode: "lines",
+      separator: "\n",
+      limit: 0,
+      trimItems: true,
+      dropEmpty: true,
+      reason: "split_lines",
+      textLength: 20,
+      rawCount: 4,
+      normalizedCount: 3,
+      count: 3,
+      truncated: false,
+    });
   });
 
   it("uses dynamic split_text policy ahead of static config", async () => {
@@ -20757,6 +20776,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("split=0:a,1:,2:b");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const splitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "split") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(splitOutput?.summary).toMatchObject({
+      mode: "separator",
+      separator: "|",
+      limit: 3,
+      trimItems: true,
+      dropEmpty: false,
+      reason: "split_separator",
+      textLength: 12,
+      rawCount: 4,
+      normalizedCount: 4,
+      count: 3,
+      truncated: true,
+    });
   });
 
   it("parses fenced JSON text and routes structured data with parse_json", async () => {
