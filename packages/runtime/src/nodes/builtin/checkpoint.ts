@@ -24,6 +24,9 @@ interface CheckpointState {
   status: Exclude<CheckpointStatus, "missing" | "cleared">;
   snapshot: VariableValue | null;
   label: string;
+  checkpointFlowId: string;
+  checkpointRunId: string;
+  checkpointNodeId: string;
   version: number;
   savedAt: number;
   loadedAt: number | null;
@@ -104,6 +107,9 @@ export const checkpointNode = defineNode({
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "label", direction: "output", kind: "data", label: "Label", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status" },
+    { id: "checkpointFlowId", direction: "output", kind: "data", label: "Checkpoint Flow Id", schema: { type: "string" } },
+    { id: "checkpointRunId", direction: "output", kind: "data", label: "Checkpoint Run Id", schema: { type: "string" } },
+    { id: "checkpointNodeId", direction: "output", kind: "data", label: "Checkpoint Node Id", schema: { type: "string" } },
     {
       id: "version",
       direction: "output",
@@ -159,6 +165,7 @@ export const checkpointNode = defineNode({
     const mode = readMode(input.mode) ?? readMode(config.mode) ?? "save";
     const label = String(input.label ?? config.label ?? "");
     const ttlMs = readIntegerAtLeast(input.ttlMs, 0) ?? readIntegerAtLeast(config.ttlMs, 0) ?? 0;
+    const locator = { checkpointFlowId: ctx.flowId, checkpointRunId: ctx.runId, checkpointNodeId: ctx.nodeId };
     const previous = normalizeExpired(readCheckpoint(store.get(name)), now);
     const decision = applyMode(previous, {
       name,
@@ -166,6 +173,7 @@ export const checkpointNode = defineNode({
       label,
       ttlMs,
       now,
+      locator,
       snapshot: toJsonValue(input.snapshot ?? input.input ?? input.in ?? config.snapshot ?? null),
     });
 
@@ -205,6 +213,9 @@ export const checkpointNode = defineNode({
         mode,
         label: state?.label ?? "",
         status: decision.branch,
+        checkpointFlowId: state?.checkpointFlowId ?? "",
+        checkpointRunId: state?.checkpointRunId ?? "",
+        checkpointNodeId: state?.checkpointNodeId ?? "",
         version: state?.version ?? 0,
         savedAt,
         loadedAt,
@@ -230,10 +241,11 @@ function applyMode(
     label: string;
     ttlMs: number;
     now: number;
+    locator: { checkpointFlowId: string; checkpointRunId: string; checkpointNodeId: string };
     snapshot: VariableValue | undefined;
   },
 ): { branch: CheckpointBranch; state: CheckpointState | null } {
-  const { name, mode, label, ttlMs, now, snapshot } = options;
+  const { name, mode, label, ttlMs, now, locator, snapshot } = options;
   if (mode === "clear") {
     return previous
       ? { branch: "cleared", state: null }
@@ -258,6 +270,7 @@ function applyMode(
             ...previous,
             status: "saved",
             label: label.trim() || previous.label,
+            ...locator,
             expiresAt: expiresAt(ttlMs, now, previous.expiresAt),
             updatedAt: now,
           },
@@ -271,6 +284,7 @@ function applyMode(
       status: "saved",
       snapshot: snapshot ?? null,
       label: label.trim(),
+      ...locator,
       version: (previous?.version ?? 0) + 1,
       savedAt: now,
       loadedAt: null,
@@ -309,6 +323,9 @@ function readCheckpoint(value: unknown): CheckpointState | null {
     status: record.status === "loaded" ? "loaded" : record.status === "expired" ? "expired" : "saved",
     snapshot: toJsonValue(record.snapshot) ?? null,
     label: typeof record.label === "string" ? record.label : "",
+    checkpointFlowId: typeof record.checkpointFlowId === "string" ? record.checkpointFlowId : "",
+    checkpointRunId: typeof record.checkpointRunId === "string" ? record.checkpointRunId : "",
+    checkpointNodeId: typeof record.checkpointNodeId === "string" ? record.checkpointNodeId : "",
     version: readNonNegativeInteger(record.version),
     savedAt: readTimestamp(record.savedAt) ?? Date.now(),
     loadedAt: readTimestamp(record.loadedAt),
@@ -389,6 +406,9 @@ function toVariableValue(state: CheckpointState): VariableValue {
     status: state.status,
     snapshot: state.snapshot,
     label: state.label,
+    checkpointFlowId: state.checkpointFlowId,
+    checkpointRunId: state.checkpointRunId,
+    checkpointNodeId: state.checkpointNodeId,
     version: state.version,
     savedAt: state.savedAt,
     loadedAt: state.loadedAt,
