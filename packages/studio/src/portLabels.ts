@@ -435,6 +435,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         true: "条件为真",
         false: "条件为假",
         result: "条件结果",
+        status: "状态",
+        summary: "摘要",
       },
       cooldown_gate: {
         in: "输入",

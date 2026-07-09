@@ -19018,6 +19018,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("retry");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const conditionOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "condition") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(conditionOutput).toMatchObject({
+      expression: "input.retryable && input.attempts < 3 && input.code != 'fatal'",
+      result: true,
+      status: "true",
+      summary: {
+        expression: "input.retryable && input.attempts < 3 && input.code != 'fatal'",
+        result: true,
+        status: "true",
+        selectedBranch: "true",
+        input: {
+          attempts: 2,
+          retryable: true,
+          code: "rate_limit",
+        },
+      },
+    });
   });
 
   it("uses dynamic condition expression ahead of static config", async () => {
@@ -19074,6 +19096,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("dynamic-true");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const conditionOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "condition") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(conditionOutput).toMatchObject({
+      expression: "input.flag",
+      result: true,
+      status: "true",
+      summary: {
+        expression: "input.flag",
+        result: true,
+        status: "true",
+        selectedBranch: "true",
+        input: { flag: true },
+      },
+    });
   });
 
   it("filters array items with numeric expressions", async () => {
