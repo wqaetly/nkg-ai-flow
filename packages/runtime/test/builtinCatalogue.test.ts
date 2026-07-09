@@ -164,6 +164,14 @@ function configFields(definition: NodeTypeDefinition) {
   return Array.isArray(schema?.fields) ? schema.fields : [];
 }
 
+function configFieldNames(definition: NodeTypeDefinition) {
+  return configFields(definition).map((field) => field.name);
+}
+
+function portIds(definition: NodeTypeDefinition) {
+  return definition.defaultPorts.map((port) => port.id);
+}
+
 describe("runtime / built-in catalogue", () => {
   it("exposes exactly the current built-in definitions including agent", () => {
     const definitions = getBuiltinNodeDefinitions({
@@ -217,6 +225,82 @@ describe("runtime / built-in catalogue", () => {
         "state",
       ]),
     );
+  });
+
+  it("exposes Studio-editable surfaces for converged workflow runtime nodes", () => {
+    const definitions = getBuiltinNodeDefinitions({
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const criticalSurfaces = [
+      {
+        type: "foreach_begin",
+        fields: ["mode", "concurrency", "batchSize", "onError", "timeoutMs"],
+        ports: ["body", "items", "iterationId", "iterationKey", "effectiveConcurrency", "batchRanges"],
+      },
+      {
+        type: "parallel",
+        fields: ["branchCount", "concurrency"],
+        ports: ["branch1", "branch2", "branchIds", "branches", "concurrencyLimited"],
+      },
+      {
+        type: "join",
+        fields: ["expectedCount"],
+        ports: ["in", "values", "expectedCount", "indexedValues", "missingCount", "missingIndexes"],
+      },
+      {
+        type: "retry_policy",
+        fields: ["maxAttempts", "baseDelayMs", "multiplier", "maxDelayMs", "jitterPercent", "retryableOnly", "requireIdempotency"],
+        ports: ["retry", "exhausted", "unsafe", "retryAfterDelayMs", "attempt", "summary"],
+      },
+      {
+        type: "circuit_breaker",
+        fields: ["name", "mode", "failureThreshold", "resetTimeoutMs"],
+        ports: ["closed", "open", "half_open", "state", "failureCount", "summary"],
+      },
+      {
+        type: "subflow",
+        fields: ["flowId", "flowVersion", "maxDepth", "failOnError", "localVariables"],
+        ports: ["succeeded", "failed", "cancelled", "output", "runId", "summary"],
+      },
+      {
+        type: "wait_signal",
+        fields: ["name", "expected", "timeoutMs"],
+        ports: ["received", "waiting", "expired", "waitFlowId", "waitRunId", "summary"],
+      },
+      {
+        type: "signal_resume",
+        fields: ["name", "signal", "expected", "createIfMissing"],
+        ports: ["resumed", "ignored", "missing", "expired", "matched", "summary"],
+      },
+      {
+        type: "approval",
+        fields: ["name", "mode", "title", "assignee", "decision", "timeoutMs"],
+        ports: ["requested", "approved", "rejected", "cancelled", "expired", "summary"],
+      },
+      {
+        type: "compensation",
+        fields: ["name", "mode", "action"],
+        ports: ["out", "actions", "registeredFlowId", "registeredRunId", "registeredValue", "drainedValue", "clearedValue", "summary"],
+      },
+      {
+        type: "rollback",
+        fields: ["mode", "successPath", "successValues", "missingResult"],
+        ports: ["rollback", "succeeded", "partial", "failed", "incomplete", "summary"],
+      },
+      {
+        type: "schema_transform",
+        fields: ["mappings", "requireAll", "includeSource", "defaultValue"],
+        ports: ["transformed", "missing", "value", "mappedTargets", "mappedMappings", "summary"],
+      },
+    ] as const;
+
+    for (const item of criticalSurfaces) {
+      const definition = definitions.find((candidate) => candidate.type === item.type);
+      expect(definition, item.type).toBeDefined();
+      if (!definition) continue;
+      expect(configFieldNames(definition), item.type).toEqual(expect.arrayContaining([...item.fields]));
+      expect(portIds(definition), item.type).toEqual(expect.arrayContaining([...item.ports]));
+    }
   });
 
   it("uses long-text controls instead of dedicated JSON field controls", () => {
