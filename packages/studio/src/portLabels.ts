@@ -623,6 +623,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         condition: "条件",
         items: "保留项",
         rejected: "剔除项",
+        keptIndexes: "保留索引",
+        rejectedIndexes: "剔除索引",
         count: "保留数量",
         rejectedCount: "剔除数量",
         total: "总数量",

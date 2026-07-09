@@ -16735,7 +16735,13 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("kept=keep,keep");
-    expect(filterOutput).toMatchObject({ count: 2, rejectedCount: 1, total: 3 });
+    expect(filterOutput).toMatchObject({
+      count: 2,
+      rejectedCount: 1,
+      total: 3,
+      keptIndexes: [0, 2],
+      rejectedIndexes: [1],
+    });
   });
 
   it("evaluates expressions with expression_eval", async () => {
@@ -17112,6 +17118,8 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 2,
       rejectedCount: 1,
       total: 3,
+      keptIndexes: [1, 2],
+      rejectedIndexes: [0],
     });
   });
 
