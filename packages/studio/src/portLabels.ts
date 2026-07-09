@@ -810,6 +810,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         mode: "模式",
         ttlMs: "TTL 毫秒",
         remainingMs: "剩余毫秒",
+        summary: "摘要",
       },
       join: {
         in: "输入分支",

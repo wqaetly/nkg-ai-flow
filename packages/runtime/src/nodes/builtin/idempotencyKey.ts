@@ -120,6 +120,7 @@ export const idempotencyKeyNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -190,6 +191,20 @@ export const idempotencyKeyNode = defineNode({
         value: state?.value ?? null,
         error: state?.error ?? null,
         remainingMs,
+        summary: {
+          branch: decision.branch,
+          status: state?.status ?? "reset",
+          namespace,
+          key,
+          stateKey: stateName,
+          mode,
+          ttlMs,
+          remainingMs,
+          hasValue: state?.value !== null && state?.value !== undefined,
+          hasError: state?.error !== null && state?.error !== undefined,
+          replayedValue: decision.branch === "replayed",
+          resetValue: decision.branch === "reset",
+        },
       },
     };
   },

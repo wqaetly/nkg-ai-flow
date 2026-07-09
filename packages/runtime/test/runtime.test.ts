@@ -6105,6 +6105,20 @@ describe("runtime / hello-flow end-to-end", () => {
       ttlMs: 120_000,
       status: "started",
       remainingMs: expect.any(Number),
+      summary: {
+        branch: "started",
+        status: "started",
+        namespace: "payments",
+        key: "order-dynamic-policy",
+        stateKey: "IDEMPOTENCY:payments:order-dynamic-policy",
+        mode: "start",
+        ttlMs: 120_000,
+        remainingMs: expect.any(Number),
+        hasValue: false,
+        hasError: false,
+        replayedValue: false,
+        resetValue: false,
+      },
     });
     expect(variables.get("IDEMPOTENCY:payments:order-dynamic-policy")).toMatchObject({
       key: "order-dynamic-policy",
@@ -6164,6 +6178,30 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("replay:receipt-1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const idemOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "idem") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(idemOutput).toMatchObject({
+      status: "completed",
+      value: "receipt-1",
+      summary: {
+        branch: "replayed",
+        status: "completed",
+        namespace: "payments",
+        key: "order-1",
+        stateKey: "IDEMPOTENCY:payments:order-1",
+        mode: "start",
+        ttlMs: 86400000,
+        remainingMs: expect.any(Number),
+        hasValue: true,
+        hasError: false,
+        replayedValue: true,
+        resetValue: false,
+      },
+    });
     expect(variables.get("IDEMPOTENCY:payments:order-1")).toMatchObject({
       status: "completed",
       value: "receipt-1",
