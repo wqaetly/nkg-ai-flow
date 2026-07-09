@@ -22090,12 +22090,28 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(progress[0]?.payload).toMatchObject({
       type: "loop_iteration",
       loopType: "for_begin",
-      context: { index: 1, count: 3 },
+      context: {
+        index: 1,
+        count: 3,
+        rangeValues: [1, 3, 5],
+        firstIndex: 1,
+        lastIndex: 5,
+        direction: "ascending",
+        remainingIterations: 2,
+      },
     });
     expect(progress[4]?.payload).toMatchObject({
       type: "loop_iteration",
       loopType: "for_begin",
-      context: { index: 5, count: 3 },
+      context: {
+        index: 5,
+        count: 3,
+        rangeValues: [1, 3, 5],
+        firstIndex: 1,
+        lastIndex: 5,
+        direction: "ascending",
+        remainingIterations: 0,
+      },
     });
   });
 
@@ -22181,12 +22197,28 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(progress[0]?.payload).toMatchObject({
       type: "loop_iteration",
       loopType: "for_begin",
-      context: { index: 2, count: 2 },
+      context: {
+        index: 2,
+        count: 2,
+        rangeValues: [2, 5],
+        firstIndex: 2,
+        lastIndex: 5,
+        direction: "ascending",
+        remainingIterations: 1,
+      },
     });
     expect(progress[2]?.payload).toMatchObject({
       type: "loop_iteration",
       loopType: "for_begin",
-      context: { index: 5, count: 2 },
+      context: {
+        index: 5,
+        count: 2,
+        rangeValues: [2, 5],
+        firstIndex: 2,
+        lastIndex: 5,
+        direction: "ascending",
+        remainingIterations: 0,
+      },
     });
   });
 
@@ -22237,6 +22269,36 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("results=i=5,i=3,i=1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+    expect(progress[0]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "for_begin",
+      context: {
+        index: 5,
+        count: 3,
+        rangeValues: [5, 3, 1],
+        firstIndex: 5,
+        lastIndex: 1,
+        direction: "descending",
+        remainingIterations: 2,
+      },
+    });
+    expect(progress[4]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "for_begin",
+      context: {
+        index: 1,
+        count: 3,
+        rangeValues: [5, 3, 1],
+        firstIndex: 5,
+        lastIndex: 1,
+        direction: "descending",
+        remainingIterations: 0,
+      },
+    });
   });
 
   it("skips a loop body when before-check condition is false", async () => {

@@ -1225,10 +1225,11 @@ export class ExecutionEngine {
     } else {
       for (let index = start; index > end; index += step) values.push(index);
     }
-    return values.map((index) => ({
+    return values.map((index, iteration) => ({
       body: null,
       index,
       count: values.length,
+      ...forIterationMetadata(values, iteration),
     }));
   }
 
@@ -2148,6 +2149,23 @@ function foreachIterationSchedule(index: number, schedule: ForeachSchedule): Rec
     batchEnd: range?.end ?? -1,
     batchItemCount: range?.count ?? 0,
     batchPartial: range?.partial ?? false,
+  };
+}
+
+function forIterationMetadata(values: number[], iteration: number): Record<string, unknown> {
+  const firstIndex = values[0] ?? null;
+  const lastIndex = values.length > 0 ? values[values.length - 1] : null;
+  return {
+    rangeValues: values,
+    firstIndex,
+    lastIndex,
+    direction:
+      values.length === 0
+        ? "empty"
+        : Number(firstIndex) <= Number(lastIndex)
+          ? "ascending"
+          : "descending",
+    remainingIterations: Math.max(0, values.length - iteration - 1),
   };
 }
 

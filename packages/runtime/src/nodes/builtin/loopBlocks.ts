@@ -295,6 +295,11 @@ export const forBeginNode = defineNode({
     { id: "iterationId", direction: "output", kind: "data", label: "迭代 ID", schema: { type: "string" } },
     { id: "iterationKey", direction: "output", kind: "data", label: "迭代定位键", schema: { type: "string" } },
     { id: "iterationSequence", direction: "output", kind: "data", label: "迭代序号", schema: { type: "number" } },
+    { id: "rangeValues", direction: "output", kind: "data", label: "范围值" },
+    { id: "firstIndex", direction: "output", kind: "data", label: "首个索引", schema: { type: "number" } },
+    { id: "lastIndex", direction: "output", kind: "data", label: "最后索引", schema: { type: "number" } },
+    { id: "direction", direction: "output", kind: "data", label: "方向", schema: { type: "string" } },
+    { id: "remainingIterations", direction: "output", kind: "data", label: "剩余迭代数", schema: { type: "number" } },
     { id: "start", direction: "output", kind: "data", label: "起始值", schema: { type: "number" } },
     { id: "end", direction: "output", kind: "data", label: "结束值", schema: { type: "number" } },
     { id: "step", direction: "output", kind: "data", label: "步长", schema: { type: "number" } },
@@ -309,6 +314,7 @@ export const forBeginNode = defineNode({
     const onError = readLoopErrorPolicyInput(input.onError ?? config.onError);
     const timeoutMs = Math.max(0, Math.trunc(readNumber(input.timeoutMs, Number(config.timeoutMs ?? 0))));
     const values = forRange(start, end, step);
+    const metadata = forIterationMetadata(values, 0);
     return {
       kind: "success",
       outputs: {
@@ -318,6 +324,7 @@ export const forBeginNode = defineNode({
         iterationId: "for_begin:0",
         iterationKey: "for_begin:0",
         iterationSequence: 0,
+        ...metadata,
         start,
         end,
         step,
@@ -767,4 +774,21 @@ function forRange(start: number, end: number, step: number): number[] {
     for (let index = start; index > end; index += step) values.push(index);
   }
   return values;
+}
+
+function forIterationMetadata(values: number[], iteration: number): Record<string, unknown> {
+  const firstIndex = values[0] ?? null;
+  const lastIndex = values.length > 0 ? values[values.length - 1] : null;
+  return {
+    rangeValues: values,
+    firstIndex,
+    lastIndex,
+    direction:
+      values.length === 0
+        ? "empty"
+        : Number(firstIndex) <= Number(lastIndex)
+          ? "ascending"
+          : "descending",
+    remainingIterations: Math.max(0, values.length - iteration - 1),
+  };
 }
