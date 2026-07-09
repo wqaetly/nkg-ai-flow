@@ -319,6 +319,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         unknownValue: "是否未知",
         remainingMs: "剩余毫秒",
         overdueByMs: "超时毫秒数",
+        summary: "摘要",
       },
       cache: {
         in: "输入",

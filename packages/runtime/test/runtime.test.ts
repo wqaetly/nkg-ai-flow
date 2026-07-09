@@ -785,6 +785,22 @@ describe("runtime / hello-flow end-to-end", () => {
       decisionReason: "elapsed_exceeded_timeout",
       onTimeValue: false,
       unknownValue: false,
+      summary: {
+        status: "timed_out",
+        decisionReason: "elapsed_exceeded_timeout",
+        elapsedMs: 1250,
+        timeoutMs: 1000,
+        graceMs: 100,
+        effectiveTimeoutMs: 1100,
+        remainingMs: 0,
+        overdueByMs: 150,
+        timedOut: true,
+        onTimeValue: false,
+        unknownValue: false,
+        durationMsPath: "durationMs",
+        startedAtPath: "startedAt",
+        finishedAtPath: "finishedAt",
+      },
     });
   });
 
@@ -934,6 +950,22 @@ describe("runtime / hello-flow end-to-end", () => {
       decisionReason: "elapsed_within_timeout",
       remainingMs: 250,
       overdueByMs: 0,
+      summary: {
+        status: "on_time",
+        decisionReason: "elapsed_within_timeout",
+        elapsedMs: 250,
+        timeoutMs: 500,
+        graceMs: 0,
+        effectiveTimeoutMs: 500,
+        remainingMs: 250,
+        overdueByMs: 0,
+        timedOut: false,
+        onTimeValue: true,
+        unknownValue: false,
+        durationMsPath: "durationMs",
+        startedAtPath: "startedAt",
+        finishedAtPath: "finishedAt",
+      },
     });
   });
 
