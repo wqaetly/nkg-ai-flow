@@ -3570,6 +3570,17 @@ describe("runtime / hello-flow end-to-end", () => {
       exhaustedValue: false,
       unsafeValue: false,
       delayMs: 100,
+      backoffDelayMs: 100,
+      retryAfterDelayMs: 0,
+      delaySource: "backoff",
+      summary: {
+        status: "retry",
+        decisionReason: "retry_allowed",
+        delayMs: 100,
+        backoffDelayMs: 100,
+        retryAfterDelayMs: 0,
+        delaySource: "backoff",
+      },
     });
   });
 
@@ -3666,6 +3677,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("retry:5000");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(policyOutput).toMatchObject({
+      status: "retry",
+      delayMs: 5000,
+      backoffDelayMs: 100,
+      retryAfterDelayMs: 5000,
+      delaySource: "retry_after",
+      summary: {
+        delayMs: 5000,
+        backoffDelayMs: 100,
+        retryAfterDelayMs: 5000,
+        delaySource: "retry_after",
+      },
+    });
   });
 
   it("uses dynamic retry_policy strategy inputs", async () => {
@@ -3864,8 +3894,17 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(policyOutput).toMatchObject({
       status: "retry",
       delayMs: 700,
+      backoffDelayMs: 100,
+      retryAfterDelayMs: 700,
+      delaySource: "retry_after",
       retryAfterMsPath: "meta.retryAfterMs",
       retryAfterAtPath: "meta.retryAfterAt",
+      summary: {
+        delayMs: 700,
+        backoffDelayMs: 100,
+        retryAfterDelayMs: 700,
+        delaySource: "retry_after",
+      },
     });
   });
 
@@ -3925,6 +3964,17 @@ describe("runtime / hello-flow end-to-end", () => {
       exhaustedValue: true,
       unsafeValue: false,
       delayMs: 0,
+      backoffDelayMs: 0,
+      retryAfterDelayMs: 0,
+      delaySource: "none",
+      summary: {
+        status: "exhausted",
+        decisionReason: "attempts_exhausted",
+        delayMs: 0,
+        backoffDelayMs: 0,
+        retryAfterDelayMs: 0,
+        delaySource: "none",
+      },
     });
   });
 

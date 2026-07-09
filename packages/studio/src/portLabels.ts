@@ -1085,6 +1085,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         unsafe: "非幂等风险",
         nextAttempt: "下一次尝试",
         delayMs: "等待毫秒",
+        backoffDelayMs: "退避等待毫秒",
+        retryAfterDelayMs: "Retry-After 等待毫秒",
+        delaySource: "等待来源",
         retryable: "可重试",
         requiresIdempotency: "要求幂等",
         blockedByIdempotency: "被幂等阻止",
@@ -1102,6 +1105,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         retryValue: "是否重试",
         exhaustedValue: "是否耗尽",
         unsafeValue: "是否非幂等风险",
+        summary: "摘要",
       },
       retry_state: {
         in: "输入",

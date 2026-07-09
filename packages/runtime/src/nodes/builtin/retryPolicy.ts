@@ -204,6 +204,27 @@ export const retryPolicyNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "backoffDelayMs",
+      direction: "output",
+      kind: "data",
+      label: "Backoff Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "retryAfterDelayMs",
+      direction: "output",
+      kind: "data",
+      label: "Retry After Delay ms",
+      schema: { type: "number" },
+    },
+    {
+      id: "delaySource",
+      direction: "output",
+      kind: "data",
+      label: "Delay Source",
+      schema: { type: "string" },
+    },
+    {
       id: "retryable",
       direction: "output",
       kind: "data",
@@ -330,6 +351,7 @@ export const retryPolicyNode = defineNode({
       label: "Unsafe",
       schema: { type: "boolean" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -345,7 +367,7 @@ export const retryPolicyNode = defineNode({
       !blockedByIdempotency &&
       (!policy.retryableOnly || retryable === true);
     const nextAttempt = canRetry ? attempt + 1 : attempt;
-    const delayMs = canRetry ? calculateDelay(policy, input.error, attempt) : 0;
+    const delay = canRetry ? calculateDelay(policy, input.error, attempt) : emptyDelay();
     const branch = blockedByIdempotency ? "unsafe" : canRetry ? "retry" : "exhausted";
     const decisionReason = retryDecisionReason({
       attempt,
@@ -366,8 +388,29 @@ export const retryPolicyNode = defineNode({
       retryableOnly: policy.retryableOnly,
       branch,
       decisionReason,
-      delayMs,
+      delayMs: delay.delayMs,
+      delaySource: delay.delaySource,
     });
+    const summary = {
+      status: branch,
+      decisionReason,
+      attempt,
+      nextAttempt,
+      maxAttempts,
+      remainingAttempts,
+      retryable,
+      retryableOnly: policy.retryableOnly,
+      idempotent,
+      requiresIdempotency,
+      blockedByIdempotency,
+      delayMs: delay.delayMs,
+      backoffDelayMs: delay.backoffDelayMs,
+      retryAfterDelayMs: delay.retryAfterDelayMs,
+      delaySource: delay.delaySource,
+      retryValue: branch === "retry",
+      exhaustedValue: branch === "exhausted",
+      unsafeValue: branch === "unsafe",
+    };
 
     return {
       kind: "success",
@@ -376,7 +419,10 @@ export const retryPolicyNode = defineNode({
         error: input.error ?? null,
         attempt,
         nextAttempt,
-        delayMs,
+        delayMs: delay.delayMs,
+        backoffDelayMs: delay.backoffDelayMs,
+        retryAfterDelayMs: delay.retryAfterDelayMs,
+        delaySource: delay.delaySource,
         retryable,
         idempotent,
         requiresIdempotency,
@@ -396,6 +442,7 @@ export const retryPolicyNode = defineNode({
         retryValue: branch === "retry",
         exhaustedValue: branch === "exhausted",
         unsafeValue: branch === "unsafe",
+        summary,
       },
     };
   },
@@ -533,6 +580,22 @@ function matchesCodePattern(code: string, pattern: string): boolean {
   return new RegExp(`^${escaped}$`).test(code);
 }
 
+interface DelayDetails {
+  delayMs: number;
+  backoffDelayMs: number;
+  retryAfterDelayMs: number;
+  delaySource: "backoff" | "retry_after" | "none";
+}
+
+function emptyDelay(): DelayDetails {
+  return {
+    delayMs: 0,
+    backoffDelayMs: 0,
+    retryAfterDelayMs: 0,
+    delaySource: "none",
+  };
+}
+
 function calculateDelay(
   config: {
     baseDelayMs: number;
@@ -544,7 +607,7 @@ function calculateDelay(
   },
   error: unknown,
   attempt: number,
-): number {
+): DelayDetails {
   const baseDelayMs = config.baseDelayMs;
   const multiplier = config.multiplier;
   const maxDelayMs = config.maxDelayMs;
@@ -556,12 +619,29 @@ function calculateDelay(
     retryAfterAtPath: config.retryAfterAtPath,
     now: Date.now(),
   });
-  if (jitterPercent <= 0 || capped <= 0) return Math.max(capped, hinted);
+  if (jitterPercent <= 0 || capped <= 0) {
+    return delayDetails(capped, hinted);
+  }
   const spread = capped * (jitterPercent / 100);
   const code = readPath(error, ["code"]);
   const unit = stableUnit(`${typeof code === "string" ? code : ""}:${attempt}`);
   const jittered = Math.max(0, Math.trunc(capped - spread + unit * spread * 2));
-  return Math.max(jittered, hinted);
+  return delayDetails(jittered, hinted);
+}
+
+function delayDetails(backoffDelayMs: number, retryAfterDelayMs: number): DelayDetails {
+  const delayMs = Math.max(backoffDelayMs, retryAfterDelayMs);
+  return {
+    delayMs,
+    backoffDelayMs,
+    retryAfterDelayMs,
+    delaySource:
+      delayMs <= 0
+        ? "none"
+        : retryAfterDelayMs > backoffDelayMs
+          ? "retry_after"
+          : "backoff",
+  };
 }
 
 function readRetryAfterDelay(
