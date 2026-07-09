@@ -99,6 +99,13 @@ export const joinNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "missingIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Missing Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
       id: "complete",
       direction: "output",
       kind: "data",
@@ -153,6 +160,10 @@ export const joinNode = defineNode({
     const presentIndexes = indexedValues
       .filter((entry) => entry.present)
       .map((entry) => entry.index);
+    const missingIndexes = Array.from(
+      { length: missingCount },
+      (_, index) => count + index,
+    );
     return {
       kind: "success",
       outputs: {
@@ -163,6 +174,7 @@ export const joinNode = defineNode({
         count,
         expectedCount,
         missingCount,
+        missingIndexes,
         complete,
         empty,
         firstValue: values[0] ?? null,

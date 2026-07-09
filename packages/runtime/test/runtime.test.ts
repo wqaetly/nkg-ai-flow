@@ -14324,6 +14324,7 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 2,
       expectedCount: 2,
       missingCount: 0,
+      missingIndexes: [],
       complete: true,
       firstValue: "upper:Flow",
       lastValue: "lower:Flow",
@@ -14383,6 +14384,7 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 1,
       expectedCount: 2,
       missingCount: 1,
+      missingIndexes: [1],
       complete: false,
     });
   });

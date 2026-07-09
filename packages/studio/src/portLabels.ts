@@ -756,6 +756,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         presentIndexes: "有效索引",
         count: "数量",
         missingCount: "缺失数量",
+        missingIndexes: "缺失索引",
         complete: "是否完整",
         empty: "是否为空",
         firstValue: "首个值",
