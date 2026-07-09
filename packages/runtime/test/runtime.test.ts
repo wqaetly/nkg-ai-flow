@@ -20032,6 +20032,9 @@ describe("runtime / hello-flow end-to-end", () => {
       iterationIds: ["begin:0", "begin:1"],
       iterationKeys: ["foreach_begin:begin:0", "foreach_begin:begin:1"],
       iterationSequences: [0, 1],
+      lastIterationId: "begin:1",
+      lastIterationKey: "foreach_begin:begin:1",
+      lastIterationSequence: 1,
     });
   });
 

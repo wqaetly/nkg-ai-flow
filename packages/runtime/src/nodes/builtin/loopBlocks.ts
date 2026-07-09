@@ -191,6 +191,9 @@ export const foreachEndNode = defineNode({
     { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
     { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
     { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
+    { id: "lastIterationId", direction: "output", kind: "data", label: "最后迭代 ID", schema: { type: "string" } },
+    { id: "lastIterationKey", direction: "output", kind: "data", label: "最后迭代定位键" },
+    { id: "lastIterationSequence", direction: "output", kind: "data", label: "最后迭代序号", schema: { type: "number" } },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -328,6 +331,9 @@ export const forEndNode = defineNode({
     { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
     { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
     { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
+    { id: "lastIterationId", direction: "output", kind: "data", label: "最后迭代 ID", schema: { type: "string" } },
+    { id: "lastIterationKey", direction: "output", kind: "data", label: "最后迭代定位键" },
+    { id: "lastIterationSequence", direction: "output", kind: "data", label: "最后迭代序号", schema: { type: "number" } },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -483,6 +489,9 @@ export const loopEndNode = defineNode({
     { id: "iterationIds", direction: "output", kind: "data", label: "迭代 ID 列表" },
     { id: "iterationKeys", direction: "output", kind: "data", label: "迭代定位键列表" },
     { id: "iterationSequences", direction: "output", kind: "data", label: "迭代序号列表" },
+    { id: "lastIterationId", direction: "output", kind: "data", label: "最后迭代 ID", schema: { type: "string" } },
+    { id: "lastIterationKey", direction: "output", kind: "data", label: "最后迭代定位键" },
+    { id: "lastIterationSequence", direction: "output", kind: "data", label: "最后迭代序号", schema: { type: "number" } },
     { id: "errors", direction: "output", kind: "data", label: "错误列表" },
     { id: "errorCount", direction: "output", kind: "data", label: "错误数量", schema: { type: "number" } },
     { id: "firstError", direction: "output", kind: "data", label: "首个错误" },
@@ -616,17 +625,30 @@ function readLoopTrace(input: Record<string, unknown>): {
   iterationIds: unknown[];
   iterationKeys: unknown[];
   iterationSequences: unknown[];
+  lastIterationId: unknown;
+  lastIterationKey: unknown;
+  lastIterationSequence: unknown;
 } {
+  const iterationIds = normalizeTraceList(input.iterationIds);
+  const iterationKeys = normalizeTraceList(input.iterationKeys);
+  const iterationSequences = normalizeTraceList(input.iterationSequences);
   return {
-    iterationIds: normalizeTraceList(input.iterationIds),
-    iterationKeys: normalizeTraceList(input.iterationKeys),
-    iterationSequences: normalizeTraceList(input.iterationSequences),
+    iterationIds,
+    iterationKeys,
+    iterationSequences,
+    lastIterationId: lastTraceValue(iterationIds),
+    lastIterationKey: lastTraceValue(iterationKeys),
+    lastIterationSequence: lastTraceValue(iterationSequences),
   };
 }
 
 function normalizeTraceList(value: unknown): unknown[] {
   if (value === undefined || value === null) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function lastTraceValue(values: unknown[]): unknown {
+  return values.length > 0 ? values[values.length - 1] : null;
 }
 
 function readLoopStatus(value: unknown, fallback: string): string {
