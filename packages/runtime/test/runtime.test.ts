@@ -5731,6 +5731,31 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("acquired:worker-1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const lockOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "lock") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(lockOutput).toMatchObject({
+      name: "ORDER_LOCK",
+      owner: "worker-1",
+      mode: "acquire",
+      ttlMs: 60_000,
+      summary: {
+        name: "ORDER_LOCK",
+        mode: "acquire",
+        branch: "acquired",
+        owner: "worker-1",
+        requestedOwner: "worker-1",
+        locked: true,
+        ttlMs: 60_000,
+        remainingMs: expect.any(Number),
+        expiresAt: expect.any(Number),
+        acquiredAt: expect.any(Number),
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("ORDER_LOCK")).toMatchObject({
       locked: true,
       owner: "worker-1",
@@ -5854,6 +5879,19 @@ describe("runtime / hello-flow end-to-end", () => {
       ttlMs: 45_000,
       remainingMs: expect.any(Number),
       expiresAt: expect.any(Number),
+      summary: {
+        name: "ORDER_DYNAMIC_POLICY_LOCK",
+        mode: "acquire",
+        branch: "acquired",
+        owner: "worker-policy",
+        requestedOwner: "worker-policy",
+        locked: true,
+        ttlMs: 45_000,
+        remainingMs: expect.any(Number),
+        expiresAt: expect.any(Number),
+        acquiredAt: expect.any(Number),
+        updatedAt: expect.any(Number),
+      },
     });
     expect(variables.get("ORDER_DYNAMIC_POLICY_LOCK")).toMatchObject({
       locked: true,
@@ -5908,6 +5946,30 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("locked:worker-1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const lockOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "lock") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(lockOutput).toMatchObject({
+      name: "ORDER_LOCK",
+      owner: "worker-1",
+      mode: "acquire",
+      summary: {
+        name: "ORDER_LOCK",
+        mode: "acquire",
+        branch: "locked",
+        owner: "worker-1",
+        requestedOwner: "worker-2",
+        locked: true,
+        ttlMs: 60_000,
+        remainingMs: expect.any(Number),
+        expiresAt: now + 60_000,
+        acquiredAt: now,
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("ORDER_LOCK")).toMatchObject({
       locked: true,
       owner: "worker-1",
@@ -5960,6 +6022,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("released:false");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const unlockOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "unlock") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(unlockOutput).toMatchObject({
+      name: "ORDER_LOCK",
+      owner: null,
+      mode: "release",
+      remainingMs: 0,
+      expiresAt: null,
+      summary: {
+        name: "ORDER_LOCK",
+        mode: "release",
+        branch: "released",
+        owner: null,
+        requestedOwner: "worker-1",
+        locked: false,
+        ttlMs: 300_000,
+        remainingMs: 0,
+        expiresAt: null,
+        acquiredAt: null,
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("ORDER_LOCK")).toMatchObject({
       locked: false,
       owner: null,

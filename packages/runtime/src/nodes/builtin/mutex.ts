@@ -113,6 +113,7 @@ export const mutexNode = defineNode({
       label: "Expires at",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -141,15 +142,22 @@ export const mutexNode = defineNode({
     const previous = normalizeExpired(readMutexState(store.get(name), now), now);
     const decision = applyMode(previous, { mode, owner, ttlMs, now });
     const remainingMs = remaining(decision.state, now);
-
-    store.set(name, toVariableValue(decision.state), metadata(ctx.flowId));
-    ctx.log.debug("mutex selected branch", {
+    const summary = {
       name,
       mode,
-      owner,
       branch: decision.branch,
+      owner: decision.state.owner,
+      requestedOwner: owner,
+      locked: decision.state.locked,
+      ttlMs,
       remainingMs,
-    });
+      expiresAt: decision.state.expiresAt,
+      acquiredAt: decision.state.acquiredAt,
+      updatedAt: decision.state.updatedAt,
+    };
+
+    store.set(name, toVariableValue(decision.state), metadata(ctx.flowId));
+    ctx.log.debug("mutex selected branch", summary);
 
     return {
       kind: "success",
@@ -162,6 +170,7 @@ export const mutexNode = defineNode({
         ttlMs,
         remainingMs,
         expiresAt: decision.state.expiresAt,
+        summary,
       },
     };
   },
