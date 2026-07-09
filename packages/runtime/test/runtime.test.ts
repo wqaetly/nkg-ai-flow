@@ -25622,6 +25622,124 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(secondBatchStartedAt).toBeGreaterThan(firstBatchFinishedAt);
   });
 
+  it("uses dynamic foreach_begin parallel batch policy inputs", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_dynamic_parallel_policy_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["a", "b", "c", "d", "e"] },
+    });
+    const mode = flow.node("transform", {
+      id: "mode",
+      position: { x: 100, y: 100 },
+      config: { value: "parallel" },
+    });
+    const concurrency = flow.node("transform", {
+      id: "concurrency",
+      position: { x: 100, y: 200 },
+      config: { value: 1 },
+    });
+    const batchSize = flow.node("transform", {
+      id: "batch_size",
+      position: { x: 100, y: 300 },
+      config: { value: 3 },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 300, y: 0 },
+      config: { mode: "sequential", concurrency: 9, batchSize: 1 },
+    });
+    const emit = flow.node("transform", {
+      id: "emit",
+      position: { x: 420, y: 0 },
+      config: { template: "${input}" },
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 560, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 700, y: 0 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 840, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), mode.in("in"));
+    flow.connect(mode.out("out"), concurrency.in("in"));
+    flow.connect(concurrency.out("out"), batchSize.in("in"));
+    flow.connect(batchSize.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(mode.out("output"), begin.in("mode"));
+    flow.connect(concurrency.out("output"), begin.in("concurrency"));
+    flow.connect(batchSize.out("output"), begin.in("batchSize"));
+    flow.connect(begin.out("body"), emit.in("in"));
+    flow.connect(begin.out("item"), emit.in("input"));
+    flow.connect(emit.out("out"), end.in("body_done"));
+    flow.connect(emit.out("output"), end.in("result"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(end.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_dynamic_parallel_policy_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=a,b,c,d,e");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const started = events
+      .filter((event) => event.kind === "node_progress" && event.nodeId === "begin")
+      .map(
+        (event) =>
+          event.payload as {
+            phase: "started" | "finished";
+            iteration: number;
+            context?: Record<string, unknown>;
+          },
+      )
+      .filter((payload) => payload.phase === "started");
+
+    expect(started.map((payload) => payload.iteration)).toEqual([0, 1, 2, 3, 4]);
+    expect(started[0]?.context).toMatchObject({
+      index: 0,
+      batchIndex: 0,
+      batchStart: 0,
+      batchEnd: 3,
+      batchItemCount: 3,
+      batchPartial: false,
+      batchCount: 2,
+      effectiveConcurrency: 1,
+      effectiveBatchSize: 3,
+      concurrencyLimited: true,
+      batchRanges: [
+        { index: 0, start: 0, end: 3, count: 3, partial: false },
+        { index: 1, start: 3, end: 5, count: 2, partial: true },
+      ],
+    });
+    expect(started[3]?.context).toMatchObject({
+      index: 3,
+      batchIndex: 1,
+      batchStart: 3,
+      batchEnd: 5,
+      batchItemCount: 2,
+      batchPartial: true,
+      effectiveConcurrency: 1,
+      effectiveBatchSize: 3,
+      concurrencyLimited: true,
+    });
+  });
+
   it("marks foreach batch metadata as concurrency-limited", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
