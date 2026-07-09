@@ -21105,6 +21105,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('json={"a":{"c":3,"d":4},"b":2}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const stringifyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "stringify") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(stringifyOutput?.summary).toMatchObject({
+      branch: "stringified",
+      status: "stringified",
+      path: "",
+      indent: 0,
+      sortKeys: true,
+      bigintMode: "string",
+      length: '{"a":{"c":3,"d":4},"b":2}'.length,
+      valueType: "object",
+      errorMessage: "",
+    });
   });
 
   it("uses dynamic stringify_json path indent and sortKeys ahead of static config", async () => {
@@ -21165,6 +21182,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('json={\n  "a": 1,\n  "b": 2\n}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const stringifyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "stringify") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(stringifyOutput?.summary).toMatchObject({
+      branch: "stringified",
+      status: "stringified",
+      path: "value.payload",
+      indent: 2,
+      sortKeys: true,
+      bigintMode: "string",
+      length: '{\n  "a": 1,\n  "b": 2\n}'.length,
+      valueType: "object",
+      errorMessage: "",
+    });
   });
 
   it("uses dynamic stringify_json bigintMode ahead of static config", async () => {
@@ -21222,6 +21256,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('json="1"');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const stringifyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "stringify") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(stringifyOutput?.summary).toMatchObject({
+      branch: "stringified",
+      status: "stringified",
+      path: "",
+      indent: 0,
+      sortKeys: false,
+      bigintMode: "string",
+      length: '"1"'.length,
+      valueType: "bigint",
+      errorMessage: "",
+    });
   });
 
   it("routes stringify_json failures without failing the run", async () => {
@@ -21272,6 +21323,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toContain("BigInt values cannot be represented");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const stringifyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "stringify") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(stringifyOutput?.summary).toMatchObject({
+      branch: "failed",
+      status: "failed",
+      path: "",
+      indent: 0,
+      sortKeys: false,
+      bigintMode: "error",
+      length: 0,
+      valueType: "bigint",
+      errorMessage: expect.stringContaining("BigInt values cannot be represented"),
+    });
   });
 
   it("selects nested values by path with select_path", async () => {

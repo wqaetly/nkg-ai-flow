@@ -111,6 +111,7 @@ export const stringifyJsonNode = defineNode({
       label: "Error message",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -222,6 +223,17 @@ function success(
     bigintMode: BigIntMode;
   },
 ) {
+  const summary = {
+    branch,
+    status,
+    path: metadata.path,
+    indent: metadata.indent,
+    sortKeys: metadata.sortKeys,
+    bigintMode: metadata.bigintMode,
+    length: text.length,
+    valueType: valueType(value),
+    errorMessage,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -235,6 +247,14 @@ function success(
       bigintMode: metadata.bigintMode,
       length: text.length,
       errorMessage,
+      summary,
     },
   };
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return typeof value;
 }

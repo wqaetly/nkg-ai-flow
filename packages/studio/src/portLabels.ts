@@ -1526,6 +1526,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         length: "长度",
         errorMessage: "错误信息",
+        summary: "摘要",
       },
       skill_parser: {
         skill_def: "Skill 定义",
