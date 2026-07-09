@@ -373,6 +373,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         openedAt: "打开时间",
         lastFailureAt: "最近失败时间",
         updatedAt: "更新时间",
+        summary: "摘要",
       },
       compare_gate: {
         in: "输入",
