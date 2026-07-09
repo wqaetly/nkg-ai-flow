@@ -1284,9 +1284,11 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         nulls: "空值位置",
         limit: "限制数量",
         keys: "排序键",
+        indexes: "来源索引",
         first: "第一项",
         last: "最后一项",
         count: "数量",
+        sourceCount: "来源数量",
       },
       split_text: {
         text: "文本",

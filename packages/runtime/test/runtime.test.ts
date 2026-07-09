@@ -18826,6 +18826,18 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("sorted=high,middle");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sortOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "sort") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sortOutput).toMatchObject({
+      keys: [3, 2],
+      indexes: [1, 2],
+      count: 2,
+      sourceCount: 3,
+    });
   });
 
   it("uses dynamic sort_items policy inputs", async () => {
@@ -18935,6 +18947,8 @@ describe("runtime / hello-flow end-to-end", () => {
       first: { id: "missing" },
       last: { id: "middle", priority: 2 },
       count: 3,
+      indexes: [2, 0, 3],
+      sourceCount: 4,
     });
   });
 

@@ -121,6 +121,13 @@ export const sortItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "indexes",
+      direction: "output",
+      kind: "data",
+      label: "Source indexes",
+      schema: { type: "array" },
+    },
+    {
       id: "first",
       direction: "output",
       kind: "data",
@@ -137,6 +144,13 @@ export const sortItemsNode = defineNode({
       direction: "output",
       kind: "data",
       label: "Count",
+      schema: { type: "number" },
+    },
+    {
+      id: "sourceCount",
+      direction: "output",
+      kind: "data",
+      label: "Source count",
       schema: { type: "number" },
     },
   ],
@@ -162,6 +176,7 @@ export const sortItemsNode = defineNode({
     const limited = limit > 0 ? sortedEntries.slice(0, limit) : sortedEntries;
     const items = limited.map((entry) => entry.item);
     const keys = limited.map((entry) => entry.key);
+    const indexes = limited.map((entry) => entry.index);
 
     ctx.log.debug("sort_items sorted items", {
       count: items.length,
@@ -182,9 +197,11 @@ export const sortItemsNode = defineNode({
         nulls,
         limit,
         keys,
+        indexes,
         first: items[0] ?? null,
         last: items.at(-1) ?? null,
         count: items.length,
+        sourceCount: source.length,
       },
     };
   },
