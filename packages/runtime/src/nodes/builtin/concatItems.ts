@@ -8,6 +8,21 @@
 import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
 
+interface SourceRange {
+  sourceIndex: number;
+  start: number;
+  end: number;
+  count: number;
+  included: boolean;
+}
+
+interface ConcatResult {
+  items: unknown[];
+  sourceIndexes: number[];
+  sourceOffsets: number[];
+  sourceRanges: SourceRange[];
+}
+
 const concatItemsConfig = z
   .object({
     includeScalars: z
@@ -54,6 +69,27 @@ export const concatItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "sourceIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Source indexes",
+      schema: { type: "array" },
+    },
+    {
+      id: "sourceOffsets",
+      direction: "output",
+      kind: "data",
+      label: "Source offsets",
+      schema: { type: "array" },
+    },
+    {
+      id: "sourceRanges",
+      direction: "output",
+      kind: "data",
+      label: "Source ranges",
+      schema: { type: "array" },
+    },
+    {
       id: "count",
       direction: "output",
       kind: "data",
@@ -72,10 +108,10 @@ export const concatItemsNode = defineNode({
   run({ input, config, ctx }) {
     const sources = normalizeSources(input.items ?? input.input);
     const includeScalars = config.includeScalars !== false;
-    const items = concatSources(sources, includeScalars);
+    const result = concatSources(sources, includeScalars);
 
     ctx.log.debug("concat_items concatenated sources", {
-      count: items.length,
+      count: result.items.length,
       sourceCount: sources.length,
       includeScalars,
     });
@@ -84,9 +120,12 @@ export const concatItemsNode = defineNode({
       kind: "success",
       outputs: {
         out: null,
-        items,
+        items: result.items,
         sources,
-        count: items.length,
+        sourceIndexes: result.sourceIndexes,
+        sourceOffsets: result.sourceOffsets,
+        sourceRanges: result.sourceRanges,
+        count: result.items.length,
         sourceCount: sources.length,
       },
     };
@@ -98,14 +137,33 @@ function normalizeSources(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [value];
 }
 
-function concatSources(sources: unknown[], includeScalars: boolean): unknown[] {
+function concatSources(sources: unknown[], includeScalars: boolean): ConcatResult {
   const items: unknown[] = [];
-  for (const source of sources) {
+  const sourceIndexes: number[] = [];
+  const sourceOffsets: number[] = [];
+  const sourceRanges: SourceRange[] = [];
+
+  sources.forEach((source, sourceIndex) => {
+    const start = items.length;
     if (Array.isArray(source)) {
-      items.push(...source);
+      source.forEach((item, sourceOffset) => {
+        items.push(item);
+        sourceIndexes.push(sourceIndex);
+        sourceOffsets.push(sourceOffset);
+      });
     } else if (includeScalars && source !== undefined) {
       items.push(source);
+      sourceIndexes.push(sourceIndex);
+      sourceOffsets.push(0);
     }
-  }
-  return items;
+    sourceRanges.push({
+      sourceIndex,
+      start,
+      end: items.length,
+      count: items.length - start,
+      included: items.length > start,
+    });
+  });
+
+  return { items, sourceIndexes, sourceOffsets, sourceRanges };
 }

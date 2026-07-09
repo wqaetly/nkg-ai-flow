@@ -17174,6 +17174,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("concat=0:a,1:b,2:c");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const concatOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "concat") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(concatOutput).toMatchObject({
+      items: ["a", "b", "c"],
+      sourceIndexes: [0, 0, 1],
+      sourceOffsets: [0, 1, 0],
+      sourceRanges: [
+        { sourceIndex: 0, start: 0, end: 2, count: 2, included: true },
+        { sourceIndex: 1, start: 2, end: 3, count: 1, included: true },
+      ],
+      count: 3,
+      sourceCount: 2,
+    });
   });
 
   it("splits text into array items with split_text", async () => {

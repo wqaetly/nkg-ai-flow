@@ -384,6 +384,9 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       concat_items: {
         items: "合并项",
         sources: "来源列表",
+        sourceIndexes: "来源索引",
+        sourceOffsets: "来源偏移",
+        sourceRanges: "来源范围",
         count: "数量",
         sourceCount: "来源数量",
       },
