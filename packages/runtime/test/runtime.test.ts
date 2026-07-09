@@ -8590,6 +8590,98 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("clears compensation actions without draining them", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_CLEAR_COMPENSATIONS", {
+      actions: [
+        {
+          id: "comp-1",
+          action: "release_inventory",
+          payload: { sku: "book" },
+          registeredAt: now,
+          registeredFlowId: "forward_flow",
+          registeredFlowVersion: "1.0.0",
+          registeredRunId: "run-1",
+          registeredNodeId: "reserve",
+        },
+      ],
+      updatedAt: now,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "compensation_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const clear = flow.node("compensation", {
+      id: "clear",
+      position: { x: 140, y: 0 },
+      config: {
+        name: "ORDER_CLEAR_COMPENSATIONS",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 320, y: 0 },
+      config: { template: "cleared:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 460, y: 0 } });
+
+    flow.connect(start.out("out"), clear.in("in"));
+    flow.connect(clear.out("out"), report.in("in"));
+    flow.connect(clear.out("clearedValue"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "compensation_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("cleared:true");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const clearOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "clear") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(clearOutput).toMatchObject({
+      name: "ORDER_CLEAR_COMPENSATIONS",
+      mode: "clear",
+      status: "cleared",
+      count: 0,
+      stackCount: 0,
+      actions: [],
+      action: null,
+      actionName: "",
+      registeredValue: false,
+      drainedValue: false,
+      clearedValue: true,
+      summary: {
+        name: "ORDER_CLEAR_COMPENSATIONS",
+        mode: "clear",
+        status: "cleared",
+        count: 0,
+        stackCount: 0,
+        actionName: "",
+        actions: [],
+        registeredValue: false,
+        drainedValue: false,
+        clearedValue: true,
+      },
+      state: {
+        actions: [],
+      },
+    });
+    expect(variables.get("ORDER_CLEAR_COMPENSATIONS")).toMatchObject({
+      actions: [],
+    });
+  });
+
   it("routes drained compensation actions into a rollback branch", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
