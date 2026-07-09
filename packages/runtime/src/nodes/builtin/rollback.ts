@@ -18,6 +18,10 @@ interface RollbackAction {
   action: string;
   payload: VariableValue;
   registeredAt: number | null;
+  registeredFlowId: string;
+  registeredFlowVersion: string;
+  registeredRunId: string;
+  registeredNodeId: string;
 }
 
 interface RollbackEvaluation {
@@ -113,6 +117,10 @@ export const rollbackNode = defineNode({
     { id: "results", direction: "output", kind: "data", label: "Results" },
     { id: "failures", direction: "output", kind: "data", label: "Failures" },
     { id: "pending", direction: "output", kind: "data", label: "Pending" },
+    { id: "registeredFlowIds", direction: "output", kind: "data", label: "Registered Flow Ids" },
+    { id: "registeredFlowVersions", direction: "output", kind: "data", label: "Registered Flow Versions" },
+    { id: "registeredRunIds", direction: "output", kind: "data", label: "Registered Run Ids" },
+    { id: "registeredNodeIds", direction: "output", kind: "data", label: "Registered Node Ids" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "successPath", direction: "output", kind: "data", label: "Success Path", schema: { type: "string" } },
@@ -169,6 +177,7 @@ export const rollbackNode = defineNode({
       ctx.log.debug("rollback selected branch", { mode, branch: "empty" });
       return success("empty", {
         ...diagnostics,
+        ...actionSourceDiagnostics([]),
         actions: [],
         results: [],
         failures: [],
@@ -189,6 +198,7 @@ export const rollbackNode = defineNode({
       });
       return success("rollback", {
         ...diagnostics,
+        ...actionSourceDiagnostics(actions),
         actions,
         results: [],
         failures: [],
@@ -228,6 +238,7 @@ export const rollbackNode = defineNode({
 
     return success(branch, {
       ...diagnostics,
+      ...actionSourceDiagnostics(actions),
       actions,
       results: evaluations,
       failures,
@@ -321,6 +332,25 @@ function readAction(value: unknown): RollbackAction | undefined {
       typeof record.registeredAt === "number" && Number.isFinite(record.registeredAt)
         ? record.registeredAt
         : null,
+    registeredFlowId: typeof record.registeredFlowId === "string" ? record.registeredFlowId : "",
+    registeredFlowVersion:
+      typeof record.registeredFlowVersion === "string" ? record.registeredFlowVersion : "",
+    registeredRunId: typeof record.registeredRunId === "string" ? record.registeredRunId : "",
+    registeredNodeId: typeof record.registeredNodeId === "string" ? record.registeredNodeId : "",
+  };
+}
+
+function actionSourceDiagnostics(actions: RollbackAction[]): {
+  registeredFlowIds: string[];
+  registeredFlowVersions: string[];
+  registeredRunIds: string[];
+  registeredNodeIds: string[];
+} {
+  return {
+    registeredFlowIds: actions.map((action) => action.registeredFlowId),
+    registeredFlowVersions: actions.map((action) => action.registeredFlowVersion),
+    registeredRunIds: actions.map((action) => action.registeredRunId),
+    registeredNodeIds: actions.map((action) => action.registeredNodeId),
   };
 }
 
