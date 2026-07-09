@@ -26680,6 +26680,23 @@ describe("runtime / variables visible to nodes", () => {
     expect(result.succeeded).toBe(true);
     expect(observedModel).toBe("deepseek-v4-pro");
     expect(observedKeyVisibility).toBe("sk-test");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const llmOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "node_llm_01") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(llmOutput?.summary).toMatchObject({
+      model: "deepseek-v4-pro",
+      stream: false,
+      promptLength: "Say hi to world".length,
+      resultLength: "ok".length,
+      temperature: expect.any(Number),
+      maxTokens: expect.any(Number),
+      baseUrlConfigured: true,
+      apiKeyConfigured: true,
+      finishReason: "",
+    });
   });
 
   it("$var and $secret references in node config get resolved", async () => {

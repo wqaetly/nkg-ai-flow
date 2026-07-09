@@ -925,6 +925,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       llm: {
         result: "结果",
+        summary: "摘要",
       },
       loop_begin: {
         body: "循环体",

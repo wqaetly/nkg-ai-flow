@@ -120,6 +120,7 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
           label: "结果",
           schema: { type: "string" },
         },
+        { id: "summary", direction: "output", kind: "data", label: "Summary" },
       ],
       validateInput: false,
       async run({ input, config, ctx }) {
@@ -266,7 +267,20 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
             await stream.close({ text: aggregated, finishReason, usage });
             return {
               kind: "success",
-              outputs: { out: null, result: aggregated },
+              outputs: {
+                out: null,
+                result: aggregated,
+                summary: summaryFor({
+                  model,
+                  prompt,
+                  result: aggregated,
+                  request,
+                  stream: true,
+                  baseUrl,
+                  apiKey,
+                  finishReason,
+                }),
+              },
             };
           } catch (cause) {
             return {
@@ -287,7 +301,19 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
           const response = await llmProvider.complete(request, runtimeCtx);
           return {
             kind: "success",
-            outputs: { out: null, result: response.text },
+            outputs: {
+              out: null,
+              result: response.text,
+              summary: summaryFor({
+                model,
+                prompt,
+                result: response.text,
+                request,
+                stream: false,
+                baseUrl,
+                apiKey,
+              }),
+            },
           };
         } catch (cause) {
           return {
@@ -305,6 +331,29 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
       },
     }),
 );
+
+function summaryFor(args: {
+  model: string | undefined;
+  prompt: string;
+  result: string;
+  request: LlmCompletionRequest;
+  stream: boolean;
+  baseUrl: string | undefined;
+  apiKey: string | undefined;
+  finishReason?: string | undefined;
+}) {
+  return {
+    model: args.model ?? "",
+    stream: args.stream,
+    promptLength: args.prompt.length,
+    resultLength: args.result.length,
+    temperature: args.request.temperature,
+    maxTokens: args.request.maxTokens,
+    baseUrlConfigured: Boolean(args.baseUrl),
+    apiKeyConfigured: Boolean(args.apiKey),
+    finishReason: args.finishReason ?? "",
+  };
+}
 
 function resolveConfigStringRef(
   value: string | undefined,
