@@ -918,6 +918,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         iterationId: "迭代 ID",
         iterationKey: "迭代定位键",
         iterationSequence: "迭代序号",
+        summary: "摘要",
       },
       loop_end: {
         body_done: "循环体完成",

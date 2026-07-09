@@ -22793,6 +22793,13 @@ describe("runtime / hello-flow end-to-end", () => {
       iterationId: "begin:1",
       iterationKey: "foreach_begin:begin:1",
       iterationSequence: 1,
+      summary: {
+        status: "continue",
+        reason: "skip_beta",
+        iterationId: "begin:1",
+        iterationKey: "foreach_begin:begin:1",
+        iterationSequence: 1,
+      },
     });
     expect(continueProgress?.payload).toMatchObject({
       status: "continue",
