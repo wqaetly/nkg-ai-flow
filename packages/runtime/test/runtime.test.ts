@@ -3922,6 +3922,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(retryOutput).toMatchObject({
       status: "retry",
       stateStatus: "waiting",
+      retryFlowId: "retry_state_retry_e2e",
+      retryRunId: result.runRecord.runId,
+      retryNodeId: "retry",
       attempt: 1,
       nextAttempt: 2,
       maxAttempts: 3,
@@ -3931,6 +3934,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
       status: "waiting",
+      retryFlowId: "retry_state_retry_e2e",
+      retryRunId: result.runRecord.runId,
+      retryNodeId: "retry",
       attempt: 1,
       retryable: true,
       lastError: { code: "payment.timeout", retryable: true },
@@ -4214,6 +4220,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(retryOutput).toMatchObject({
       status: "unsafe",
       stateStatus: "unsafe",
+      retryFlowId: "retry_state_idempotency_unsafe_e2e",
+      retryRunId: recordResult.runRecord.runId,
+      retryNodeId: "retry",
       retryable: true,
       requiresIdempotency: true,
       blockedByIdempotency: true,
@@ -4223,6 +4232,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("PAYMENT_RETRY:unsafe-order")).toMatchObject({
       status: "unsafe",
+      retryFlowId: "retry_state_idempotency_unsafe_e2e",
+      retryRunId: recordResult.runRecord.runId,
+      retryNodeId: "retry",
       attempt: 1,
       retryable: true,
       idempotent: null,
@@ -4443,6 +4455,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("waiting:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const retryOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(retryOutput).toMatchObject({
+      status: "waiting",
+      stateStatus: "waiting",
+      retryFlowId: "retry_state_waiting_e2e",
+      retryRunId: result.runRecord.runId,
+      retryNodeId: "retry",
+    });
+    expect(variables.get("PAYMENT_RETRY:order-1")).toMatchObject({
+      retryFlowId: "retry_state_waiting_e2e",
+      retryRunId: result.runRecord.runId,
+      retryNodeId: "retry",
+    });
   });
 
   it("routes retry_state to exhausted when attempts reach the limit", async () => {

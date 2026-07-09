@@ -20,6 +20,9 @@ type RetryStatus = "retry" | "waiting" | "exhausted" | "unsafe";
 
 interface PersistedRetryState {
   status: RetryStatus;
+  retryFlowId: string;
+  retryRunId: string;
+  retryNodeId: string;
   attempt: number;
   maxAttempts: number;
   retryable: boolean | null;
@@ -172,6 +175,9 @@ export const retryStateNode = defineNode({
     { id: "error", direction: "output", kind: "data", label: "Error" },
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "retryFlowId", direction: "output", kind: "data", label: "Retry Flow Id", schema: { type: "string" } },
+    { id: "retryRunId", direction: "output", kind: "data", label: "Retry Run Id", schema: { type: "string" } },
+    { id: "retryNodeId", direction: "output", kind: "data", label: "Retry Node Id", schema: { type: "string" } },
     { id: "attempt", direction: "output", kind: "data", label: "Attempt", schema: { type: "number" } },
     { id: "nextAttempt", direction: "output", kind: "data", label: "Next Attempt", schema: { type: "number" } },
     { id: "delayMs", direction: "output", kind: "data", label: "Delay ms", schema: { type: "number" } },
@@ -218,7 +224,8 @@ export const retryStateNode = defineNode({
     }
 
     const now = Date.now();
-    const previous = readRetryState(store.get(stateKey));
+    const locator = { retryFlowId: ctx.flowId, retryRunId: ctx.runId, retryNodeId: ctx.nodeId };
+    const previous = readRetryState(store.get(stateKey), locator);
     const mode = readMode(input.mode) ?? readMode(config.mode) ?? "record_failure";
     const requireIdempotency =
       readBoolean(input.requireIdempotency) ?? (config.requireIdempotency === true);
@@ -255,6 +262,7 @@ export const retryStateNode = defineNode({
       retryAfterMsPath,
       retryAfterAtPath,
       stateKey,
+      locator,
       now,
       nodeId: ctx.nodeId,
     });
@@ -300,6 +308,9 @@ export const retryStateNode = defineNode({
         error: decision.state?.lastError ?? null,
         mode,
         status: decision.branch,
+        retryFlowId: decision.state?.retryFlowId ?? "",
+        retryRunId: decision.state?.retryRunId ?? "",
+        retryNodeId: decision.state?.retryNodeId ?? "",
         attempt,
         nextAttempt: decision.branch === "retry" ? attempt + 1 : attempt,
         delayMs: decision.delayMs,
@@ -345,6 +356,7 @@ function applyMode(
     retryAfterMsPath: string;
     retryAfterAtPath: string;
     stateKey: string;
+    locator: { retryFlowId: string; retryRunId: string; retryNodeId: string };
     now: number;
     nodeId: string;
   },
@@ -393,6 +405,9 @@ function applyMode(
       delayMs: 0,
       state: {
         status: "unsafe",
+        retryFlowId: options.locator.retryFlowId,
+        retryRunId: options.locator.retryRunId,
+        retryNodeId: options.locator.retryNodeId,
         attempt,
         maxAttempts: options.maxAttempts,
         retryable: retryable ?? null,
@@ -415,6 +430,9 @@ function applyMode(
       delayMs: 0,
       state: {
         status: "exhausted",
+        retryFlowId: options.locator.retryFlowId,
+        retryRunId: options.locator.retryRunId,
+        retryNodeId: options.locator.retryNodeId,
         attempt,
         maxAttempts: options.maxAttempts,
         retryable: retryable ?? null,
@@ -436,6 +454,9 @@ function applyMode(
     delayMs,
     state: {
       status: "waiting",
+      retryFlowId: options.locator.retryFlowId,
+      retryRunId: options.locator.retryRunId,
+      retryNodeId: options.locator.retryNodeId,
       attempt,
       maxAttempts: options.maxAttempts,
       retryable: retryable ?? null,
@@ -567,12 +588,18 @@ function matchesCodePattern(code: string, pattern: string): boolean {
   return new RegExp(`^${escaped}$`).test(code);
 }
 
-function readRetryState(value: unknown): PersistedRetryState | null {
+function readRetryState(
+  value: unknown,
+  locator: { retryFlowId: string; retryRunId: string; retryNodeId: string },
+): PersistedRetryState | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const lastError = toJsonValue(record.lastError);
   return {
     status: readStatus(record.status),
+    retryFlowId: readString(record.retryFlowId) ?? locator.retryFlowId,
+    retryRunId: readString(record.retryRunId) ?? locator.retryRunId,
+    retryNodeId: readString(record.retryNodeId) ?? locator.retryNodeId,
     attempt: readPositiveInteger(record.attempt, 0),
     maxAttempts: readPositiveInteger(record.maxAttempts, 1),
     retryable: typeof record.retryable === "boolean" ? record.retryable : null,
@@ -594,6 +621,10 @@ function readStatus(value: unknown): RetryStatus {
 
 function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
 }
 
 function readMode(value: unknown): RetryStateMode | undefined {
@@ -701,6 +732,9 @@ function toJsonValue(value: unknown): VariableValue | undefined {
 function toVariableValue(state: PersistedRetryState): VariableValue {
   return {
     status: state.status,
+    retryFlowId: state.retryFlowId,
+    retryRunId: state.retryRunId,
+    retryNodeId: state.retryNodeId,
     attempt: state.attempt,
     maxAttempts: state.maxAttempts,
     retryable: state.retryable,
