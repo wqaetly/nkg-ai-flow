@@ -3508,6 +3508,44 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(first.output).toBe("ready:ready");
     expect(second.output).toBe("cooling:600");
     expect(third.output).toBe("ready:ready");
+    const firstEvents = await rt.eventBus.store.read(first.runRecord.runId);
+    const firstGateOutput = (
+      firstEvents.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(firstGateOutput?.summary).toMatchObject({
+      name: "ALERT_COOLDOWN",
+      branch: "ready",
+      status: "ready",
+      mode: "consume",
+      durationMs: 1000,
+      remainingMs: 0,
+      readyAt: 2000,
+      lastAllowedAt: 1000,
+      allowedCount: 1,
+      suppressedCount: 0,
+      stateExists: true,
+    });
+    const secondEvents = await rt.eventBus.store.read(second.runRecord.runId);
+    const secondGateOutput = (
+      secondEvents.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(secondGateOutput?.summary).toMatchObject({
+      name: "ALERT_COOLDOWN",
+      branch: "cooling",
+      status: "cooling",
+      mode: "consume",
+      durationMs: 1000,
+      remainingMs: 600,
+      readyAt: 2000,
+      lastAllowedAt: 1000,
+      allowedCount: 1,
+      suppressedCount: 1,
+      stateExists: true,
+    });
   });
 
   it("routes a dynamically named cooldown_gate to ready", async () => {
@@ -3633,6 +3671,19 @@ describe("runtime / hello-flow end-to-end", () => {
       allowedCount: 1,
       suppressedCount: 0,
     });
+    expect(gateOutput?.summary).toMatchObject({
+      name: "ALERT_DYNAMIC_POLICY_COOLDOWN",
+      branch: "ready",
+      status: "ready",
+      mode: "consume",
+      durationMs: 2500,
+      remainingMs: 0,
+      readyAt: 12_500,
+      lastAllowedAt: 10_000,
+      allowedCount: 1,
+      suppressedCount: 0,
+      stateExists: true,
+    });
     expect(variables.get("ALERT_DYNAMIC_POLICY_COOLDOWN")).toMatchObject({
       lastAllowedAt: 10_000,
       readyAt: 12_500,
@@ -3688,6 +3739,25 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("reset:reset");
     expect(variables.has("RESETTABLE_COOLDOWN")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resetOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "reset") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resetOutput?.summary).toMatchObject({
+      name: "RESETTABLE_COOLDOWN",
+      branch: "reset",
+      status: "reset",
+      mode: "reset",
+      durationMs: 60000,
+      remainingMs: 0,
+      readyAt: expect.any(Number),
+      lastAllowedAt: 0,
+      allowedCount: 1,
+      suppressedCount: 0,
+      stateExists: false,
+    });
   });
 
   it("routes distinct_until_changed only when the selected value changes", async () => {

@@ -90,6 +90,7 @@ export const cooldownGateNode = defineNode({
     { id: "lastAllowedAt", direction: "output", kind: "data", label: "Last allowed at", schema: { type: "number" } },
     { id: "allowedCount", direction: "output", kind: "data", label: "Allowed count", schema: { type: "number" } },
     { id: "suppressedCount", direction: "output", kind: "data", label: "Suppressed count", schema: { type: "number" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -198,6 +199,19 @@ function success(
   },
   name: string,
 ) {
+  const summary = {
+    name,
+    branch,
+    status: data.status,
+    mode: data.mode,
+    durationMs: data.durationMs,
+    remainingMs: data.remainingMs,
+    readyAt: data.readyAt,
+    lastAllowedAt: data.lastAllowedAt,
+    allowedCount: data.allowedCount,
+    suppressedCount: data.suppressedCount,
+    stateExists: state !== null,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -212,6 +226,7 @@ function success(
       lastAllowedAt: data.lastAllowedAt,
       allowedCount: data.allowedCount,
       suppressedCount: data.suppressedCount,
+      summary,
     },
   };
 }

@@ -459,6 +459,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         lastAllowedAt: "上次放行时间",
         allowedCount: "放行次数",
         suppressedCount: "抑制次数",
+        summary: "摘要",
       },
       cron_schedule: {
         in: "输入",
