@@ -1106,6 +1106,23 @@ describe("runtime / hello-flow end-to-end", () => {
       openValue: true,
       closedValue: false,
       overnightValue: false,
+      summary: {
+        status: "open",
+        now: Date.UTC(2026, 6, 6, 10, 0),
+        startTime: "09:00",
+        endTime: "17:00",
+        days: "1,2,3,4,5",
+        timezoneOffsetMinutes: 0,
+        day: 1,
+        minuteOfDay: 600,
+        nextOpenInMs: 0,
+        nextOpenAt: Date.UTC(2026, 6, 6, 10, 0),
+        startMinute: 540,
+        endMinute: 1020,
+        openValue: true,
+        closedValue: false,
+        overnightValue: false,
+      },
     });
   });
 
@@ -1167,6 +1184,23 @@ describe("runtime / hello-flow end-to-end", () => {
       openValue: false,
       closedValue: true,
       overnightValue: false,
+      summary: {
+        status: "closed",
+        now: Date.UTC(2026, 6, 6, 8, 30),
+        startTime: "09:00",
+        endTime: "17:00",
+        days: "1,2,3,4,5",
+        timezoneOffsetMinutes: 0,
+        day: 1,
+        minuteOfDay: 510,
+        nextOpenInMs: 1_800_000,
+        nextOpenAt: Date.UTC(2026, 6, 6, 9, 0),
+        startMinute: 540,
+        endMinute: 1020,
+        openValue: false,
+        closedValue: true,
+        overnightValue: false,
+      },
     });
   });
 
@@ -1261,6 +1295,23 @@ describe("runtime / hello-flow end-to-end", () => {
       openValue: true,
       closedValue: false,
       overnightValue: false,
+      summary: {
+        status: "open",
+        now: Date.UTC(2026, 6, 6, 10, 0),
+        startTime: "09:00",
+        endTime: "17:00",
+        days: "1,2,3,4,5",
+        timezoneOffsetMinutes: 0,
+        day: 1,
+        minuteOfDay: 600,
+        nextOpenInMs: 0,
+        nextOpenAt: Date.UTC(2026, 6, 6, 10, 0),
+        startMinute: 540,
+        endMinute: 1020,
+        openValue: true,
+        closedValue: false,
+        overnightValue: false,
+      },
     });
   });
 

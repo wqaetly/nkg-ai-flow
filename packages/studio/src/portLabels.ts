@@ -1272,6 +1272,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         openValue: "是否开启",
         closedValue: "是否关闭",
         overnightValue: "是否跨夜",
+        summary: "摘要",
       },
       schema_guard: {
         in: "输入",
