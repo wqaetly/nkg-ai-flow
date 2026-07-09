@@ -299,6 +299,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         remaining: "剩余数量",
         ageMs: "窗口年龄毫秒",
         flushCount: "输出批次数",
+        summary: "摘要",
       },
       branch_timeout: {
         in: "输入",

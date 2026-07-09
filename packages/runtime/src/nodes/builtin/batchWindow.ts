@@ -113,6 +113,7 @@ export const batchWindowNode = defineNode({
       label: "Flush count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -155,14 +156,22 @@ export const batchWindowNode = defineNode({
     const count = decision.state.items.length;
     const ageMs = count > 0 ? Math.max(0, now - decision.state.createdAt) : 0;
     const remaining = Math.max(0, maxItems - count);
-    ctx.log.debug("batch_window selected branch", {
+    const summary = {
       name,
       mode,
       branch: decision.branch,
       count,
+      bufferedCount: count,
+      emittedCount: decision.items.length,
       maxItems,
+      maxAgeMs,
+      remaining,
       ageMs,
-    });
+      flushCount: decision.state.flushCount,
+      persisted: decision.persist,
+      updatedAt: decision.state.updatedAt,
+    };
+    ctx.log.debug("batch_window selected branch", summary);
 
     return {
       kind: "success",
@@ -178,6 +187,7 @@ export const batchWindowNode = defineNode({
         remaining,
         ageMs,
         flushCount: decision.state.flushCount,
+        summary,
       },
     };
   },

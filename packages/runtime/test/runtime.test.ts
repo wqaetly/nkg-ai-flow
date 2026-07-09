@@ -14440,6 +14440,27 @@ describe("runtime / hello-flow end-to-end", () => {
       items: ["email-1"],
       flushCount: 0,
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput?.summary).toMatchObject({
+      name: "EMAIL_BATCH",
+      mode: "add",
+      branch: "waiting",
+      count: 1,
+      bufferedCount: 1,
+      emittedCount: 1,
+      maxItems: 2,
+      maxAgeMs: 0,
+      remaining: 1,
+      ageMs: expect.any(Number),
+      flushCount: 0,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes a dynamically named batch_window to waiting", async () => {
@@ -14582,6 +14603,21 @@ describe("runtime / hello-flow end-to-end", () => {
       items: ["email-policy"],
       flushCount: 0,
     });
+    expect(batchOutput?.summary).toMatchObject({
+      name: "EMAIL_DYNAMIC_POLICY_BATCH",
+      mode: "add",
+      branch: "waiting",
+      count: 1,
+      bufferedCount: 1,
+      emittedCount: 1,
+      maxItems: 3,
+      maxAgeMs: 5_000,
+      remaining: 2,
+      ageMs: expect.any(Number),
+      flushCount: 0,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
     expect(variables.get("EMAIL_DYNAMIC_POLICY_BATCH")).toMatchObject({
       items: ["email-policy"],
       flushCount: 0,
@@ -14639,6 +14675,27 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("ready:email-1,email-2");
     expect(variables.has("EMAIL_BATCH")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput?.summary).toMatchObject({
+      name: "EMAIL_BATCH",
+      mode: "add",
+      branch: "ready",
+      count: 0,
+      bufferedCount: 0,
+      emittedCount: 2,
+      maxItems: 2,
+      maxAgeMs: 0,
+      remaining: 2,
+      ageMs: 0,
+      flushCount: 1,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("flushes an existing batch_window explicitly", async () => {
@@ -14685,6 +14742,27 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("flushed:2");
     expect(variables.has("EMAIL_BATCH")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const batchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "batch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(batchOutput?.summary).toMatchObject({
+      name: "EMAIL_BATCH",
+      mode: "flush",
+      branch: "ready",
+      count: 0,
+      bufferedCount: 0,
+      emittedCount: 2,
+      maxItems: 10,
+      maxAgeMs: 0,
+      remaining: 10,
+      ageMs: 0,
+      flushCount: 2,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("records node errors into dead_letter", async () => {
