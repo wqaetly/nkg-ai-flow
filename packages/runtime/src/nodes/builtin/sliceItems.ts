@@ -90,6 +90,13 @@ export const sliceItemsNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "indexes",
+      direction: "output",
+      kind: "data",
+      label: "Source indexes",
+      schema: { type: "array" },
+    },
+    {
       id: "total",
       direction: "output",
       kind: "data",
@@ -161,6 +168,7 @@ export const sliceItemsNode = defineNode({
         out: null,
         items,
         count: items.length,
+        indexes: rangeIndexes(start, end),
         total,
         start,
         end,
@@ -200,4 +208,8 @@ function readBoolean(value: unknown): boolean | undefined {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function rangeIndexes(start: number, end: number): number[] {
+  return Array.from({ length: Math.max(0, end - start) }, (_, offset) => start + offset);
 }

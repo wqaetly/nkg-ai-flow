@@ -1276,6 +1276,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       slice_items: {
         items: "截取项",
         count: "数量",
+        indexes: "来源索引",
         total: "总数",
         start: "起点",
         end: "终点",

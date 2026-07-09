@@ -19031,6 +19031,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("slice=0:b,1:c,2:d");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sliceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "slice") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sliceOutput).toMatchObject({
+      indexes: [1, 2, 3],
+      start: 1,
+      end: 4,
+      count: 3,
+      total: 5,
+      hasMore: true,
+    });
   });
 
   it("uses dynamic slice_items start and end ahead of static config", async () => {
@@ -19091,6 +19105,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("slice=0:c,1:d");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sliceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "slice") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sliceOutput).toMatchObject({
+      indexes: [2, 3],
+      start: 2,
+      end: 4,
+      count: 2,
+      total: 5,
+      hasMore: true,
+    });
   });
 
   it("uses dynamic slice_items fromEnd and count ahead of static config", async () => {
@@ -19158,6 +19186,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("slice=0:c,1:d");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sliceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "slice") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sliceOutput).toMatchObject({
+      indexes: [2, 3],
+      start: 2,
+      end: 4,
+      count: 2,
+      total: 5,
+      fromEnd: true,
+      hasMore: true,
+    });
   });
 
   it("builds sliding windows with window_items", async () => {
