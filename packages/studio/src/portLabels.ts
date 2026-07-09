@@ -1011,6 +1011,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         type: "类型",
         errorMessage: "错误信息",
+        summary: "摘要",
       },
       partial_success: {
         results: "分支结果",

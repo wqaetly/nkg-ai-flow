@@ -122,6 +122,7 @@ export const parseJsonNode = defineNode({
       label: "Error message",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -211,6 +212,19 @@ function success(
     acceptNonString: boolean;
   },
 ) {
+  const type = jsonType(value);
+  const rawType = jsonType(raw);
+  const summary = {
+    branch,
+    status,
+    type,
+    rawType,
+    errorMessage,
+    path: metadata.path,
+    trim: metadata.trim,
+    unwrapCodeFence: metadata.unwrapCodeFence,
+    acceptNonString: metadata.acceptNonString,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -222,8 +236,9 @@ function success(
       unwrapCodeFence: metadata.unwrapCodeFence,
       acceptNonString: metadata.acceptNonString,
       status,
-      type: jsonType(value),
+      type,
       errorMessage,
+      summary,
     },
   };
 }

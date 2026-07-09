@@ -20802,6 +20802,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("order=a,b");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const parseOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "parse") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(parseOutput?.summary).toMatchObject({
+      branch: "parsed",
+      status: "unwrapped_code_fence",
+      type: "object",
+      rawType: "string",
+      errorMessage: "",
+      path: "",
+      trim: true,
+      unwrapCodeFence: true,
+      acceptNonString: true,
+    });
   });
 
   it("routes invalid JSON text through parse_json invalid branch", async () => {
@@ -20840,6 +20857,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toContain("bad=");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const parseOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "parse") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(parseOutput?.summary).toMatchObject({
+      branch: "invalid",
+      status: "invalid_json",
+      type: "null",
+      rawType: "string",
+      errorMessage: expect.any(String),
+      path: "",
+      trim: true,
+      unwrapCodeFence: true,
+      acceptNonString: true,
+    });
   });
 
   it("uses dynamic parse_json path trim and code fence policy ahead of static config", async () => {
@@ -20907,6 +20941,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("order=x,y");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const parseOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "parse") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(parseOutput?.summary).toMatchObject({
+      branch: "parsed",
+      status: "unwrapped_code_fence",
+      type: "object",
+      rawType: "string",
+      errorMessage: "",
+      path: "text.payload",
+      trim: true,
+      unwrapCodeFence: true,
+      acceptNonString: true,
+    });
   });
 
   it("uses dynamic parse_json acceptNonString ahead of static config", async () => {
@@ -20960,6 +21011,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("id=ord_dynamic");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const parseOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "parse") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(parseOutput?.summary).toMatchObject({
+      branch: "parsed",
+      status: "already_structured",
+      type: "object",
+      rawType: "object",
+      errorMessage: "",
+      path: "text.payload",
+      trim: true,
+      unwrapCodeFence: true,
+      acceptNonString: true,
+    });
   });
 
   it("stringifies structured data with stable sorted keys using stringify_json", async () => {
