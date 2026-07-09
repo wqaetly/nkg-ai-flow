@@ -86,6 +86,7 @@ export const stateGetNode = defineNode({
       label: "Metadata",
       schema: { type: "object" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -97,6 +98,14 @@ export const stateGetNode = defineNode({
     const hasConfigDefault = Object.prototype.hasOwnProperty.call(config, "defaultValue");
     const defaultValue = hasInputDefault ? input.defaultValue : hasConfigDefault ? config.defaultValue : null;
     const value = found ? entry?.value ?? fallbackValue : defaultValue;
+    const metadata = entry?.metadata ?? null;
+    const summary = {
+      name,
+      found,
+      hasDefault: hasInputDefault || hasConfigDefault,
+      valueType: valueType(value),
+      metadataPresent: metadata !== null,
+    };
 
     ctx.log.debug("state_get read variable", { name, found });
 
@@ -108,7 +117,8 @@ export const stateGetNode = defineNode({
         value,
         found,
         defaultValue,
-        metadata: entry?.metadata ?? null,
+        metadata,
+        summary,
       },
     };
   },
@@ -133,4 +143,11 @@ function describeVariable(
     }).describe(name);
   }
   return undefined;
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return typeof value;
 }

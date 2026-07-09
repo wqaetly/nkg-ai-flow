@@ -14672,6 +14672,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("state=ready");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const getOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "get_state") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(getOutput?.summary).toMatchObject({
+      name: "FLOW_STATE_OBJECT",
+      found: true,
+      hasDefault: false,
+      valueType: "object",
+      metadataPresent: true,
+    });
   });
 
   it("uses dynamic state_get default value ahead of static config", async () => {
@@ -14715,6 +14728,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("state=dynamic");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const getOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "get_state") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(getOutput?.summary).toMatchObject({
+      name: "MISSING_STATE_VALUE",
+      found: false,
+      hasDefault: true,
+      valueType: "object",
+      metadataPresent: false,
+    });
   });
 
   it("routes batch_window to waiting while the batch is not full", async () => {

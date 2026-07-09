@@ -1576,6 +1576,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "状态值",
         found: "是否存在",
         metadata: "元数据",
+        summary: "摘要",
       },
       state_set: {
         value: "状态值",
