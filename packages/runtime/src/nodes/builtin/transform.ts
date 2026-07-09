@@ -52,14 +52,17 @@ export const transformNode = defineNode({
   ports: [
     { id: "input", direction: "input", kind: "data", label: "Input" },
     { id: "output", direction: "output", kind: "data", label: "Output" },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const raw = input as Record<string, unknown>;
     const { template, expression, value } = config;
     let output: unknown;
+    let transformMode: "template" | "expression_template" | "expression_eval" | "value" | "passthrough";
     if (typeof template === "string") {
       output = renderTemplate(template, raw);
+      transformMode = "template";
     } else if (typeof expression === "string") {
       // Strip an outer pair of backticks if the author wrote a JS
       // template literal in JSON (`"\`Hello, ${input.name}\`"`).
@@ -68,21 +71,41 @@ export const transformNode = defineNode({
           ? expression.slice(1, -1)
           : expression;
       const trimmed = stripped.trim();
-      output = trimmed.startsWith("expr:")
-        ? evaluateExpression(trimmed.slice("expr:".length), raw)
-        : renderTemplate(stripped, raw);
+      if (trimmed.startsWith("expr:")) {
+        output = evaluateExpression(trimmed.slice("expr:".length), raw);
+        transformMode = "expression_eval";
+      } else {
+        output = renderTemplate(stripped, raw);
+        transformMode = "expression_template";
+      }
     } else if (value !== undefined) {
       output = value;
+      transformMode = "value";
     } else {
       output = raw.input ?? raw.in ?? null;
+      transformMode = "passthrough";
     }
+    const summary = {
+      mode: transformMode,
+      inputType: valueType(raw.input ?? raw.in ?? raw.__runInput__ ?? null),
+      outputType: valueType(output),
+      hasTemplate: transformMode === "template" || transformMode === "expression_template",
+      hasExpression: transformMode === "expression_eval" || transformMode === "expression_template",
+    };
     ctx.log.debug("transform produced output", {
       hasTemplate:
         typeof template === "string" || typeof expression === "string",
     });
     return {
       kind: "success",
-      outputs: { out: null, output },
+      outputs: { out: null, output, summary },
     };
   },
 });
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return typeof value;
+}

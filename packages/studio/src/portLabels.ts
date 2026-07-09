@@ -1631,6 +1631,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       transform: {
         input: "输入",
         output: "输出",
+        summary: "摘要",
       },
       wait_signal: {
         in: "输入",

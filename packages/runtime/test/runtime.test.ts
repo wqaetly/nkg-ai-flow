@@ -113,6 +113,19 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.runRecord.status).toBe("succeeded");
     expect(result.output).toBe("Hello, Node");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const greetOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "node_greet_01") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(greetOutput?.summary).toMatchObject({
+      mode: "template",
+      inputType: "object",
+      outputType: "string",
+      hasTemplate: true,
+      hasExpression: false,
+    });
   });
 
   it("evaluates safe transform expressions with expr prefix", async () => {
@@ -146,6 +159,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("sum=10");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const summarizeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "summarize") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(summarizeOutput?.summary).toMatchObject({
+      mode: "expression_eval",
+      inputType: "object",
+      outputType: "number",
+      hasTemplate: false,
+      hasExpression: true,
+    });
   });
 
   it("exposes start runInput as an explicit data output port", async () => {
