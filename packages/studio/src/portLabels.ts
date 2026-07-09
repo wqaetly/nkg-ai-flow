@@ -1359,6 +1359,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         last: "最后一项",
         count: "数量",
         sourceCount: "来源数量",
+        summary: "摘要",
       },
       split_text: {
         text: "文本",

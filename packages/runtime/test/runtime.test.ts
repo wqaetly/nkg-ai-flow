@@ -20351,6 +20351,21 @@ describe("runtime / hello-flow end-to-end", () => {
       indexes: [1, 2],
       count: 2,
       sourceCount: 3,
+      summary: {
+        status: "sorted",
+        path: "priority",
+        direction: "desc",
+        type: "number",
+        nulls: "last",
+        limit: 2,
+        limited: true,
+        keys: [3, 2],
+        indexes: [1, 2],
+        first: { id: "high", priority: 3 },
+        last: { id: "middle", priority: 2 },
+        count: 2,
+        sourceCount: 3,
+      },
     });
   });
 
@@ -20463,6 +20478,20 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 3,
       indexes: [2, 0, 3],
       sourceCount: 4,
+      summary: {
+        status: "sorted",
+        path: "priority",
+        direction: "asc",
+        type: "number",
+        nulls: "first",
+        limit: 3,
+        limited: true,
+        indexes: [2, 0, 3],
+        first: { id: "missing" },
+        last: { id: "middle", priority: 2 },
+        count: 3,
+        sourceCount: 4,
+      },
     });
   });
 
