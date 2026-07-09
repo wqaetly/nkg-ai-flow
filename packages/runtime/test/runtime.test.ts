@@ -3327,7 +3327,10 @@ describe("runtime / hello-flow end-to-end", () => {
       nextAttempt: 2,
       maxAttempts: 3,
       remainingAttempts: 2,
+      decisionReason: "retry_allowed",
+      retryValue: true,
       exhaustedValue: false,
+      unsafeValue: false,
       delayMs: 100,
     });
   });
@@ -3679,7 +3682,10 @@ describe("runtime / hello-flow end-to-end", () => {
       nextAttempt: 1,
       maxAttempts: 1,
       remainingAttempts: 0,
+      decisionReason: "attempts_exhausted",
+      retryValue: false,
       exhaustedValue: true,
+      unsafeValue: false,
       delayMs: 0,
     });
   });
@@ -3735,6 +3741,8 @@ describe("runtime / hello-flow end-to-end", () => {
       retryable: true,
       requiresIdempotency: true,
       blockedByIdempotency: true,
+      decisionReason: "blocked_by_idempotency",
+      retryValue: false,
       exhaustedValue: false,
       unsafeValue: true,
       delayMs: 0,

@@ -239,6 +239,13 @@ export const retryPolicyNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "decisionReason",
+      direction: "output",
+      kind: "data",
+      label: "Decision Reason",
+      schema: { type: "string" },
+    },
+    {
       id: "maxAttempts",
       direction: "output",
       kind: "data",
@@ -303,6 +310,13 @@ export const retryPolicyNode = defineNode({
       schema: { type: "string" },
     },
     {
+      id: "retryValue",
+      direction: "output",
+      kind: "data",
+      label: "Retry",
+      schema: { type: "boolean" },
+    },
+    {
       id: "exhaustedValue",
       direction: "output",
       kind: "data",
@@ -333,6 +347,14 @@ export const retryPolicyNode = defineNode({
     const nextAttempt = canRetry ? attempt + 1 : attempt;
     const delayMs = canRetry ? calculateDelay(policy, input.error, attempt) : 0;
     const branch = blockedByIdempotency ? "unsafe" : canRetry ? "retry" : "exhausted";
+    const decisionReason = retryDecisionReason({
+      attempt,
+      maxAttempts,
+      retryable,
+      retryableOnly: policy.retryableOnly,
+      blockedByIdempotency,
+      branch,
+    });
     const remainingAttempts = Math.max(0, maxAttempts - attempt);
 
     ctx.log.debug("retry_policy selected branch", {
@@ -343,6 +365,7 @@ export const retryPolicyNode = defineNode({
       requiresIdempotency,
       retryableOnly: policy.retryableOnly,
       branch,
+      decisionReason,
       delayMs,
     });
 
@@ -359,6 +382,7 @@ export const retryPolicyNode = defineNode({
         requiresIdempotency,
         blockedByIdempotency,
         status: branch,
+        decisionReason,
         maxAttempts,
         remainingAttempts,
         baseDelayMs: policy.baseDelayMs,
@@ -369,12 +393,29 @@ export const retryPolicyNode = defineNode({
         retryableCodes: policy.retryableCodes,
         retryAfterMsPath: policy.retryAfterMsPath,
         retryAfterAtPath: policy.retryAfterAtPath,
+        retryValue: branch === "retry",
         exhaustedValue: branch === "exhausted",
         unsafeValue: branch === "unsafe",
       },
     };
   },
 });
+
+function retryDecisionReason(input: {
+  attempt: number;
+  maxAttempts: number;
+  retryable: boolean | undefined;
+  retryableOnly: boolean;
+  blockedByIdempotency: boolean;
+  branch: "retry" | "exhausted" | "unsafe";
+}): string {
+  if (input.blockedByIdempotency) return "blocked_by_idempotency";
+  if (input.branch === "retry") return "retry_allowed";
+  if (input.attempt >= input.maxAttempts) return "attempts_exhausted";
+  if (input.retryableOnly && input.retryable === false) return "not_retryable";
+  if (input.retryableOnly && input.retryable !== true) return "retryability_unknown";
+  return "retry_exhausted";
+}
 
 function readAttempt(input: Record<string, unknown>): number {
   const explicit = Number(input.attempt);
