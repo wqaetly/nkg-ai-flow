@@ -12350,6 +12350,21 @@ describe("runtime / hello-flow end-to-end", () => {
       maxSamples: 2,
       average: 35,
       samples: [30, 80],
+      summary: {
+        name: "ORDER_LATENCY_MS",
+        branch: "updated",
+        mode: "observe",
+        maxSamples: 2,
+        value: 80,
+        count: 4,
+        sum: 140,
+        min: 10,
+        max: 80,
+        average: 35,
+        last: 80,
+        sampleCount: 2,
+        updatedAt: expect.any(Number),
+      },
     });
   });
 

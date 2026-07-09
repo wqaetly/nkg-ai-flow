@@ -100,6 +100,7 @@ export const metricNode = defineNode({
     { id: "average", direction: "output", kind: "data", label: "Average", schema: { type: "number" } },
     { id: "last", direction: "output", kind: "data", label: "Last", schema: { type: "number" } },
     { id: "samples", direction: "output", kind: "data", label: "Samples" },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -185,6 +186,21 @@ function updateMetric(
 
 function success(branch: MetricBranch, state: MetricState, mode: MetricMode, maxSamples: number) {
   const average = state.count > 0 ? state.sum / state.count : 0;
+  const summary = {
+    name: state.name,
+    branch,
+    mode,
+    maxSamples,
+    value: state.value,
+    count: state.count,
+    sum: state.sum,
+    min: state.min,
+    max: state.max,
+    average,
+    last: state.last,
+    sampleCount: state.samples.length,
+    updatedAt: state.updatedAt,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -201,6 +217,7 @@ function success(branch: MetricBranch, state: MetricState, mode: MetricMode, max
       average,
       last: state.last,
       samples: state.samples,
+      summary,
     },
   };
 }

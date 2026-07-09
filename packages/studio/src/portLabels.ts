@@ -906,6 +906,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         average: "平均值",
         last: "最近值",
         samples: "最近样本",
+        summary: "摘要",
       },
       mutex: {
         in: "输入",
