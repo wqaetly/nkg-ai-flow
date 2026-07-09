@@ -279,6 +279,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "批次数量",
         itemCount: "项目数量",
         hasPartial: "存在不完整批次",
+        summary: "摘要",
       },
       batch_window: {
         in: "输入",

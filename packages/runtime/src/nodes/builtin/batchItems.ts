@@ -127,6 +127,7 @@ export const batchItemsNode = defineNode({
       label: "Has partial",
       schema: { type: "boolean" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -176,6 +177,16 @@ export const batchItemsNode = defineNode({
         count: batches.length,
         itemCount: source.length,
         hasPartial,
+        summary: {
+          status: "batched",
+          size,
+          includePartial,
+          count: batches.length,
+          itemCount: source.length,
+          hasPartial,
+          droppedPartial: hasPartial && !includePartial,
+          ranges,
+        },
       },
     };
   },

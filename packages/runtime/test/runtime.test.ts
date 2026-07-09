@@ -20917,6 +20917,20 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 1, start: 2, end: 4, count: 2, partial: false },
         { index: 2, start: 4, end: 5, count: 1, partial: true },
       ],
+      summary: {
+        status: "batched",
+        size: 2,
+        includePartial: true,
+        count: 3,
+        itemCount: 5,
+        hasPartial: true,
+        droppedPartial: false,
+        ranges: [
+          { index: 0, start: 0, end: 2, count: 2, partial: false },
+          { index: 1, start: 2, end: 4, count: 2, partial: false },
+          { index: 2, start: 4, end: 5, count: 1, partial: true },
+        ],
+      },
     });
   });
 
@@ -20974,6 +20988,19 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 0, start: 0, end: 2, count: 2, partial: false },
         { index: 1, start: 2, end: 4, count: 2, partial: false },
       ],
+      summary: {
+        status: "batched",
+        size: 2,
+        includePartial: false,
+        count: 2,
+        itemCount: 5,
+        hasPartial: true,
+        droppedPartial: true,
+        ranges: [
+          { index: 0, start: 0, end: 2, count: 2, partial: false },
+          { index: 1, start: 2, end: 4, count: 2, partial: false },
+        ],
+      },
     });
   });
 
