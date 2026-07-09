@@ -666,6 +666,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         groups: "分组对象",
         entries: "分组列表",
         keys: "分组键",
+        groupIndexes: "分组索引",
         count: "分组数量",
         total: "总数",
       },

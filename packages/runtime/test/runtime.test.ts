@@ -19706,6 +19706,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("groups=open:2,closed:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const groupOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "group") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(groupOutput).toMatchObject({
+      keys: ["open", "closed"],
+      groupIndexes: {
+        open: [0, 2],
+        closed: [1],
+      },
+      entries: [
+        { key: "open", indexes: [0, 2], count: 2 },
+        { key: "closed", indexes: [1], count: 1 },
+      ],
+      count: 2,
+      total: 3,
+    });
   });
 
   it("sorts group_items entries by count", async () => {
@@ -19761,6 +19780,27 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("sorted=open:3,closed:2,pending:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const groupOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "group") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(groupOutput).toMatchObject({
+      keys: ["open", "closed", "pending"],
+      groupIndexes: {
+        open: [2, 4, 5],
+        closed: [1, 3],
+        pending: [0],
+      },
+      entries: [
+        { key: "open", indexes: [2, 4, 5], count: 3 },
+        { key: "closed", indexes: [1, 3], count: 2 },
+        { key: "pending", indexes: [0], count: 1 },
+      ],
+      count: 3,
+      total: 6,
+    });
   });
 
   it("uses dynamic group_items policy inputs", async () => {
@@ -19860,6 +19900,14 @@ describe("runtime / hello-flow end-to-end", () => {
       sortBy: "key",
       sortDirection: "asc",
       keys: ["open", "unknown"],
+      groupIndexes: {
+        open: [0, 1],
+        unknown: [2],
+      },
+      entries: [
+        { key: "open", indexes: [0, 1], count: 2 },
+        { key: "unknown", indexes: [2], count: 1 },
+      ],
       count: 2,
       total: 3,
     });

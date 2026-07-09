@@ -13,6 +13,7 @@ interface GroupEntry {
   key: string;
   value: unknown;
   items: unknown[];
+  indexes: number[];
   count: number;
 }
 
@@ -125,6 +126,13 @@ export const groupItemsNode = defineNode({
       label: "Group keys",
       schema: { type: "array" },
     },
+    {
+      id: "groupIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Group indexes",
+      schema: { type: "object" },
+    },
     { id: "path", direction: "output", kind: "data", label: "Path", schema: { type: "string" } },
     { id: "missingKey", direction: "output", kind: "data", label: "Missing key", schema: { type: "string" } },
     {
@@ -171,6 +179,7 @@ export const groupItemsNode = defineNode({
       sortDirection,
     });
     const groups = Object.fromEntries(entries.map((entry) => [entry.key, entry.items]));
+    const groupIndexes = Object.fromEntries(entries.map((entry) => [entry.key, entry.indexes]));
 
     ctx.log.debug("group_items grouped items", {
       count: entries.length,
@@ -185,6 +194,7 @@ export const groupItemsNode = defineNode({
         groups,
         entries,
         keys: entries.map((entry) => entry.key),
+        groupIndexes,
         path,
         missingKey,
         caseSensitive,
@@ -225,22 +235,24 @@ function groupItems(
   },
 ): GroupEntry[] {
   const groups = new Map<string, GroupEntry>();
-  for (const item of source) {
+  source.forEach((item, index) => {
     const value = valueAtPath(item, options.path);
     const key = displayKey(value, options);
     const existing = groups.get(key);
     if (existing) {
       existing.items.push(item);
+      existing.indexes.push(index);
       existing.count += 1;
     } else {
       groups.set(key, {
         key,
         value: value === undefined || value === null ? options.missingKey : value,
         items: [item],
+        indexes: [index],
         count: 1,
       });
     }
-  }
+  });
   return sortGroups([...groups.values()], options.sortBy, options.sortDirection);
 }
 
