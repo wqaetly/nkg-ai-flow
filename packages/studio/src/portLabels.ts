@@ -696,6 +696,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         groupIndexes: "分组索引",
         count: "分组数量",
         total: "总数",
+        summary: "摘要",
       },
       for_begin: {
         body: "循环体",

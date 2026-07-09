@@ -21380,6 +21380,25 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       count: 2,
       total: 3,
+      summary: {
+        status: "grouped",
+        path: "status",
+        missingKey: "__missing__",
+        caseSensitive: true,
+        sortBy: "first",
+        sortDirection: "asc",
+        keys: ["open", "closed"],
+        groupCounts: {
+          open: 2,
+          closed: 1,
+        },
+        groupIndexes: {
+          open: [0, 2],
+          closed: [1],
+        },
+        count: 2,
+        total: 3,
+      },
     });
   });
 
@@ -21456,6 +21475,27 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       count: 3,
       total: 6,
+      summary: {
+        status: "grouped",
+        path: "status",
+        missingKey: "__missing__",
+        caseSensitive: true,
+        sortBy: "count",
+        sortDirection: "desc",
+        keys: ["open", "closed", "pending"],
+        groupCounts: {
+          open: 3,
+          closed: 2,
+          pending: 1,
+        },
+        groupIndexes: {
+          open: [2, 4, 5],
+          closed: [1, 3],
+          pending: [0],
+        },
+        count: 3,
+        total: 6,
+      },
     });
   });
 
@@ -21566,6 +21606,25 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       count: 2,
       total: 3,
+      summary: {
+        status: "grouped",
+        path: "status",
+        missingKey: "unknown",
+        caseSensitive: false,
+        sortBy: "key",
+        sortDirection: "asc",
+        keys: ["open", "unknown"],
+        groupCounts: {
+          open: 2,
+          unknown: 1,
+        },
+        groupIndexes: {
+          open: [0, 1],
+          unknown: [2],
+        },
+        count: 2,
+        total: 3,
+      },
     });
   });
 

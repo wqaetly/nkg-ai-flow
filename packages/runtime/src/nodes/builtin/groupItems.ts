@@ -158,6 +158,7 @@ export const groupItemsNode = defineNode({
       label: "Total",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -180,6 +181,8 @@ export const groupItemsNode = defineNode({
     });
     const groups = Object.fromEntries(entries.map((entry) => [entry.key, entry.items]));
     const groupIndexes = Object.fromEntries(entries.map((entry) => [entry.key, entry.indexes]));
+    const keys = entries.map((entry) => entry.key);
+    const groupCounts = Object.fromEntries(entries.map((entry) => [entry.key, entry.count]));
 
     ctx.log.debug("group_items grouped items", {
       count: entries.length,
@@ -193,7 +196,7 @@ export const groupItemsNode = defineNode({
         out: null,
         groups,
         entries,
-        keys: entries.map((entry) => entry.key),
+        keys,
         groupIndexes,
         path,
         missingKey,
@@ -202,6 +205,19 @@ export const groupItemsNode = defineNode({
         sortDirection,
         count: entries.length,
         total: source.length,
+        summary: {
+          status: "grouped",
+          path,
+          missingKey,
+          caseSensitive,
+          sortBy,
+          sortDirection,
+          keys,
+          groupCounts,
+          groupIndexes,
+          count: entries.length,
+          total: source.length,
+        },
       },
     };
   },
