@@ -830,6 +830,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         count: "数量",
         indexes: "来源索引",
         sourceCount: "来源数量",
+        summary: "摘要",
       },
       merge: {
         in: "输入分支",

@@ -20139,6 +20139,16 @@ describe("runtime / hello-flow end-to-end", () => {
       indexes: [0, 1, 2],
       count: 3,
       sourceCount: 3,
+      summary: {
+        status: "mapped",
+        mode: "template",
+        template: "${index}:${item}",
+        expression: "",
+        usedExpression: false,
+        count: 3,
+        sourceCount: 3,
+        indexes: [0, 1, 2],
+      },
     });
   });
 
@@ -20192,6 +20202,16 @@ describe("runtime / hello-flow end-to-end", () => {
       indexes: [0, 1],
       count: 2,
       sourceCount: 2,
+      summary: {
+        status: "mapped",
+        mode: "expression",
+        template: "${item}",
+        expression: "upper(item.name)",
+        usedExpression: true,
+        count: 2,
+        sourceCount: 2,
+        indexes: [0, 1],
+      },
     });
   });
 

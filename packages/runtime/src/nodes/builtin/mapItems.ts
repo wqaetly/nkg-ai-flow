@@ -84,6 +84,7 @@ export const mapItemsNode = defineNode({
       label: "Source count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -109,6 +110,7 @@ export const mapItemsNode = defineNode({
         ? evaluateExpression(expression, scope)
         : renderTemplate(template, scope);
     });
+    const indexes = source.map((_item, index) => index);
 
     return {
       kind: "success",
@@ -119,8 +121,18 @@ export const mapItemsNode = defineNode({
         expression,
         usedExpression,
         count: items.length,
-        indexes: source.map((_item, index) => index),
+        indexes,
         sourceCount: source.length,
+        summary: {
+          status: "mapped",
+          mode: usedExpression ? "expression" : "template",
+          template,
+          expression,
+          usedExpression,
+          count: items.length,
+          sourceCount: source.length,
+          indexes,
+        },
       },
     };
   },
