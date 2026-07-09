@@ -19,6 +19,9 @@ type WaitTimerStatus = "waiting" | "due" | "expired";
 
 interface WaitTimerState {
   status: WaitTimerStatus;
+  waitFlowId: string;
+  waitRunId: string;
+  waitNodeId: string;
   requestedAt: number;
   dueAt: number;
   timeoutAt: number | null;
@@ -118,6 +121,9 @@ export const waitTimerNode = defineNode({
     { id: "state", direction: "output", kind: "data", label: "State" },
     { id: "name", direction: "output", kind: "data", label: "Name", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "waitFlowId", direction: "output", kind: "data", label: "Wait Flow Id", schema: { type: "string" } },
+    { id: "waitRunId", direction: "output", kind: "data", label: "Wait Run Id", schema: { type: "string" } },
+    { id: "waitNodeId", direction: "output", kind: "data", label: "Wait Node Id", schema: { type: "string" } },
     { id: "requestedAt", direction: "output", kind: "data", label: "Requested At", schema: { type: "string" } },
     { id: "dueAt", direction: "output", kind: "data", label: "Due At", schema: { type: "string" } },
     { id: "timeoutAt", direction: "output", kind: "data", label: "Timeout At", schema: { type: "string" } },
@@ -169,8 +175,9 @@ export const waitTimerNode = defineNode({
 
     const now = Date.now();
     const reset = readBoolean(input.reset) ?? (config.reset === true);
-    const previous = reset ? null : readWaitTimerState(store.get(name));
-    const created = previous ?? createWaitTimerState(input, config, now);
+    const locator = { waitFlowId: ctx.flowId, waitRunId: ctx.runId, waitNodeId: ctx.nodeId };
+    const previous = reset ? null : readWaitTimerState(store.get(name), locator);
+    const created = previous ?? createWaitTimerState(input, config, now, locator);
     if (!created) {
       return error(
         "node.wait_timer.invalid_due_time",
@@ -206,6 +213,9 @@ export const waitTimerNode = defineNode({
         state: next,
         name,
         status: next.status,
+        waitFlowId: next.waitFlowId,
+        waitRunId: next.waitRunId,
+        waitNodeId: next.waitNodeId,
         requestedAt: requestedAtIso,
         dueAt: dueAtIso,
         timeoutAt: timeoutAtIso,
@@ -229,6 +239,7 @@ function createWaitTimerState(
     timeoutMs?: unknown;
   },
   now: number,
+  locator: { waitFlowId: string; waitRunId: string; waitNodeId: string },
 ): WaitTimerState | null {
   const dueAt = readDueTime(input.dueAt) ?? readDueTime(config.dueAt);
   const durationMs = readDuration(input.durationMs) ?? readDuration(config.durationMs) ?? 0;
@@ -238,6 +249,9 @@ function createWaitTimerState(
   const timeoutMs = readDuration(input.timeoutMs) ?? readDuration(config.timeoutMs) ?? 0;
   return {
     status: "waiting",
+    waitFlowId: locator.waitFlowId,
+    waitRunId: locator.waitRunId,
+    waitNodeId: locator.waitNodeId,
     requestedAt: now,
     dueAt: computedDueAt,
     timeoutAt: timeoutMs > 0 ? computedDueAt + timeoutMs : null,
@@ -267,7 +281,10 @@ function evaluateState(state: WaitTimerState, now: number): WaitTimerState {
   };
 }
 
-function readWaitTimerState(value: unknown): WaitTimerState | null {
+function readWaitTimerState(
+  value: unknown,
+  locator: { waitFlowId: string; waitRunId: string; waitNodeId: string },
+): WaitTimerState | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const requestedAt = readTimestamp(record.requestedAt);
@@ -276,6 +293,9 @@ function readWaitTimerState(value: unknown): WaitTimerState | null {
   if (requestedAt === null || dueAt === null || updatedAt === null) return null;
   return {
     status: readStatus(record.status),
+    waitFlowId: readString(record.waitFlowId) ?? locator.waitFlowId,
+    waitRunId: readString(record.waitRunId) ?? locator.waitRunId,
+    waitNodeId: readString(record.waitNodeId) ?? locator.waitNodeId,
     requestedAt,
     dueAt,
     timeoutAt: readTimestamp(record.timeoutAt),
@@ -318,6 +338,10 @@ function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
   if (
     value &&
@@ -332,6 +356,9 @@ function asMutableVariableStore(value: unknown): MutableVariableStore | undefine
 function toVariableValue(state: WaitTimerState): VariableValue {
   return {
     status: state.status,
+    waitFlowId: state.waitFlowId,
+    waitRunId: state.waitRunId,
+    waitNodeId: state.waitNodeId,
     requestedAt: state.requestedAt,
     dueAt: state.dueAt,
     timeoutAt: state.timeoutAt,

@@ -8633,6 +8633,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(timerOutput).toMatchObject({
       status: "waiting",
+      waitFlowId: "wait_timer_waiting_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
       requestedAt: expect.any(String),
       dueAt: expect.any(String),
       timeoutAt: "",
@@ -8645,6 +8648,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
       status: "waiting",
+      waitFlowId: "wait_timer_waiting_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
     });
     expect((variables.get("ORDER_RETRY_TIMER") as { dueAt?: number }).dueAt).toBeGreaterThan(
       Date.now(),
@@ -8826,8 +8832,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("timer:due");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timerOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timer") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timerOutput).toMatchObject({
+      status: "due",
+      waitFlowId: "wait_timer_due_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
+    });
     expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
       status: "due",
+      waitFlowId: "wait_timer_due_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
     });
   });
 
@@ -8882,6 +8903,9 @@ describe("runtime / hello-flow end-to-end", () => {
     )?.payload?.output;
     expect(timerOutput).toMatchObject({
       status: "expired",
+      waitFlowId: "wait_timer_expired_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
       requestedAt: expect.any(String),
       dueAt: expect.any(String),
       timeoutAt: expect.any(String),
@@ -8894,6 +8918,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("ORDER_RETRY_TIMER")).toMatchObject({
       status: "expired",
+      waitFlowId: "wait_timer_expired_e2e",
+      waitRunId: result.runRecord.runId,
+      waitNodeId: "timer",
     });
   });
 
