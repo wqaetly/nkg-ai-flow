@@ -580,6 +580,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         ignoredCount: "忽略数量",
         hasFailure: "是否失败",
         failedIndex: "失败索引",
+        failedIndexes: "失败索引列表",
+        ignoredIndexes: "忽略索引列表",
         errorCode: "错误码",
         errorMessage: "错误信息",
         evaluations: "评估结果",
