@@ -5590,6 +5590,30 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("class:author_http");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const classifierOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "classifier") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(classifierOutput?.summary).toMatchObject({
+      branch: "matched",
+      matched: true,
+      reason: "matched",
+      code: "node.http.missing_url",
+      kind: "validation",
+      category: "author",
+      retryable: false,
+      label: "author_http",
+      filters: {
+        codes: ["node.http.*"],
+        kinds: [],
+        categories: ["author"],
+        retryable: "any",
+        messageIncludes: "",
+      },
+      hasError: true,
+    });
   });
 
   it("routes error_classifier to unmatched when filters do not match", async () => {
@@ -5630,6 +5654,30 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("miss:code_mismatch");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const classifierOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "classifier") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(classifierOutput?.summary).toMatchObject({
+      branch: "unmatched",
+      matched: false,
+      reason: "code_mismatch",
+      code: "node.http.missing_url",
+      kind: "validation",
+      category: "author",
+      retryable: false,
+      label: "",
+      filters: {
+        codes: ["node.llm.*"],
+        kinds: [],
+        categories: [],
+        retryable: "any",
+        messageIncludes: "",
+      },
+      hasError: true,
+    });
   });
 
   it("routes rate_limit to allowed and records a sliding-window hit", async () => {

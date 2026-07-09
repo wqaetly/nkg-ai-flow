@@ -104,30 +104,39 @@ export const errorClassifierNode = defineNode({
     { id: "message", direction: "output", kind: "data", label: "Message", schema: { type: "string" } },
     { id: "label", direction: "output", kind: "data", label: "Label", schema: { type: "string" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const error = input.error ?? input.input ?? input.in ?? null;
     const facts = readFacts(error);
     const label = String(config.label ?? "").trim();
+    const filters = {
+      codes: parseList(config.codes),
+      kinds: parseList(config.kinds),
+      categories: parseList(config.categories),
+      retryable: readRetryableFilter(config.retryable),
+      messageIncludes: String(config.messageIncludes ?? "").trim(),
+    };
     const decision = facts
-      ? classify(facts, {
-          codes: parseList(config.codes),
-          kinds: parseList(config.kinds),
-          categories: parseList(config.categories),
-          retryable: readRetryableFilter(config.retryable),
-          messageIncludes: String(config.messageIncludes ?? "").trim(),
-        })
+      ? classify(facts, filters)
       : { matched: false, reason: "no_error" };
     const branch = decision.matched ? "matched" : "unmatched";
-
-    ctx.log.debug("error_classifier selected branch", {
+    const summary = {
       branch,
+      matched: decision.matched,
       reason: decision.reason,
       code: facts?.code ?? "",
       kind: facts?.kind ?? "",
       category: facts?.category ?? "",
-    });
+      retryable: facts?.retryable ?? null,
+      message: facts?.message ?? "",
+      label,
+      filters,
+      hasError: facts !== null,
+    };
+
+    ctx.log.debug("error_classifier selected branch", summary);
 
     return {
       kind: "success",
@@ -141,6 +150,7 @@ export const errorClassifierNode = defineNode({
         message: facts?.message ?? "",
         label,
         reason: decision.reason,
+        summary,
       },
     };
   },

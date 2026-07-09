@@ -590,6 +590,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         message: "错误消息",
         label: "分类标签",
         reason: "匹配原因",
+        summary: "摘要",
       },
       fail_fast: {
         in: "输入分支",
