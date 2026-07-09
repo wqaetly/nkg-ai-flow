@@ -14492,6 +14492,7 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "joined",
       empty: false,
       count: 2,
+      presentCount: 2,
       expectedCount: 2,
       missingCount: 0,
       missingIndexes: [],
@@ -14503,6 +14504,76 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 1, value: "lower:Flow", present: true },
       ],
       presentIndexes: [0, 1],
+      absentIndexes: [],
+    });
+  });
+
+  it("reports absent join values separately from joined count", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "join_absent_values_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const emptyValue = flow.node("transform", {
+      id: "empty_value",
+      position: { x: 140, y: 20 },
+      config: { value: null },
+    });
+    const filledValue = flow.node("transform", {
+      id: "filled_value",
+      position: { x: 140, y: 140 },
+      config: { value: "ready" },
+    });
+    const join = flow.node("join", {
+      id: "join",
+      position: { x: 300, y: 80 },
+      config: { expectedCount: 2 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 80 },
+      config: { template: "present=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 80 } });
+
+    flow.connect(start.out("out"), emptyValue.in("in"));
+    flow.connect(start.out("out"), filledValue.in("in"));
+    flow.connect(emptyValue.out("out"), join.in("in"));
+    flow.connect(filledValue.out("out"), join.in("in"));
+    flow.connect(emptyValue.out("output"), join.in("values"));
+    flow.connect(filledValue.out("output"), join.in("values"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("presentCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "join_absent_values_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("present=1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(joinOutput).toMatchObject({
+      status: "joined",
+      empty: false,
+      count: 2,
+      presentCount: 1,
+      expectedCount: 2,
+      missingCount: 0,
+      missingIndexes: [],
+      complete: true,
+      indexedValues: [
+        { index: 0, value: null, present: false },
+        { index: 1, value: "ready", present: true },
+      ],
+      presentIndexes: [1],
+      absentIndexes: [0],
     });
   });
 
@@ -14552,9 +14623,11 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(joinOutput).toMatchObject({
       status: "partial",
       count: 1,
+      presentCount: 1,
       expectedCount: 2,
       missingCount: 1,
       missingIndexes: [1],
+      absentIndexes: [],
       complete: false,
     });
   });
@@ -14595,6 +14668,8 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "empty",
       empty: true,
       count: 0,
+      presentCount: 0,
+      absentIndexes: [],
       firstValue: null,
       lastValue: null,
     });
