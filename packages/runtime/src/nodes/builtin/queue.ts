@@ -128,6 +128,7 @@ export const queueNode = defineNode({
       label: "Remaining",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -164,13 +165,20 @@ export const queueNode = defineNode({
     }
 
     const queueSize = decision.state.items.length;
-    ctx.log.debug("queue selected branch", {
+    const summary = {
       name,
       mode,
       branch: decision.branch,
       count: decision.items.length,
+      requestedCount: count,
+      maxItems,
       queueSize,
-    });
+      remaining: Math.max(0, maxItems - queueSize),
+      pushedCount: decision.state.pushedCount,
+      poppedCount: decision.state.poppedCount,
+      persisted: decision.persist,
+    };
+    ctx.log.debug("queue selected branch", summary);
 
     return {
       kind: "success",
@@ -186,6 +194,7 @@ export const queueNode = defineNode({
         count: decision.items.length,
         queueSize,
         remaining: Math.max(0, maxItems - queueSize),
+        summary,
       },
     };
   },

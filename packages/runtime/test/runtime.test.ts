@@ -14730,6 +14730,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("queued:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const queueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "queue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(queueOutput).toMatchObject({
+      name: "ORDER_WORK_QUEUE",
+      mode: "push",
+      count: 1,
+      queueSize: 1,
+      remaining: 9,
+      summary: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "push",
+        branch: "pushed",
+        count: 1,
+        requestedCount: 1,
+        maxItems: 10,
+        queueSize: 1,
+        remaining: 9,
+        pushedCount: 1,
+        poppedCount: 0,
+        persisted: true,
+      },
+    });
     expect(variables.get("ORDER_WORK_QUEUE")).toMatchObject({
       items: [{ orderId: "order-1", task: "charge" }],
       pushedCount: 1,
@@ -14878,6 +14904,19 @@ describe("runtime / hello-flow end-to-end", () => {
       remaining: 2,
       items: ["work-1", "work-2"],
       item: "work-1",
+      summary: {
+        name: "ORDER_DYNAMIC_POLICY_QUEUE",
+        mode: "peek",
+        branch: "peeked",
+        count: 2,
+        requestedCount: 2,
+        maxItems: 5,
+        queueSize: 3,
+        remaining: 2,
+        pushedCount: 3,
+        poppedCount: 0,
+        persisted: true,
+      },
     });
     expect(variables.get("ORDER_DYNAMIC_POLICY_QUEUE")).toMatchObject({
       items: ["work-1", "work-2", "work-3"],
@@ -14929,6 +14968,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("popped:order-1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const queueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "queue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(queueOutput).toMatchObject({
+      name: "ORDER_WORK_QUEUE",
+      mode: "pop",
+      count: 1,
+      queueSize: 1,
+      remaining: 999,
+      summary: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "pop",
+        branch: "popped",
+        count: 1,
+        requestedCount: 1,
+        maxItems: 1000,
+        queueSize: 1,
+        remaining: 999,
+        pushedCount: 2,
+        poppedCount: 1,
+        persisted: true,
+      },
+    });
     expect(variables.get("ORDER_WORK_QUEUE")).toMatchObject({
       items: ["order-2"],
       pushedCount: 2,
@@ -15024,6 +15089,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("empty:0");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const queueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "queue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(queueOutput).toMatchObject({
+      name: "ORDER_WORK_QUEUE",
+      mode: "pop",
+      count: 0,
+      queueSize: 0,
+      remaining: 1000,
+      summary: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "pop",
+        branch: "empty",
+        count: 0,
+        requestedCount: 1,
+        maxItems: 1000,
+        queueSize: 0,
+        remaining: 1000,
+        pushedCount: 0,
+        poppedCount: 0,
+        persisted: false,
+      },
+    });
     expect(variables.has("ORDER_WORK_QUEUE")).toBe(false);
   });
 
@@ -15070,6 +15161,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("cleared:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const queueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "queue") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(queueOutput).toMatchObject({
+      name: "ORDER_WORK_QUEUE",
+      mode: "clear",
+      count: 2,
+      queueSize: 0,
+      remaining: 1000,
+      summary: {
+        name: "ORDER_WORK_QUEUE",
+        mode: "clear",
+        branch: "cleared",
+        count: 2,
+        requestedCount: 1,
+        maxItems: 1000,
+        queueSize: 0,
+        remaining: 1000,
+        pushedCount: 2,
+        poppedCount: 0,
+        persisted: false,
+      },
+    });
     expect(variables.has("ORDER_WORK_QUEUE")).toBe(false);
   });
 

@@ -1058,6 +1058,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         requestedCount: "请求数量",
         queueSize: "队列大小",
         remaining: "剩余容量",
+        summary: "摘要",
       },
       quorum: {
         values: "到达值",
