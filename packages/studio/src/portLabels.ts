@@ -635,6 +635,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         path: "路径",
         depth: "深度",
         includeNulls: "包含空值",
+        sourceIndexes: "来源索引",
+        sourcePaths: "来源路径",
         count: "数量",
         inputCount: "输入数量",
       },

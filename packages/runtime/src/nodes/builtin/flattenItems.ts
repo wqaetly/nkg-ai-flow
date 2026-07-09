@@ -9,6 +9,12 @@ import { z } from "zod";
 import { defineNode } from "@ai-native-flow/node-sdk";
 import { readPath } from "./_helpers.js";
 
+interface FlattenEntry {
+  value: unknown;
+  sourceIndex: number;
+  sourcePath: string;
+}
+
 const flattenItemsConfig = z
   .object({
     path: z
@@ -74,6 +80,20 @@ export const flattenItemsNode = defineNode({
     { id: "depth", direction: "output", kind: "data", label: "Depth", schema: { type: "number" } },
     { id: "includeNulls", direction: "output", kind: "data", label: "Include nulls", schema: { type: "boolean" } },
     {
+      id: "sourceIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Source indexes",
+      schema: { type: "array" },
+    },
+    {
+      id: "sourcePaths",
+      direction: "output",
+      kind: "data",
+      label: "Source paths",
+      schema: { type: "array" },
+    },
+    {
       id: "count",
       direction: "output",
       kind: "data",
@@ -98,10 +118,10 @@ export const flattenItemsNode = defineNode({
     const path = String(input.path ?? config.path ?? "");
     const depth = readPositiveInteger(input.depth) ?? readPositiveInteger(config.depth) ?? 1;
     const includeNulls = readBoolean(input.includeNulls) ?? readBoolean(config.includeNulls) ?? true;
-    const selected = path.trim() === "" ? source : source.map((item) => readPath(item, path));
-    const items = flatten(selected, depth).filter(
-      (item) => includeNulls || (item !== null && item !== undefined),
+    const entries = flattenSelected(source, path, depth).filter(
+      (entry) => includeNulls || (entry.value !== null && entry.value !== undefined),
     );
+    const items = entries.map((entry) => entry.value);
 
     ctx.log.debug("flatten_items flattened items", {
       count: items.length,
@@ -118,6 +138,8 @@ export const flattenItemsNode = defineNode({
         path,
         depth,
         includeNulls,
+        sourceIndexes: entries.map((entry) => entry.sourceIndex),
+        sourcePaths: entries.map((entry) => entry.sourcePath),
         count: items.length,
         inputCount: source.length,
       },
@@ -139,14 +161,20 @@ function readBoolean(value: unknown): boolean | undefined {
   return undefined;
 }
 
-function flatten(values: unknown[], depth: number): unknown[] {
-  const output: unknown[] = [];
-  for (const value of values) {
-    if (Array.isArray(value) && depth > 0) {
-      output.push(...flatten(value, depth - 1));
-    } else {
-      output.push(value);
-    }
+function flattenSelected(source: unknown[], path: string, depth: number): FlattenEntry[] {
+  const trimmedPath = path.trim();
+  return source.flatMap((item, index) => {
+    const value = trimmedPath === "" ? item : readPath(item, trimmedPath);
+    const basePath = trimmedPath === "" ? String(index) : `${index}.${trimmedPath}`;
+    return flattenEntries(value, depth, index, basePath);
+  });
+}
+
+function flattenEntries(value: unknown, depth: number, sourceIndex: number, sourcePath: string): FlattenEntry[] {
+  if (Array.isArray(value) && depth > 0) {
+    return value.flatMap((child, index) =>
+      flattenEntries(child, depth - 1, sourceIndex, `${sourcePath}.${index}`),
+    );
   }
-  return output;
+  return [{ value, sourceIndex, sourcePath }];
 }

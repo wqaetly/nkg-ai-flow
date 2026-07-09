@@ -18549,6 +18549,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("flat=0:a1,1:a2,2:b1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const flattenOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "flatten") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(flattenOutput).toMatchObject({
+      items: ["a1", "a2", "b1"],
+      sourceIndexes: [0, 0, 1],
+      sourcePaths: ["0.items.0", "0.items.1", "1.items.0"],
+      count: 3,
+      inputCount: 2,
+    });
   });
 
   it("uses dynamic flatten_items policy inputs", async () => {
@@ -18629,6 +18642,8 @@ describe("runtime / hello-flow end-to-end", () => {
       depth: 2,
       includeNulls: false,
       items: ["a", "b", "c"],
+      sourceIndexes: [0, 0, 1],
+      sourcePaths: ["0.groups.0.0", "0.groups.1.0", "1.groups.0.0"],
       count: 3,
       inputCount: 2,
     });
