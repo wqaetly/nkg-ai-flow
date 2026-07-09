@@ -1591,6 +1591,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       text_input: {
         text: "文本",
+        summary: "摘要",
       },
       tool: {
         in: "输入",

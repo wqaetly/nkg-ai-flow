@@ -38,13 +38,19 @@ export const textInputNode = defineNode({
       label: "Text",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ config }) {
     const value = typeof config.value === "string" ? config.value : "";
+    const summary = {
+      length: value.length,
+      empty: value.length === 0,
+      lineCount: value.length === 0 ? 0 : value.split(/\r?\n/).length,
+    };
     return {
       kind: "success",
-      outputs: { out: null, text: value },
+      outputs: { out: null, text: value, summary },
     };
   },
 });

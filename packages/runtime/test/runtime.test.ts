@@ -26490,6 +26490,17 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toEqual([{ query: "run input" }, "canvas text"]);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const textOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "input") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(textOutput?.summary).toMatchObject({
+      length: "canvas text".length,
+      empty: false,
+      lineCount: 1,
+    });
   });
 });
 
