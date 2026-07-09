@@ -22670,6 +22670,31 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(
       events.some((event) => event.kind === "node_started" && event.nodeId === "done_report"),
     ).toBe(false);
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+    expect(progress[0]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "loop_begin",
+      context: {
+        iteration: 0,
+        maxIterations: 2,
+        remainingIterations: 1,
+        checkMode: "after",
+        onError: "terminate",
+        timeoutMs: 0,
+      },
+    });
+    expect(progress[2]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "loop_begin",
+      context: {
+        iteration: 1,
+        maxIterations: 2,
+        remainingIterations: 0,
+        checkMode: "after",
+      },
+    });
     const loopFinished = events.filter(
       (event) => event.kind === "node_finished" && event.nodeId === "loop_end",
     );
@@ -22754,6 +22779,29 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(
       events.filter((event) => event.kind === "node_started" && event.nodeId === "body"),
     ).toHaveLength(2);
+    const progress = events.filter(
+      (event) => event.kind === "node_progress" && event.nodeId === "begin",
+    );
+    expect(progress[0]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "loop_begin",
+      context: {
+        iteration: 0,
+        maxIterations: 2,
+        remainingIterations: 1,
+        checkMode: "after",
+      },
+    });
+    expect(progress[2]?.payload).toMatchObject({
+      type: "loop_iteration",
+      loopType: "loop_begin",
+      context: {
+        iteration: 1,
+        maxIterations: 2,
+        remainingIterations: 0,
+        checkMode: "after",
+      },
+    });
   });
 
   it("aggregates inbound values for data input ports marked multiple", async () => {

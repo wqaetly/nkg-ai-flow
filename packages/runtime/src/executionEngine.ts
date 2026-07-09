@@ -1449,6 +1449,11 @@ export class ExecutionEngine {
         state,
         iteration,
         ...this.nextLoopIterationTrace(beginNode, iteration),
+        remainingIterations: Math.max(0, maxIterations - iteration - 1),
+        maxIterations,
+        checkMode,
+        onError: errorPolicy,
+        timeoutMs,
       };
       const iterationState: ExecutionState = {
         portValues: new Map(executionState.portValues),
