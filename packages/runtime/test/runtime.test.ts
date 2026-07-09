@@ -16168,10 +16168,16 @@ describe("runtime / hello-flow end-to-end", () => {
       failureIndexes: [0],
       firstSuccess: { status: "succeeded", value: "fresh" },
       firstFailure: { status: "failed", error: "api timeout" },
+      firstSuccessIndex: 1,
+      firstFailureIndex: 0,
       hasSuccess: true,
       hasFailure: true,
       successRate: 0.5,
       failureRate: 0.5,
+      summary: {
+        firstSuccessIndex: 1,
+        firstFailureIndex: 0,
+      },
     });
   });
 
@@ -16281,6 +16287,12 @@ describe("runtime / hello-flow end-to-end", () => {
       failureRate: 0.5,
       firstSuccess: { state: "done", label: "b" },
       firstFailure: { state: "blocked", failure: "api timeout", label: "a" },
+      firstSuccessIndex: 1,
+      firstFailureIndex: 0,
+      summary: {
+        firstSuccessIndex: 1,
+        firstFailureIndex: 0,
+      },
     });
   });
 
@@ -16342,10 +16354,16 @@ describe("runtime / hello-flow end-to-end", () => {
       failureIndexes: [0, 1],
       firstSuccess: null,
       firstFailure: { status: "failed", error: "api timeout" },
+      firstSuccessIndex: -1,
+      firstFailureIndex: 0,
       hasSuccess: false,
       hasFailure: true,
       successRate: 0,
       failureRate: 1,
+      summary: {
+        firstSuccessIndex: -1,
+        firstFailureIndex: 0,
+      },
     });
   });
 
@@ -16400,6 +16418,14 @@ describe("runtime / hello-flow end-to-end", () => {
       successCount: 0,
       failureCount: 0,
       total: 0,
+      firstSuccess: null,
+      firstFailure: null,
+      firstSuccessIndex: -1,
+      firstFailureIndex: -1,
+      summary: {
+        firstSuccessIndex: -1,
+        firstFailureIndex: -1,
+      },
     });
   });
 
