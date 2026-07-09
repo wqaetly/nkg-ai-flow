@@ -103,18 +103,24 @@ export const concatItemsNode = defineNode({
       label: "Source count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const sources = normalizeSources(input.items ?? input.input);
     const includeScalars = config.includeScalars !== false;
     const result = concatSources(sources, includeScalars);
-
-    ctx.log.debug("concat_items concatenated sources", {
+    const includedSourceCount = result.sourceRanges.filter((range) => range.included).length;
+    const summary = {
       count: result.items.length,
       sourceCount: sources.length,
+      includedSourceCount,
+      skippedSourceCount: sources.length - includedSourceCount,
       includeScalars,
-    });
+      sourceRanges: result.sourceRanges,
+    };
+
+    ctx.log.debug("concat_items concatenated sources", summary);
 
     return {
       kind: "success",
@@ -127,6 +133,7 @@ export const concatItemsNode = defineNode({
         sourceRanges: result.sourceRanges,
         count: result.items.length,
         sourceCount: sources.length,
+        summary,
       },
     };
   },

@@ -402,6 +402,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         sourceRanges: "来源范围",
         count: "数量",
         sourceCount: "来源数量",
+        summary: "摘要",
       },
       checkpoint: {
         in: "输入",

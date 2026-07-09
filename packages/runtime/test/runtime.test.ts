@@ -20219,6 +20219,17 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       count: 3,
       sourceCount: 2,
+      summary: {
+        count: 3,
+        sourceCount: 2,
+        includedSourceCount: 2,
+        skippedSourceCount: 0,
+        includeScalars: true,
+        sourceRanges: [
+          { sourceIndex: 0, start: 0, end: 2, count: 2, included: true },
+          { sourceIndex: 1, start: 2, end: 3, count: 1, included: true },
+        ],
+      },
     });
   });
 
