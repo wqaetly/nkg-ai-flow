@@ -66,12 +66,14 @@ export const expressionEvalNode = defineNode({
       label: "Truthy",
       schema: { type: "boolean" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const expression = String((input as Record<string, unknown>).expression ?? config.expression ?? "input");
     const result = evaluateExpression(expression, input as Record<string, unknown>);
     const truthy = Boolean(result);
+    const resultType = Array.isArray(result) ? "array" : result === null ? "null" : typeof result;
 
     ctx.log.debug("expression_eval evaluated expression", {
       expression,
@@ -85,6 +87,12 @@ export const expressionEvalNode = defineNode({
         result,
         expression,
         truthy,
+        summary: {
+          status: "evaluated",
+          expression,
+          truthy,
+          resultType,
+        },
       },
     };
   },

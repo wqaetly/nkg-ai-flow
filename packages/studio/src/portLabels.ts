@@ -560,6 +560,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         expression: "表达式",
         result: "结果",
         truthy: "是否为真",
+        summary: "摘要",
       },
       error_classifier: {
         error: "错误",

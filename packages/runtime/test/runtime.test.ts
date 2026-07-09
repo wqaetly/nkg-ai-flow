@@ -18259,6 +18259,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("truthy=true");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const expressionOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "expression") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(expressionOutput).toMatchObject({
+      result: true,
+      truthy: true,
+      expression: "input.amount >= 10 && input.status == 'ready' && contains(input.tags, 'batch')",
+      summary: {
+        status: "evaluated",
+        expression: "input.amount >= 10 && input.status == 'ready' && contains(input.tags, 'batch')",
+        truthy: true,
+        resultType: "boolean",
+      },
+    });
   });
 
   it("uses dynamic expression_eval expression ahead of static config", async () => {
@@ -18305,6 +18322,23 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("truthy=true");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const expressionOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "expression") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(expressionOutput).toMatchObject({
+      result: true,
+      truthy: true,
+      expression: "input.amount >= 5 && input.status == 'ready'",
+      summary: {
+        status: "evaluated",
+        expression: "input.amount >= 5 && input.status == 'ready'",
+        truthy: true,
+        resultType: "boolean",
+      },
+    });
   });
 
   it("evaluates expression_eval aggregate and string helper functions", async () => {
