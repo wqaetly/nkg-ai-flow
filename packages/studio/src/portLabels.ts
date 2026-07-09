@@ -1377,6 +1377,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         createMissing: "创建缺失路径",
         overwrite: "覆盖已有值",
         reason: "原因",
+        summary: "摘要",
       },
       slice_items: {
         items: "截取项",

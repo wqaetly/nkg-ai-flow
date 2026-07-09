@@ -21462,6 +21462,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('updated={"order":{"id":"ord_1","status":"paid"}}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      branch: "updated",
+      path: "order.status",
+      createMissing: true,
+      overwrite: true,
+      exists: false,
+      changed: true,
+      reason: "created",
+      assignedType: "string",
+      previousType: "undefined",
+      valueType: "object",
+    });
   });
 
   it("uses dynamic set_path path value and createMissing ahead of static config", async () => {
@@ -21529,6 +21547,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('updated={"order":{"customer":{"name":"dynamic-customer"},"id":"ord_1"}}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      branch: "updated",
+      path: "order.customer.name",
+      createMissing: true,
+      overwrite: true,
+      exists: false,
+      changed: true,
+      reason: "created",
+      assignedType: "string",
+      previousType: "undefined",
+      valueType: "object",
+    });
   });
 
   it("uses dynamic set_path overwrite ahead of static config", async () => {
@@ -21575,6 +21611,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("assigned=paid");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      branch: "updated",
+      path: "order.status",
+      createMissing: true,
+      overwrite: true,
+      exists: true,
+      changed: true,
+      reason: "overwritten",
+      assignedType: "string",
+      previousType: "string",
+      valueType: "object",
+    });
   });
 
   it("routes set_path to missing when containers cannot be created", async () => {
@@ -21614,6 +21668,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("missing=path_missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      branch: "missing",
+      path: "order.status",
+      createMissing: false,
+      overwrite: true,
+      exists: false,
+      changed: false,
+      reason: "path_missing",
+      assignedType: "string",
+      previousType: "undefined",
+      valueType: "object",
+    });
   });
 
   it("routes set_path to skipped when overwrite is disabled", async () => {
@@ -21653,6 +21725,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("previous=new");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      branch: "skipped",
+      path: "order.status",
+      createMissing: true,
+      overwrite: false,
+      exists: true,
+      changed: false,
+      reason: "overwrite_disabled",
+      assignedType: "string",
+      previousType: "string",
+      valueType: "object",
+    });
   });
 
   it("deletes nested object fields by path with delete_path", async () => {

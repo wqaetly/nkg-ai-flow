@@ -124,6 +124,7 @@ export const setPathNode = defineNode({
       label: "Reason",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -136,6 +137,18 @@ export const setPathNode = defineNode({
       createMissing,
       overwrite,
     });
+    const summary = {
+      branch: result.branch,
+      path,
+      createMissing,
+      overwrite,
+      exists: result.exists,
+      changed: result.changed,
+      reason: result.reason,
+      assignedType: valueType(assigned),
+      previousType: valueType(result.previous),
+      valueType: valueType(result.value),
+    };
 
     ctx.log.debug("set_path wrote value", {
       path,
@@ -159,6 +172,7 @@ export const setPathNode = defineNode({
         createMissing,
         overwrite,
         reason: result.reason,
+        summary,
       },
     };
   },
@@ -357,4 +371,11 @@ function setSegment(
 function readArrayIndex(value: string): number | undefined {
   if (!/^\d+$/.test(value)) return undefined;
   return Number(value);
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return typeof value;
 }
