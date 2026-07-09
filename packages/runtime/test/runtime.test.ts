@@ -5636,6 +5636,92 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("routes retry_state check to retry after backoff expires", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("PAYMENT_RETRY:order-ready", {
+      status: "waiting",
+      attempt: 1,
+      maxAttempts: 3,
+      retryable: true,
+      lastError: { code: "payment.timeout", retryable: true },
+      nextRetryAt: Date.now() - 1,
+      exhaustedAt: null,
+      updatedAt: Date.now() - 1000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "retry_state_ready_check_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const retry = flow.node("retry_state", {
+      id: "retry",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "PAYMENT_RETRY",
+        key: "order-ready",
+        mode: "check",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), retry.in("in"));
+    flow.connect(retry.out("retry"), report.in("in"));
+    flow.connect(retry.out("nextAttempt"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_state_ready_check_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const retryOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "retry") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(retryOutput).toMatchObject({
+      status: "retry",
+      stateStatus: "retry",
+      attempt: 1,
+      nextAttempt: 2,
+      maxAttempts: 3,
+      remainingAttempts: 2,
+      delayMs: 0,
+      retryAfterMs: 0,
+      exhaustedValue: false,
+      unsafeValue: false,
+      summary: {
+        status: "retry",
+        mode: "check",
+        stateStatus: "retry",
+        attempt: 1,
+        nextAttempt: 2,
+        maxAttempts: 3,
+        remainingAttempts: 2,
+        delayMs: 0,
+        retryAfterMs: 0,
+      },
+    });
+    expect(variables.get("PAYMENT_RETRY:order-ready")).toMatchObject({
+      status: "retry",
+      attempt: 1,
+      retryFlowId: "retry_state_ready_check_e2e",
+      retryRunId: result.runRecord.runId,
+      retryNodeId: "retry",
+    });
+  });
+
   it("routes retry_state to exhausted when attempts reach the limit", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("PAYMENT_RETRY:order-1", {
