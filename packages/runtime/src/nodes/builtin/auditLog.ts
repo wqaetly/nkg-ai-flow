@@ -129,6 +129,7 @@ export const auditLogNode = defineNode({
       label: "Sequence",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -177,13 +178,23 @@ export const auditLogNode = defineNode({
       store.delete(name);
     }
 
-    ctx.log.debug("audit_log selected branch", {
+    const summary = {
       name,
       mode,
       branch: decision.branch,
       count: decision.entries.length,
+      retainedCount: decision.state.entries.length,
       sequence: decision.state.sequence,
-    });
+      maxEntries,
+      limit,
+      type: eventType,
+      actor,
+      message,
+      entrySequence: decision.entries[0]?.sequence ?? null,
+      persisted: decision.persist,
+      updatedAt: decision.state.updatedAt,
+    };
+    ctx.log.debug("audit_log selected branch", summary);
 
     return {
       kind: "success",
@@ -201,6 +212,7 @@ export const auditLogNode = defineNode({
         state: decision.state,
         count: decision.entries.length,
         sequence: decision.state.sequence,
+        summary,
       },
     };
   },

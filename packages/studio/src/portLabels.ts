@@ -246,6 +246,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         state: "日志状态",
         count: "数量",
         sequence: "序号",
+        summary: "摘要",
       },
       compensation: {
         in: "输入",

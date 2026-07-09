@@ -11356,6 +11356,28 @@ describe("runtime / hello-flow end-to-end", () => {
         },
       ],
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const auditOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "audit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(auditOutput?.summary).toMatchObject({
+      name: "ORDER_AUDIT_LOG",
+      mode: "append",
+      branch: "appended",
+      count: 1,
+      retainedCount: 1,
+      sequence: 1,
+      maxEntries: 10,
+      limit: 100,
+      type: "approval",
+      actor: "finance",
+      message: "Order approved",
+      entrySequence: 1,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("appends business events into a dynamically named audit_log", async () => {
@@ -11575,6 +11597,22 @@ describe("runtime / hello-flow end-to-end", () => {
       limit: 1,
       sequence: 3,
     });
+    expect(auditOutput?.summary).toMatchObject({
+      name: "ORDER_AUDIT_LOG",
+      mode: "append",
+      branch: "appended",
+      count: 1,
+      retainedCount: 2,
+      sequence: 3,
+      maxEntries: 2,
+      limit: 1,
+      type: "payment",
+      actor: "payment-service",
+      message: "Payment captured",
+      entrySequence: 3,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("reads recent audit_log entries with a limit", async () => {
@@ -11662,6 +11700,24 @@ describe("runtime / hello-flow end-to-end", () => {
         { sequence: 3 },
       ],
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const auditOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "audit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(auditOutput?.summary).toMatchObject({
+      name: "ORDER_AUDIT_LOG",
+      mode: "read",
+      branch: "read",
+      count: 2,
+      retainedCount: 3,
+      sequence: 3,
+      limit: 2,
+      entrySequence: 2,
+      persisted: true,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("routes empty audit_log reads to empty", async () => {
@@ -11702,6 +11758,23 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("audit:0");
     expect(variables.has("ORDER_AUDIT_LOG")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const auditOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "audit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(auditOutput?.summary).toMatchObject({
+      name: "ORDER_AUDIT_LOG",
+      mode: "read",
+      branch: "empty",
+      count: 0,
+      retainedCount: 0,
+      sequence: 0,
+      entrySequence: null,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("clears audit_log entries", async () => {
@@ -11770,6 +11843,23 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("audit:2");
     expect(variables.has("ORDER_AUDIT_LOG")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const auditOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "audit") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(auditOutput?.summary).toMatchObject({
+      name: "ORDER_AUDIT_LOG",
+      mode: "clear",
+      branch: "cleared",
+      count: 2,
+      retainedCount: 0,
+      sequence: 2,
+      entrySequence: 1,
+      persisted: false,
+      updatedAt: expect.any(Number),
+    });
   });
 
   it("increments a persisted metric", async () => {
