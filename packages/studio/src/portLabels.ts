@@ -1609,6 +1609,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         dueValue: "是否到期",
         waitingValue: "是否等待中",
         expiredValue: "是否过期",
+        summary: "摘要",
       },
     },
   },

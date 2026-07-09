@@ -152,6 +152,7 @@ export const waitTimerNode = defineNode({
     { id: "dueValue", direction: "output", kind: "data", label: "Due", schema: { type: "boolean" } },
     { id: "waitingValue", direction: "output", kind: "data", label: "Waiting", schema: { type: "boolean" } },
     { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -226,6 +227,17 @@ export const waitTimerNode = defineNode({
         dueValue: next.status === "due",
         waitingValue: next.status === "waiting",
         expiredValue: next.status === "expired",
+        summary: waitTimerSummary({
+          name,
+          state: next,
+          requestedAtIso,
+          dueAtIso,
+          timeoutAtIso,
+          timeoutMs,
+          reset,
+          remainingMs,
+          overdueByMs,
+        }),
       },
     };
   },
@@ -307,6 +319,36 @@ function readStatus(value: unknown): WaitTimerStatus {
   return value === "due" || value === "expired" || value === "waiting"
     ? value
     : "waiting";
+}
+
+function waitTimerSummary(args: {
+  name: string;
+  state: WaitTimerState;
+  requestedAtIso: string;
+  dueAtIso: string;
+  timeoutAtIso: string;
+  timeoutMs: number;
+  reset: boolean;
+  remainingMs: number;
+  overdueByMs: number;
+}): Record<string, unknown> {
+  return {
+    name: args.name,
+    status: args.state.status,
+    waitFlowId: args.state.waitFlowId,
+    waitRunId: args.state.waitRunId,
+    waitNodeId: args.state.waitNodeId,
+    requestedAt: args.requestedAtIso,
+    dueAt: args.dueAtIso,
+    timeoutAt: args.timeoutAtIso,
+    timeoutMs: args.timeoutMs,
+    reset: args.reset,
+    remainingMs: args.remainingMs,
+    overdueByMs: args.overdueByMs,
+    dueValue: args.state.status === "due",
+    waitingValue: args.state.status === "waiting",
+    expiredValue: args.state.status === "expired",
+  };
 }
 
 function readDueTime(value: unknown): number | null {
