@@ -13,6 +13,8 @@
 
 本文档作为项目入口，只覆盖 **项目目标 / 主要功能 / 安装与运行指引**；详细架构、规格和决策请看
 [ARCHITECTURE.md](./ARCHITECTURE.md) 和 [docs/](./docs)。
+通用 Workflow Runtime 控制流能力的收敛覆盖范围见
+[docs/specs/workflow-runtime-coverage.md](./docs/specs/workflow-runtime-coverage.md)。
 
 ---
 
