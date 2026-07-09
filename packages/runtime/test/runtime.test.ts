@@ -2417,6 +2417,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("chosen:backup");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectorOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "selector") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectorOutput).toMatchObject({
+      index: 1,
+      firstSuccessIndex: 1,
+      firstFailureIndex: 0,
+      successIndexes: [1, 2],
+      failureIndexes: [0],
+      successCount: 2,
+      failureCount: 1,
+      count: 3,
+      summary: {
+        index: 1,
+        firstSuccessIndex: 1,
+        firstFailureIndex: 0,
+        successIndexes: [1, 2],
+        failureIndexes: [0],
+        successCount: 2,
+        failureCount: 1,
+        count: 3,
+      },
+    });
   });
 
   it("uses dynamic first_success policy inputs", async () => {
@@ -2509,8 +2535,24 @@ describe("runtime / hello-flow end-to-end", () => {
       errorPath: "error",
       successValueCount: 1,
       index: 1,
+      firstSuccessIndex: 1,
+      firstFailureIndex: 0,
+      successIndexes: [1],
+      failureIndexes: [0],
+      successCount: 1,
+      failureCount: 1,
+      count: 2,
       status: "found",
       reason: "status_match",
+      summary: {
+        index: 1,
+        firstSuccessIndex: 1,
+        firstFailureIndex: 0,
+        successIndexes: [1],
+        failureIndexes: [0],
+        successCount: 1,
+        failureCount: 1,
+      },
     });
   });
 
@@ -2560,6 +2602,33 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("fallback:no_successful_candidate");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectorOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "selector") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectorOutput).toMatchObject({
+      index: -1,
+      firstSuccessIndex: -1,
+      firstFailureIndex: 0,
+      successIndexes: [],
+      failureIndexes: [0, 1],
+      successCount: 0,
+      failureCount: 2,
+      count: 2,
+      status: "missing",
+      reason: "no_successful_candidate",
+      summary: {
+        index: -1,
+        firstSuccessIndex: -1,
+        firstFailureIndex: 0,
+        successIndexes: [],
+        failureIndexes: [0, 1],
+        successCount: 0,
+        failureCount: 2,
+      },
+    });
   });
 
   it("routes fallback to primary when the selected value is usable", async () => {

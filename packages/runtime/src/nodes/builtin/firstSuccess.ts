@@ -131,9 +131,40 @@ export const firstSuccessNode = defineNode({
     },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
     { id: "index", direction: "output", kind: "data", label: "Index", schema: { type: "number" } },
+    {
+      id: "firstSuccessIndex",
+      direction: "output",
+      kind: "data",
+      label: "First Success Index",
+      schema: { type: "number" },
+    },
+    {
+      id: "firstFailureIndex",
+      direction: "output",
+      kind: "data",
+      label: "First Failure Index",
+      schema: { type: "number" },
+    },
+    {
+      id: "successIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Success Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
+      id: "failureIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Failure Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    { id: "successCount", direction: "output", kind: "data", label: "Success Count", schema: { type: "number" } },
+    { id: "failureCount", direction: "output", kind: "data", label: "Failure Count", schema: { type: "number" } },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -152,20 +183,43 @@ export const firstSuccessNode = defineNode({
         errorPath,
       }),
     );
+    const successIndexes = evaluations
+      .filter((evaluation) => evaluation.passed)
+      .map((evaluation) => evaluation.index);
+    const failureIndexes = evaluations
+      .filter((evaluation) => !evaluation.passed)
+      .map((evaluation) => evaluation.index);
     const selected = evaluations.find((evaluation) => evaluation.passed);
     const status = selected ? "found" : "missing";
     const reason = selected?.reason ?? "no_successful_candidate";
+    const firstSuccessIndex = selected?.index ?? -1;
+    const firstFailureIndex = failureIndexes[0] ?? -1;
+    const successCount = successIndexes.length;
+    const failureCount = failureIndexes.length;
     const value =
       selected === undefined
         ? null
         : selectValue(selected.candidate, valuePath);
-
-    ctx.log.debug("first_success evaluated candidates", {
+    const summary = {
       status,
+      reason,
+      index: firstSuccessIndex,
+      firstSuccessIndex,
+      firstFailureIndex,
+      successIndexes,
+      failureIndexes,
+      successCount,
+      failureCount,
       count: candidates.length,
-      index: selected?.index ?? -1,
       mode,
-    });
+      valuePath,
+      statusPath,
+      successValues: successValuesSource,
+      errorPath,
+      successValueCount: successValues.size,
+    };
+
+    ctx.log.debug("first_success evaluated candidates", summary);
 
     return {
       kind: "success",
@@ -181,10 +235,17 @@ export const firstSuccessNode = defineNode({
         errorPath,
         successValueCount: successValues.size,
         evaluations,
-        index: selected?.index ?? -1,
+        index: firstSuccessIndex,
+        firstSuccessIndex,
+        firstFailureIndex,
+        successIndexes,
+        failureIndexes,
+        successCount,
+        failureCount,
         count: candidates.length,
         status,
         reason,
+        summary,
       },
     };
   },
