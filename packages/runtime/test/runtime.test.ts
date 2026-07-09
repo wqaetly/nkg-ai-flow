@@ -17782,6 +17782,115 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_CLEAR_CHECKPOINT")).toBe(false);
   });
 
+  it("touches an existing checkpoint to extend ttl and metadata", async () => {
+    const now = Date.now();
+    const originalExpiresAt = now + 1_000;
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_TOUCH_CHECKPOINT", {
+      name: "ORDER_TOUCH_CHECKPOINT",
+      status: "loaded",
+      snapshot: { step: "payment", status: "waiting" },
+      label: "old label",
+      checkpointFlowId: "old_flow",
+      checkpointRunId: "old_run",
+      checkpointNodeId: "old_checkpoint",
+      version: 5,
+      savedAt: now - 30_000,
+      loadedAt: now - 5_000,
+      expiresAt: originalExpiresAt,
+      updatedAt: now - 5_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_touch_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_TOUCH_CHECKPOINT",
+        mode: "touch",
+        label: "renewed label",
+        ttlMs: 60_000,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "checkpoint:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(checkpoint.out("saved"), report.in("in"));
+    flow.connect(checkpoint.out("label"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_touch_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:renewed label");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "saved",
+      name: "ORDER_TOUCH_CHECKPOINT",
+      mode: "touch",
+      label: "renewed label",
+      snapshot: { step: "payment", status: "waiting" },
+      checkpointFlowId: "checkpoint_touch_e2e",
+      checkpointRunId: result.runRecord.runId,
+      checkpointNodeId: "checkpoint",
+      version: 5,
+      stateExists: true,
+      savedValue: true,
+      loadedValue: false,
+      missingValue: false,
+      clearedValue: false,
+      expiredValue: false,
+      remainingMs: expect.any(Number),
+      summary: {
+        name: "ORDER_TOUCH_CHECKPOINT",
+        mode: "touch",
+        status: "saved",
+        label: "renewed label",
+        snapshot: { step: "payment", status: "waiting" },
+        checkpointFlowId: "checkpoint_touch_e2e",
+        checkpointRunId: result.runRecord.runId,
+        checkpointNodeId: "checkpoint",
+        version: 5,
+        stateExists: true,
+        savedValue: true,
+        loadedValue: false,
+        missingValue: false,
+        clearedValue: false,
+        expiredValue: false,
+      },
+    });
+    expect(Number(checkpointOutput?.remainingMs)).toBeGreaterThan(0);
+    const stored = variables.get("ORDER_TOUCH_CHECKPOINT") as { expiresAt: number; label: string; version: number };
+    expect(stored).toMatchObject({
+      status: "saved",
+      label: "renewed label",
+      checkpointFlowId: "checkpoint_touch_e2e",
+      checkpointRunId: result.runRecord.runId,
+      checkpointNodeId: "checkpoint",
+      version: 5,
+    });
+    expect(stored.expiresAt).toBeGreaterThan(originalExpiresAt);
+  });
+
   it("routes checkpoint load to expired when the saved snapshot TTL has elapsed", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();
