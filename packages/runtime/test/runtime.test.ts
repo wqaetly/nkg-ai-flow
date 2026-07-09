@@ -22884,6 +22884,18 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 3,
       total: 5,
       hasMore: true,
+      summary: {
+        indexes: [1, 2, 3],
+        start: 1,
+        end: 4,
+        requestedStart: 1,
+        requestedEnd: 0,
+        requestedCount: 3,
+        count: 3,
+        total: 5,
+        fromEnd: false,
+        hasMore: true,
+      },
     });
   });
 
@@ -22958,6 +22970,18 @@ describe("runtime / hello-flow end-to-end", () => {
       count: 2,
       total: 5,
       hasMore: true,
+      summary: {
+        indexes: [2, 3],
+        start: 2,
+        end: 4,
+        requestedStart: 2,
+        requestedEnd: 4,
+        requestedCount: 0,
+        count: 2,
+        total: 5,
+        fromEnd: false,
+        hasMore: true,
+      },
     });
   });
 
@@ -23040,6 +23064,18 @@ describe("runtime / hello-flow end-to-end", () => {
       total: 5,
       fromEnd: true,
       hasMore: true,
+      summary: {
+        indexes: [2, 3],
+        start: 2,
+        end: 4,
+        requestedStart: 1,
+        requestedEnd: 0,
+        requestedCount: 2,
+        count: 2,
+        total: 5,
+        fromEnd: true,
+        hasMore: true,
+      },
     });
   });
 

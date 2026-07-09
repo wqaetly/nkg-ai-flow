@@ -1388,6 +1388,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         end: "终点",
         fromEnd: "从末尾开始",
         hasMore: "还有更多",
+        summary: "摘要",
       },
       sort_items: {
         items: "排序项",

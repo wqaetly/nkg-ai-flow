@@ -131,6 +131,7 @@ export const sliceItemsNode = defineNode({
       label: "Has more",
       schema: { type: "boolean" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -153,6 +154,19 @@ export const sliceItemsNode = defineNode({
         ? clamp(requestedEnd, start, total)
         : total;
     const items = source.slice(start, end);
+    const indexes = rangeIndexes(start, end);
+    const summary = {
+      start,
+      end,
+      requestedStart,
+      requestedEnd,
+      requestedCount,
+      count: items.length,
+      total,
+      fromEnd,
+      hasMore: end < total,
+      indexes,
+    };
 
     ctx.log.debug("slice_items sliced items", {
       start,
@@ -168,12 +182,13 @@ export const sliceItemsNode = defineNode({
         out: null,
         items,
         count: items.length,
-        indexes: rangeIndexes(start, end),
+        indexes,
         total,
         start,
         end,
         fromEnd,
         hasMore: end < total,
+        summary,
       },
     };
   },
