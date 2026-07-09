@@ -399,6 +399,14 @@ describe("runtime / hello-flow end-to-end", () => {
       elapsedMs: expect.any(Number),
       startedAt: expect.any(Number),
       completedAt: expect.any(Number),
+      summary: {
+        status: "delayed",
+        durationMs: 1,
+        elapsedMs: expect.any(Number),
+        startedAt: expect.any(Number),
+        completedAt: expect.any(Number),
+        driftMs: expect.any(Number),
+      },
     });
   });
 

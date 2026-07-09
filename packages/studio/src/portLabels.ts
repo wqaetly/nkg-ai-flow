@@ -526,6 +526,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         elapsedMs: "实际等待毫秒",
         startedAt: "开始时间",
         completedAt: "完成时间",
+        summary: "摘要",
       },
       distinct_until_changed: {
         in: "输入",

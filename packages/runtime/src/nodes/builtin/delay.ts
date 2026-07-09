@@ -69,6 +69,7 @@ export const delayNode = defineNode({
       label: "Completed At",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   async run({ input, config, ctx }) {
@@ -82,14 +83,23 @@ export const delayNode = defineNode({
       };
     }
     const completedAt = Date.now();
+    const elapsedMs = completedAt - startedAt;
     return {
       kind: "success",
       outputs: {
         out: null,
-        elapsedMs: completedAt - startedAt,
+        elapsedMs,
         durationMs,
         startedAt,
         completedAt,
+        summary: {
+          status: "delayed",
+          durationMs,
+          elapsedMs,
+          startedAt,
+          completedAt,
+          driftMs: Math.max(0, elapsedMs - durationMs),
+        },
       },
     };
   },
