@@ -197,6 +197,10 @@ export const subflowNode = defineNode({
     { id: "childFinishedAt", direction: "output", kind: "data", label: "Child Finished At", schema: { type: "string" } },
     { id: "childDurationMs", direction: "output", kind: "data", label: "Child Duration Ms", schema: { type: "number" } },
     { id: "childTraceId", direction: "output", kind: "data", label: "Child Trace Id", schema: { type: "string" } },
+    { id: "parentFlowId", direction: "output", kind: "data", label: "Parent Flow Id", schema: { type: "string" } },
+    { id: "parentFlowVersion", direction: "output", kind: "data", label: "Parent Flow Version", schema: { type: "string" } },
+    { id: "parentRunId", direction: "output", kind: "data", label: "Parent Run Id", schema: { type: "string" } },
+    { id: "parentNodeId", direction: "output", kind: "data", label: "Parent Node Id", schema: { type: "string" } },
     { id: "subflowDepth", direction: "output", kind: "data", label: "Subflow Depth", schema: { type: "number" } },
     { id: "childDepth", direction: "output", kind: "data", label: "Child Depth", schema: { type: "number" } },
     { id: "inputMode", direction: "output", kind: "data", label: "Input Mode", schema: { type: "string" } },
@@ -255,6 +259,12 @@ export const subflowNode = defineNode({
     }
     const childDepth = subflowDepth + 1;
     const childTraceId = `${ctx.runId}:${ctx.nodeId}`;
+    const parentLocator = {
+      parentFlowId: ctx.flowId,
+      parentFlowVersion: ctx.flowVersion,
+      parentRunId: ctx.runId,
+      parentNodeId: ctx.nodeId,
+    };
 
     const parentVariables = (ctx as unknown as { variables: VariableStore }).variables;
     const localVariables = readLocalVariables(policy.localVariables);
@@ -291,6 +301,7 @@ export const subflowNode = defineNode({
         flowId,
         flowVersion,
         childTraceId,
+        parentLocator,
         subflowDepth,
         childDepth,
         localScope,
@@ -332,6 +343,7 @@ export const subflowNode = defineNode({
       flowVersion: result.runRecord.flowVersion,
       ...childRunTiming(result.runRecord),
       childTraceId,
+      ...parentLocator,
       subflowDepth,
       childDepth,
       inputMode: policy.inputMode,
@@ -369,6 +381,7 @@ export const subflowNode = defineNode({
           flowId,
           flowVersion: result.runRecord.flowVersion,
           childTraceId,
+          parentLocator,
           subflowDepth,
           childDepth,
           localScope,
@@ -513,6 +526,12 @@ function contractFailure(args: {
   flowId: string;
   flowVersion: string;
   childTraceId: string;
+  parentLocator: {
+    parentFlowId: string;
+    parentFlowVersion: string;
+    parentRunId: string;
+    parentNodeId: string;
+  };
   subflowDepth: number;
   childDepth: number;
   localScope: boolean;
@@ -538,6 +557,7 @@ function contractFailure(args: {
         flowVersion: args.runRecord?.flowVersion ?? args.flowVersion,
         ...childRunTiming(args.runRecord),
         childTraceId: args.childTraceId,
+        ...args.parentLocator,
         contractStage: args.stage,
         contractIssues: args.issues,
         contractIssueCount: args.issues.length,
