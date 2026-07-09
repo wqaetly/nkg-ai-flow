@@ -19670,6 +19670,122 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("fans out through three parallel branches and reports branch batches", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "parallel_three_branch_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const fanout = flow.node("parallel", {
+      id: "fanout",
+      position: { x: 120, y: 120 },
+      config: { branchCount: 3, concurrency: 2 },
+    });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 280, y: 20 },
+      config: { template: "a:${input.name}" },
+    });
+    const second = flow.node("transform", {
+      id: "second",
+      position: { x: 280, y: 120 },
+      config: { template: "b:${input.name}" },
+    });
+    const third = flow.node("transform", {
+      id: "third",
+      position: { x: 280, y: 220 },
+      config: { template: "c:${input.name}" },
+    });
+    const join = flow.node("join", { id: "join", position: { x: 440, y: 120 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 580, y: 120 },
+      config: { template: "parallel=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 720, y: 120 } });
+
+    flow.connect(start.out("out"), fanout.in("in"));
+    flow.connect(start.out("runInput"), fanout.in("input"));
+    flow.connect(fanout.out("branch1"), first.in("in"));
+    flow.connect(fanout.out("branch2"), second.in("in"));
+    flow.connect(fanout.out("branch3"), third.in("in"));
+    flow.connect(fanout.out("value"), first.in("input"));
+    flow.connect(fanout.out("value"), second.in("input"));
+    flow.connect(fanout.out("value"), third.in("input"));
+    flow.connect(first.out("out"), join.in("in"));
+    flow.connect(second.out("out"), join.in("in"));
+    flow.connect(third.out("out"), join.in("in"));
+    flow.connect(first.out("output"), join.in("values"));
+    flow.connect(second.out("output"), join.in("values"));
+    flow.connect(third.out("output"), join.in("values"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("values"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "parallel_three_branch_e2e",
+      input: { name: "Flow" },
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fanoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fanout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("parallel=a:Flow,b:Flow,c:Flow");
+    expect(fanoutOutput).toMatchObject({
+      branchCount: 3,
+      concurrency: 2,
+      concurrencyLimited: true,
+      batchCount: 2,
+      branchIds: ["branch1", "branch2", "branch3"],
+      branchIndexes: [0, 1, 2],
+      branchNumbers: [1, 2, 3],
+      branches: [
+        { id: "branch1", index: 0, number: 1, parallelNodeId: "fanout" },
+        { id: "branch2", index: 1, number: 2, parallelNodeId: "fanout" },
+        { id: "branch3", index: 2, number: 3, parallelNodeId: "fanout" },
+      ],
+      branchBatches: [
+        {
+          index: 0,
+          branchIds: ["branch1", "branch2"],
+          branchIndexes: [0, 1],
+          branchNumbers: [1, 2],
+        },
+        {
+          index: 1,
+          branchIds: ["branch3"],
+          branchIndexes: [2],
+          branchNumbers: [3],
+        },
+      ],
+      summary: {
+        parallelNodeId: "fanout",
+        branchCount: 3,
+        concurrency: 2,
+        concurrencyLimited: true,
+        batchCount: 2,
+        branchIds: ["branch1", "branch2", "branch3"],
+      },
+    });
+    expect(joinOutput).toMatchObject({
+      status: "joined",
+      count: 3,
+      presentCount: 3,
+      firstValue: "a:Flow",
+      lastValue: "c:Flow",
+      values: ["a:Flow", "b:Flow", "c:Flow"],
+    });
+  });
+
   it("injects traceable branch inputs into direct parallel branch entries", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "parallel_branch_trace_inputs_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
