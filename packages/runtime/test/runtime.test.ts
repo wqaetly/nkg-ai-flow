@@ -15862,12 +15862,18 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "all_success",
       firstSuccess: { status: "ok", label: "a" },
       firstFailure: null,
+      firstSuccessIndex: 0,
+      firstFailureIndex: -1,
       successIndexes: [0, 1],
       failureIndexes: [],
       hasSuccess: true,
       hasFailure: false,
       successRate: 1,
       failureRate: 0,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: -1,
+      },
     });
   });
 
@@ -15972,6 +15978,12 @@ describe("runtime / hello-flow end-to-end", () => {
       failureRate: 0,
       firstSuccess: { state: "ready", label: "a" },
       firstFailure: null,
+      firstSuccessIndex: 0,
+      firstFailureIndex: -1,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: -1,
+      },
     });
   });
 
@@ -16026,12 +16038,18 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "failed",
       firstSuccess: { status: "ok", label: "a" },
       firstFailure: { status: "failed", error: "api timeout", label: "b" },
+      firstSuccessIndex: 0,
+      firstFailureIndex: 1,
       successIndexes: [0],
       failureIndexes: [1],
       hasSuccess: true,
       hasFailure: true,
       successRate: 0.5,
       failureRate: 0.5,
+      summary: {
+        firstSuccessIndex: 0,
+        firstFailureIndex: 1,
+      },
     });
   });
 
@@ -16071,6 +16089,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("all=empty");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const allOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "all") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(allOutput).toMatchObject({
+      status: "empty",
+      firstSuccess: null,
+      firstFailure: null,
+      firstSuccessIndex: -1,
+      firstFailureIndex: -1,
+      successIndexes: [],
+      failureIndexes: [],
+      summary: {
+        firstSuccessIndex: -1,
+        firstFailureIndex: -1,
+      },
+    });
   });
 
   it("routes any_success when at least one branch result succeeds", async () => {

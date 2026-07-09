@@ -134,6 +134,20 @@ export const allSuccessNode = defineNode({
     },
     { id: "firstSuccess", direction: "output", kind: "data", label: "First success" },
     { id: "firstFailure", direction: "output", kind: "data", label: "First failure" },
+    {
+      id: "firstSuccessIndex",
+      direction: "output",
+      kind: "data",
+      label: "First Success Index",
+      schema: { type: "number" },
+    },
+    {
+      id: "firstFailureIndex",
+      direction: "output",
+      kind: "data",
+      label: "First Failure Index",
+      schema: { type: "number" },
+    },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations" },
     { id: "summary", direction: "output", kind: "data", label: "Summary" },
     { id: "successCount", direction: "output", kind: "data", label: "Success count", schema: { type: "number" } },
@@ -177,6 +191,8 @@ export const allSuccessNode = defineNode({
     const failureIndexes = evaluations
       .filter((evaluation) => !evaluation.passed)
       .map((evaluation) => evaluation.index);
+    const firstSuccessIndex = successIndexes[0] ?? -1;
+    const firstFailureIndex = failureIndexes[0] ?? -1;
     const successCount = successes.length;
     const failureCount = failures.length;
     const total = results.length;
@@ -205,6 +221,8 @@ export const allSuccessNode = defineNode({
       failureRate,
       successIndexes,
       failureIndexes,
+      firstSuccessIndex,
+      firstFailureIndex,
     };
 
     ctx.log.debug("all_success classified branch results", summary);
@@ -220,6 +238,8 @@ export const allSuccessNode = defineNode({
         failureIndexes,
         firstSuccess: successes[0] ?? null,
         firstFailure: failures[0] ?? null,
+        firstSuccessIndex,
+        firstFailureIndex,
         evaluations,
         summary,
         successCount,
