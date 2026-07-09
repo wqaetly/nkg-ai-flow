@@ -880,6 +880,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         keys: "字段键",
         sourceCount: "来源数量",
         skippedCount: "跳过数量",
+        summary: "摘要",
       },
       metric: {
         in: "输入",

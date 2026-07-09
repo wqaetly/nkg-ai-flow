@@ -21885,6 +21885,22 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(result.output).toBe(
       'merged={"customer":{"id":"cus_1"},"order":{"id":"ord_1","status":"paid","total":42},"tags":["base"]}',
     );
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mergeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "merge_object") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mergeOutput?.summary).toMatchObject({
+      mode: "deep",
+      nullMode: "keep",
+      nonObjectMode: "skip",
+      scalarKey: "value",
+      sourceCount: 2,
+      skippedCount: 0,
+      keyCount: 3,
+      keys: ["order", "tags", "customer"],
+    });
   });
 
   it("reports skipped non-object sources with merge_object", async () => {
@@ -21924,6 +21940,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("skipped=1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mergeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "merge_object") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mergeOutput?.summary).toMatchObject({
+      mode: "deep",
+      nullMode: "keep",
+      nonObjectMode: "skip",
+      scalarKey: "value",
+      sourceCount: 0,
+      skippedCount: 1,
+      keyCount: 0,
+      keys: [],
+    });
   });
 
   it("uses dynamic merge_object modes and scalar key ahead of static config", async () => {
@@ -22012,6 +22044,22 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('merged={"nested":{"a":1,"b":2,"c":3},"scalar":"raw"}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mergeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "merge_object") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mergeOutput?.summary).toMatchObject({
+      mode: "deep",
+      nullMode: "skip",
+      nonObjectMode: "wrap",
+      scalarKey: "scalar",
+      sourceCount: 3,
+      skippedCount: 0,
+      keyCount: 2,
+      keys: ["nested", "scalar"],
+    });
   });
 
   it("flattens nested arrays with flatten_items", async () => {

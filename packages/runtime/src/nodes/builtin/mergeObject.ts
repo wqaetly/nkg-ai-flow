@@ -133,6 +133,7 @@ export const mergeObjectNode = defineNode({
     { id: "nullMode", direction: "output", kind: "data", label: "Null mode", schema: { type: "string" } },
     { id: "nonObjectMode", direction: "output", kind: "data", label: "Non-object mode", schema: { type: "string" } },
     { id: "scalarKey", direction: "output", kind: "data", label: "Scalar key", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -146,6 +147,16 @@ export const mergeObjectNode = defineNode({
     const normalized = normalizeSources(rawSources, options);
     const value = mergeSources(normalized.sources, options);
     const keys = Object.keys(value);
+    const summary = {
+      mode: options.mode,
+      nullMode: options.nullMode,
+      nonObjectMode: options.nonObjectMode,
+      scalarKey: options.scalarKey,
+      sourceCount: normalized.sources.length,
+      skippedCount: normalized.skipped.length,
+      keyCount: keys.length,
+      keys,
+    };
 
     ctx.log.debug("merge_object merged sources", {
       sourceCount: normalized.sources.length,
@@ -168,6 +179,7 @@ export const mergeObjectNode = defineNode({
         nullMode: options.nullMode,
         nonObjectMode: options.nonObjectMode,
         scalarKey: options.scalarKey,
+        summary,
       },
     };
   },
