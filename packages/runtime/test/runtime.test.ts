@@ -18746,6 +18746,18 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("mapped=0:alpha,1:beta,2:gamma");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mapOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "map") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mapOutput).toMatchObject({
+      items: ["0:alpha", "1:beta", "2:gamma"],
+      indexes: [0, 1, 2],
+      count: 3,
+      sourceCount: 3,
+    });
   });
 
   it("maps array items with map_items expressions", async () => {
@@ -18785,6 +18797,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("mapped=ALPHA,BETA");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mapOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "map") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mapOutput).toMatchObject({
+      expression: "upper(item.name)",
+      usedExpression: true,
+      items: ["ALPHA", "BETA"],
+      indexes: [0, 1],
+      count: 2,
+      sourceCount: 2,
+    });
   });
 
   it("uses dynamic map_items expression input", async () => {
@@ -18842,7 +18868,9 @@ describe("runtime / hello-flow end-to-end", () => {
       expression: "upper(item.name)",
       usedExpression: true,
       items: ["ALPHA", "BETA"],
+      indexes: [0, 1],
       count: 2,
+      sourceCount: 2,
     });
   });
 

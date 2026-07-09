@@ -791,6 +791,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         expression: "表达式",
         usedExpression: "使用表达式",
         count: "数量",
+        indexes: "来源索引",
+        sourceCount: "来源数量",
       },
       merge: {
         in: "输入分支",

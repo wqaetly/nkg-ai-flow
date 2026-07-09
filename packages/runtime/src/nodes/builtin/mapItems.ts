@@ -70,6 +70,20 @@ export const mapItemsNode = defineNode({
       label: "Count",
       schema: { type: "number" },
     },
+    {
+      id: "indexes",
+      direction: "output",
+      kind: "data",
+      label: "Source indexes",
+      schema: { type: "array" },
+    },
+    {
+      id: "sourceCount",
+      direction: "output",
+      kind: "data",
+      label: "Source count",
+      schema: { type: "number" },
+    },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -105,6 +119,8 @@ export const mapItemsNode = defineNode({
         expression,
         usedExpression,
         count: items.length,
+        indexes: source.map((_item, index) => index),
+        sourceCount: source.length,
       },
     };
   },
