@@ -17680,6 +17680,108 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(variables.has("ORDER_CHECKPOINT")).toBe(false);
   });
 
+  it("clears an existing checkpoint snapshot", async () => {
+    const now = Date.now();
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_CLEAR_CHECKPOINT", {
+      name: "ORDER_CLEAR_CHECKPOINT",
+      status: "saved",
+      snapshot: { step: "shipping", status: "ready" },
+      label: "shipping gate",
+      checkpointFlowId: "forward_flow",
+      checkpointRunId: "run-1",
+      checkpointNodeId: "checkpoint",
+      version: 4,
+      savedAt: now - 10_000,
+      loadedAt: null,
+      expiresAt: now + 60_000,
+      updatedAt: now - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "checkpoint_clear_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const checkpoint = flow.node("checkpoint", {
+      id: "checkpoint",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_CLEAR_CHECKPOINT",
+        mode: "clear",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "checkpoint:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), checkpoint.in("in"));
+    flow.connect(checkpoint.out("cleared"), report.in("in"));
+    flow.connect(checkpoint.out("clearedValue"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "checkpoint_clear_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("checkpoint:true");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const checkpointOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "checkpoint") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(checkpointOutput).toMatchObject({
+      status: "cleared",
+      name: "ORDER_CLEAR_CHECKPOINT",
+      state: null,
+      snapshot: null,
+      label: "",
+      version: 0,
+      savedAt: "",
+      loadedAt: "",
+      expiresAt: "",
+      ttlMs: 0,
+      remainingMs: 0,
+      stateExists: false,
+      savedValue: false,
+      loadedValue: false,
+      missingValue: false,
+      clearedValue: true,
+      expiredValue: false,
+      summary: {
+        name: "ORDER_CLEAR_CHECKPOINT",
+        mode: "clear",
+        status: "cleared",
+        label: "",
+        snapshot: null,
+        checkpointFlowId: "",
+        checkpointRunId: "",
+        checkpointNodeId: "",
+        version: 0,
+        savedAt: "",
+        loadedAt: "",
+        expiresAt: "",
+        ttlMs: 0,
+        remainingMs: 0,
+        stateExists: false,
+        savedValue: false,
+        loadedValue: false,
+        missingValue: false,
+        clearedValue: true,
+        expiredValue: false,
+      },
+    });
+    expect(variables.has("ORDER_CLEAR_CHECKPOINT")).toBe(false);
+  });
+
   it("routes checkpoint load to expired when the saved snapshot TTL has elapsed", async () => {
     const now = Date.now();
     const variables = new InMemoryVariableStore();
