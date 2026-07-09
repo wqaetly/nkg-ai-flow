@@ -14558,6 +14558,19 @@ describe("runtime / hello-flow end-to-end", () => {
       source: "runtime",
       scope: { flowId: "state_set_e2e" },
     });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set_state") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      name: "FLOW_STATE_VALUE",
+      existed: false,
+      valueType: "string",
+      previousType: "undefined",
+      descriptionPresent: true,
+    });
   });
 
   it("writes state with a dynamically named state_set", async () => {
@@ -14623,6 +14636,19 @@ describe("runtime / hello-flow end-to-end", () => {
       scope: { flowId: "state_set_dynamic_name_e2e" },
     });
     expect(variables.has("")).toBe(false);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const setOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "set_state") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(setOutput?.summary).toMatchObject({
+      name: "FLOW_DYNAMIC_STATE_VALUE",
+      existed: false,
+      valueType: "object",
+      previousType: "undefined",
+      descriptionPresent: true,
+    });
   });
 
   it("reads state as explicit data with state_get", async () => {

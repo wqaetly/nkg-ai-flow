@@ -1583,6 +1583,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         previous: "原值",
         existed: "已存在",
         name: "状态名",
+        summary: "摘要",
       },
       start: {
         runInput: "运行输入",

@@ -92,6 +92,7 @@ export const stateSetNode = defineNode({
       label: "Name",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -135,6 +136,13 @@ export const stateSetNode = defineNode({
 
     store.set(name, value, metadata);
     ctx.log.debug("state_set wrote variable", { name, existed });
+    const summary = {
+      name,
+      existed,
+      valueType: valueType(value),
+      previousType: valueType(previous),
+      descriptionPresent: description !== "",
+    };
 
     return {
       kind: "success",
@@ -144,6 +152,7 @@ export const stateSetNode = defineNode({
         value,
         previous: previous ?? null,
         existed,
+        summary,
       },
     };
   },
@@ -185,6 +194,13 @@ function toVariableValue(value: unknown): VariableValue | undefined {
     return out;
   }
   return undefined;
+}
+
+function valueType(value: unknown): string {
+  if (Array.isArray(value)) return "array";
+  if (value === undefined) return "undefined";
+  if (value === null) return "null";
+  return typeof value;
 }
 
 function error(
