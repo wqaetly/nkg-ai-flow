@@ -2266,6 +2266,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("schema:valid");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const guardOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "guard") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(guardOutput).toMatchObject({
+      status: "valid",
+      issueCount: 0,
+      firstIssue: "",
+      summary: {
+        status: "valid",
+        issueCount: 0,
+        firstIssue: "",
+        issuePaths: [],
+        issueCodes: [],
+      },
+    });
   });
 
   it("uses dynamic schema_guard schema input", async () => {
@@ -2342,6 +2360,13 @@ describe("runtime / hello-flow end-to-end", () => {
       schema: {
         required: ["id"],
       },
+      summary: {
+        status: "valid",
+        issueCount: 0,
+        firstIssue: "",
+        issuePaths: [],
+        issueCodes: [],
+      },
     });
   });
 
@@ -2392,6 +2417,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("issues:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const guardOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "guard") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(guardOutput).toMatchObject({
+      status: "invalid",
+      issueCount: 2,
+      firstIssue: "$.quantity must be integer",
+      summary: {
+        status: "invalid",
+        issueCount: 2,
+        firstIssue: "$.quantity must be integer",
+        issuePaths: ["$.quantity", "$.extra"],
+        issueCodes: ["type", "additional"],
+      },
+    });
   });
 
   it("transforms structured payloads with schema_transform mappings", async () => {

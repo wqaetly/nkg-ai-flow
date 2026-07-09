@@ -77,6 +77,7 @@ export const schemaGuardNode = defineNode({
       label: "First issue",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -93,11 +94,15 @@ export const schemaGuardNode = defineNode({
     const issues = validateValue(value, schema, "$");
     const valid = issues.length === 0;
     const status = valid ? "valid" : "invalid";
-
-    ctx.log.debug("schema_guard evaluated payload", {
+    const summary = {
       status,
       issueCount: issues.length,
-    });
+      firstIssue: issues[0]?.message ?? "",
+      issuePaths: issues.map((issue) => issue.path),
+      issueCodes: issues.map((issue) => issue.code),
+    };
+
+    ctx.log.debug("schema_guard evaluated payload", summary);
 
     return {
       kind: "success",
@@ -109,6 +114,7 @@ export const schemaGuardNode = defineNode({
         issues,
         issueCount: issues.length,
         firstIssue: issues[0]?.message ?? "",
+        summary,
       },
     };
   },

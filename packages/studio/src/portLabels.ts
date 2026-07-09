@@ -1296,6 +1296,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         issues: "问题列表",
         issueCount: "问题数量",
         firstIssue: "首个问题",
+        summary: "摘要",
       },
       schema_transform: {
         in: "输入",
