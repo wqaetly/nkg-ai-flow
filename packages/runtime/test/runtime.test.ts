@@ -17484,6 +17484,80 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic join expectedCount ahead of static config", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "join_dynamic_expected_count_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const expectedCount = flow.node("transform", {
+      id: "expected_count",
+      position: { x: 140, y: 0 },
+      config: { value: 3 },
+    });
+    const upper = flow.node("transform", {
+      id: "upper",
+      position: { x: 280, y: 0 },
+      config: { template: "upper:${input.name}" },
+    });
+    const join = flow.node("join", {
+      id: "join",
+      position: { x: 420, y: 0 },
+      config: { expectedCount: 1 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 560, y: 0 },
+      config: { template: "join=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 700, y: 0 } });
+
+    flow.connect(start.out("out"), expectedCount.in("in"));
+    flow.connect(expectedCount.out("out"), upper.in("in"));
+    flow.connect(start.out("runInput"), upper.in("input"));
+    flow.connect(upper.out("out"), join.in("in"));
+    flow.connect(upper.out("output"), join.in("values"));
+    flow.connect(expectedCount.out("output"), join.in("expectedCount"));
+    flow.connect(join.out("out"), report.in("in"));
+    flow.connect(join.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "join_dynamic_expected_count_e2e",
+      input: { name: "Flow" },
+    });
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const joinOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "join") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("join=partial");
+    expect(joinOutput).toMatchObject({
+      status: "partial",
+      count: 1,
+      presentCount: 1,
+      expectedCount: 3,
+      missingCount: 2,
+      missingIndexes: [1, 2],
+      complete: false,
+      summary: {
+        status: "partial",
+        count: 1,
+        presentCount: 1,
+        expectedCount: 3,
+        missingCount: 2,
+        missingIndexes: [1, 2],
+        complete: false,
+        empty: false,
+        firstValue: "upper:Flow",
+        lastValue: "upper:Flow",
+      },
+    });
+  });
+
   it("emits empty join diagnostics when no values arrive", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "join_empty_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
