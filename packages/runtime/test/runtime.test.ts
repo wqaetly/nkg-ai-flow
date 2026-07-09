@@ -12144,6 +12144,122 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("resolves approval with dynamic decision and comment inputs", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL", {
+      name: "ORDER_APPROVAL",
+      status: "pending",
+      requestFlowId: "approval_request_flow",
+      requestRunId: "approval_request_run",
+      requestNodeId: "approval_request_node",
+      title: "Approve shipment",
+      assignee: "ops",
+      payload: { orderId: "order-4" },
+      decision: null,
+      comment: "",
+      requestedAt: Date.now() - 10_000,
+      resolvedAt: null,
+      expiresAt: Date.now() + 60_000,
+      updatedAt: Date.now() - 10_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "approval_dynamic_resolve_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const decision = flow.node("transform", {
+      id: "decision",
+      position: { x: 120, y: 0 },
+      config: { value: "approve" },
+    });
+    const comment = flow.node("transform", {
+      id: "comment",
+      position: { x: 260, y: 0 },
+      config: { value: "release shipment" },
+    });
+    const approval = flow.node("approval", {
+      id: "approval",
+      position: { x: 400, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL",
+        mode: "resolve",
+        decision: "rejected",
+        comment: "static comment",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "approval:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), decision.in("in"));
+    flow.connect(decision.out("out"), comment.in("in"));
+    flow.connect(comment.out("out"), approval.in("in"));
+    flow.connect(decision.out("output"), approval.in("decision"));
+    flow.connect(comment.out("output"), approval.in("comment"));
+    flow.connect(approval.out("approved"), report.in("in"));
+    flow.connect(approval.out("comment"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "approval_dynamic_resolve_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("approval:release shipment");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const approvalOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "approval") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(approvalOutput).toMatchObject({
+      branch: "approved",
+      status: "approved",
+      requestFlowId: "approval_request_flow",
+      requestRunId: "approval_request_run",
+      requestNodeId: "approval_request_node",
+      title: "Approve shipment",
+      assignee: "ops",
+      payload: { orderId: "order-4" },
+      decision: "approved",
+      comment: "release shipment",
+      approvedValue: true,
+      rejectedValue: false,
+      summary: {
+        name: "ORDER_APPROVAL",
+        mode: "resolve",
+        branch: "approved",
+        status: "approved",
+        requestFlowId: "approval_request_flow",
+        requestRunId: "approval_request_run",
+        requestNodeId: "approval_request_node",
+        title: "Approve shipment",
+        assignee: "ops",
+        payload: { orderId: "order-4" },
+        decision: "approved",
+        comment: "release shipment",
+        approvedValue: true,
+        rejectedValue: false,
+        stateExists: true,
+      },
+    });
+    expect(variables.get("ORDER_APPROVAL")).toMatchObject({
+      status: "approved",
+      requestFlowId: "approval_request_flow",
+      requestRunId: "approval_request_run",
+      requestNodeId: "approval_request_node",
+      decision: "approved",
+      comment: "release shipment",
+    });
+  });
+
   it("routes expired pending approvals to expired", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL", {
