@@ -21298,6 +21298,106 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic concat_items includeScalars policy input", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "concat_items_dynamic_include_scalars_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 80 } });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 120, y: 0 },
+      config: { value: ["a"] },
+    });
+    const scalar = flow.node("transform", {
+      id: "scalar",
+      position: { x: 120, y: 80 },
+      config: { value: "skip-me" },
+    });
+    const second = flow.node("transform", {
+      id: "second",
+      position: { x: 120, y: 160 },
+      config: { value: ["b"] },
+    });
+    const includeScalars = flow.node("transform", {
+      id: "include_scalars",
+      position: { x: 120, y: 240 },
+      config: { value: false },
+    });
+    const concat = flow.node("concat_items", {
+      id: "concat",
+      position: { x: 300, y: 80 },
+      config: { includeScalars: true },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 440, y: 80 },
+      config: { template: "${index}:${item}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 580, y: 80 },
+      config: { template: "concat=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 720, y: 80 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(start.out("out"), scalar.in("in"));
+    flow.connect(start.out("out"), second.in("in"));
+    flow.connect(start.out("out"), includeScalars.in("in"));
+    flow.connect(first.out("out"), concat.in("in"));
+    flow.connect(scalar.out("out"), concat.in("in"));
+    flow.connect(second.out("out"), concat.in("in"));
+    flow.connect(first.out("output"), concat.in("items"));
+    flow.connect(scalar.out("output"), concat.in("items"));
+    flow.connect(second.out("output"), concat.in("items"));
+    flow.connect(includeScalars.out("output"), concat.in("includeScalars"));
+    flow.connect(concat.out("out"), map.in("in"));
+    flow.connect(concat.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "concat_items_dynamic_include_scalars_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("concat=0:a,1:b");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const concatOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "concat") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(concatOutput).toMatchObject({
+      items: ["a", "b"],
+      includeScalars: false,
+      sourceIndexes: [0, 2],
+      sourceOffsets: [0, 0],
+      sourceRanges: [
+        { sourceIndex: 0, start: 0, end: 1, count: 1, included: true },
+        { sourceIndex: 1, start: 1, end: 1, count: 0, included: false },
+        { sourceIndex: 2, start: 1, end: 2, count: 1, included: true },
+      ],
+      count: 2,
+      sourceCount: 3,
+      summary: {
+        count: 2,
+        sourceCount: 3,
+        includedSourceCount: 2,
+        skippedSourceCount: 1,
+        includeScalars: false,
+        sourceRanges: [
+          { sourceIndex: 0, start: 0, end: 1, count: 1, included: true },
+          { sourceIndex: 1, start: 1, end: 1, count: 0, included: false },
+          { sourceIndex: 2, start: 1, end: 2, count: 1, included: true },
+        ],
+      },
+    });
+  });
+
   it("splits text into array items with split_text", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "split_text_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

@@ -55,6 +55,13 @@ export const concatItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "includeScalars",
+      direction: "input",
+      kind: "data",
+      label: "Include scalars",
+      schema: { type: "boolean" },
+    },
+    {
       id: "items",
       direction: "output",
       kind: "data",
@@ -103,12 +110,20 @@ export const concatItemsNode = defineNode({
       label: "Source count",
       schema: { type: "number" },
     },
+    {
+      id: "includeScalars",
+      direction: "output",
+      kind: "data",
+      label: "Include scalars",
+      schema: { type: "boolean" },
+    },
     { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
     const sources = normalizeSources(input.items ?? input.input);
-    const includeScalars = config.includeScalars !== false;
+    const includeScalars =
+      readBoolean(input.includeScalars) ?? readBoolean(config.includeScalars) ?? true;
     const result = concatSources(sources, includeScalars);
     const includedSourceCount = result.sourceRanges.filter((range) => range.included).length;
     const summary = {
@@ -133,6 +148,7 @@ export const concatItemsNode = defineNode({
         sourceRanges: result.sourceRanges,
         count: result.items.length,
         sourceCount: sources.length,
+        includeScalars,
         summary,
       },
     };
@@ -142,6 +158,15 @@ export const concatItemsNode = defineNode({
 function normalizeSources(value: unknown): unknown[] {
   if (value === undefined) return [];
   return Array.isArray(value) ? value : [value];
+}
+
+function readBoolean(value: unknown): boolean | undefined {
+  if (typeof value === "boolean") return value;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") return true;
+  if (normalized === "false") return false;
+  return undefined;
 }
 
 function concatSources(sources: unknown[], includeScalars: boolean): ConcatResult {
