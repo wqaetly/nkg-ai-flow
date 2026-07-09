@@ -1612,6 +1612,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         keys: "唯一键",
         count: "唯一数量",
         duplicateCount: "重复数量",
+        summary: "摘要",
       },
       window_items: {
         items: "窗口项",

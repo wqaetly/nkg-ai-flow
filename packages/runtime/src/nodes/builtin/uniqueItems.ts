@@ -135,6 +135,7 @@ export const uniqueItemsNode = defineNode({
       label: "Duplicate count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -152,6 +153,17 @@ export const uniqueItemsNode = defineNode({
     const indexes = entries.map((entry) => entry.index);
     const duplicateItems = duplicates.map((entry) => entry.item);
     const duplicateIndexes = duplicates.map((entry) => entry.index);
+    const summary = {
+      path,
+      keep,
+      caseSensitive,
+      sourceCount: source.length,
+      count: items.length,
+      duplicateCount: duplicates.length,
+      indexes,
+      duplicateIndexes,
+      keys,
+    };
 
     ctx.log.debug("unique_items deduplicated items", {
       count: items.length,
@@ -175,6 +187,7 @@ export const uniqueItemsNode = defineNode({
         caseSensitive,
         count: items.length,
         duplicateCount: duplicates.length,
+        summary,
       },
     };
   },

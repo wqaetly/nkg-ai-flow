@@ -23687,6 +23687,17 @@ describe("runtime / hello-flow end-to-end", () => {
       indexes: [0, 1],
       duplicateIndexes: [2],
       keys: ["A", "b"],
+      summary: {
+        path: "id",
+        keep: "first",
+        caseSensitive: false,
+        sourceCount: 3,
+        count: 2,
+        duplicateCount: 1,
+        indexes: [0, 1],
+        duplicateIndexes: [2],
+        keys: ["A", "b"],
+      },
     });
   });
 
@@ -23780,6 +23791,17 @@ describe("runtime / hello-flow end-to-end", () => {
       indexes: [1, 2],
       duplicateIndexes: [0],
       keys: ["b", "a"],
+      summary: {
+        path: "id",
+        keep: "last",
+        caseSensitive: false,
+        sourceCount: 3,
+        count: 2,
+        duplicateCount: 1,
+        indexes: [1, 2],
+        duplicateIndexes: [0],
+        keys: ["b", "a"],
+      },
     });
   });
 
