@@ -1021,11 +1021,13 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         value: "胜出值",
         indexedValues: "索引数据",
         presentIndexes: "有效索引",
+        absentIndexes: "空值索引",
         hasWinner: "存在胜出值",
         emptyValue: "是否为空",
         winnerIndex: "胜出索引",
         index: "索引",
         count: "到达数量",
+        presentCount: "有效数量",
         status: "状态",
       },
       rate_limit: {

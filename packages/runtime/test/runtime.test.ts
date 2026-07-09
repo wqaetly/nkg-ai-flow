@@ -15037,8 +15037,66 @@ describe("runtime / hello-flow end-to-end", () => {
       winnerIndex: 0,
       index: 0,
       count: 1,
+      presentCount: 1,
       indexedValues: [{ index: 0, value: "fast", present: true }],
       presentIndexes: [0],
+      absentIndexes: [],
+    });
+  });
+
+  it("reports absent race values when arrivals are empty", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "race_absent_values_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const emptyValue = flow.node("transform", {
+      id: "empty_value",
+      position: { x: 140, y: 0 },
+      config: { value: null },
+    });
+    const race = flow.node("race", { id: "race", position: { x: 300, y: 0 } });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "status=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), emptyValue.in("in"));
+    flow.connect(emptyValue.out("out"), race.in("in"));
+    flow.connect(emptyValue.out("output"), race.in("values"));
+    flow.connect(race.out("empty"), report.in("in"));
+    flow.connect(race.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "race_absent_values_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("status=empty");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const raceOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "race") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(raceOutput).toMatchObject({
+      status: "empty",
+      value: null,
+      hasWinner: false,
+      emptyValue: true,
+      winnerIndex: -1,
+      index: -1,
+      count: 1,
+      presentCount: 0,
+      indexedValues: [
+        { index: 0, value: null, present: false },
+      ],
+      presentIndexes: [],
+      absentIndexes: [0],
     });
   });
 
@@ -15148,8 +15206,10 @@ describe("runtime / hello-flow end-to-end", () => {
       winnerIndex: -1,
       index: -1,
       count: 0,
+      presentCount: 0,
       indexedValues: [],
       presentIndexes: [],
+      absentIndexes: [],
     });
   });
 

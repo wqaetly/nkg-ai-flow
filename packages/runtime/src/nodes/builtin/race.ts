@@ -47,6 +47,13 @@ export const raceNode = defineNode({
       schema: { type: "array", items: { type: "number" } },
     },
     {
+      id: "absentIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Absent Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
+    {
       id: "hasWinner",
       direction: "output",
       kind: "data",
@@ -82,6 +89,13 @@ export const raceNode = defineNode({
       schema: { type: "number" },
     },
     {
+      id: "presentCount",
+      direction: "output",
+      kind: "data",
+      label: "Present Count",
+      schema: { type: "number" },
+    },
+    {
       id: "status",
       direction: "output",
       kind: "data",
@@ -99,6 +113,9 @@ export const raceNode = defineNode({
     }));
     const presentIndexes = indexedValues
       .filter((entry) => entry.present)
+      .map((entry) => entry.index);
+    const absentIndexes = indexedValues
+      .filter((entry) => !entry.present)
       .map((entry) => entry.index);
     const index = presentIndexes[0] ?? -1;
     const found = index >= 0;
@@ -119,11 +136,13 @@ export const raceNode = defineNode({
         values,
         indexedValues,
         presentIndexes,
+        absentIndexes,
         hasWinner: found,
         emptyValue: !found,
         winnerIndex: index,
         index,
         count: values.length,
+        presentCount: presentIndexes.length,
         status,
       },
     };
