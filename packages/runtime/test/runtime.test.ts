@@ -22075,6 +22075,15 @@ describe("runtime / hello-flow end-to-end", () => {
       sourcePaths: ["0.items.0", "0.items.1", "1.items.0"],
       count: 3,
       inputCount: 2,
+      summary: {
+        path: "items",
+        depth: 1,
+        includeNulls: true,
+        count: 3,
+        inputCount: 2,
+        sourceIndexes: [0, 0, 1],
+        sourcePaths: ["0.items.0", "0.items.1", "1.items.0"],
+      },
     });
   });
 
@@ -22160,6 +22169,15 @@ describe("runtime / hello-flow end-to-end", () => {
       sourcePaths: ["0.groups.0.0", "0.groups.1.0", "1.groups.0.0"],
       count: 3,
       inputCount: 2,
+      summary: {
+        path: "groups",
+        depth: 2,
+        includeNulls: false,
+        count: 3,
+        inputCount: 2,
+        sourceIndexes: [0, 0, 1],
+        sourcePaths: ["0.groups.0.0", "0.groups.1.0", "1.groups.0.0"],
+      },
     });
   });
 

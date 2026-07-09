@@ -107,6 +107,7 @@ export const flattenItemsNode = defineNode({
       label: "Input count",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -122,6 +123,17 @@ export const flattenItemsNode = defineNode({
       (entry) => includeNulls || (entry.value !== null && entry.value !== undefined),
     );
     const items = entries.map((entry) => entry.value);
+    const sourceIndexes = entries.map((entry) => entry.sourceIndex);
+    const sourcePaths = entries.map((entry) => entry.sourcePath);
+    const summary = {
+      path,
+      depth,
+      includeNulls,
+      count: items.length,
+      inputCount: source.length,
+      sourceIndexes,
+      sourcePaths,
+    };
 
     ctx.log.debug("flatten_items flattened items", {
       count: items.length,
@@ -138,10 +150,11 @@ export const flattenItemsNode = defineNode({
         path,
         depth,
         includeNulls,
-        sourceIndexes: entries.map((entry) => entry.sourceIndex),
-        sourcePaths: entries.map((entry) => entry.sourcePath),
+        sourceIndexes,
+        sourcePaths,
         count: items.length,
         inputCount: source.length,
+        summary,
       },
     };
   },

@@ -680,6 +680,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         sourcePaths: "来源路径",
         count: "数量",
         inputCount: "输入数量",
+        summary: "摘要",
       },
       first_success: {
         candidates: "候选结果",
