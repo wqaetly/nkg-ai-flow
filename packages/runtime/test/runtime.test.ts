@@ -21282,6 +21282,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("sku=second");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "select") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectOutput?.summary).toMatchObject({
+      branch: "found",
+      path: "order.items[1].sku",
+      exists: true,
+      hasDefault: false,
+      type: "string",
+      reason: "selected_path",
+    });
   });
 
   it("routes missing select_path values with a default", async () => {
@@ -21321,6 +21335,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("customer=anonymous");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "select") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectOutput?.summary).toMatchObject({
+      branch: "missing",
+      path: "order.customer.name",
+      exists: false,
+      hasDefault: true,
+      type: "string",
+      reason: "missing_default",
+    });
   });
 
   it("uses dynamic select_path path and default inputs ahead of static config", async () => {
@@ -21374,6 +21402,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("customer=dynamic-customer");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const selectOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "select") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(selectOutput?.summary).toMatchObject({
+      branch: "missing",
+      path: "order.customer.name",
+      exists: false,
+      hasDefault: true,
+      type: "string",
+      reason: "missing_default",
+    });
   });
 
   it("sets nested values by path with set_path", async () => {

@@ -80,6 +80,7 @@ export const selectPathNode = defineNode({
       label: "Reason",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -100,11 +101,20 @@ export const selectPathNode = defineNode({
       : hasDefault
         ? "missing_default"
         : "missing_null";
+    const type = valueType(value);
+    const summary = {
+      branch,
+      path,
+      exists,
+      hasDefault,
+      type,
+      reason,
+    };
 
     ctx.log.debug("select_path selected value", {
       path,
       exists,
-      type: valueType(value),
+      type,
       reason,
     });
 
@@ -117,8 +127,9 @@ export const selectPathNode = defineNode({
         exists,
         path,
         defaultValue: hasDefault ? defaultValue : null,
-        type: valueType(value),
+        type,
         reason,
+        summary,
       },
     };
   },

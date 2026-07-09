@@ -1345,6 +1345,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         defaultValue: "默认值",
         type: "类型",
         reason: "原因",
+        summary: "摘要",
       },
       semaphore: {
         in: "输入",
