@@ -111,6 +111,7 @@ export const distinctUntilChangedNode = defineNode({
     { id: "fingerprint", direction: "output", kind: "data", label: "Fingerprint", schema: { type: "string" } },
     { id: "evaluations", direction: "output", kind: "data", label: "Evaluations", schema: { type: "number" } },
     { id: "changes", direction: "output", kind: "data", label: "Changes", schema: { type: "number" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -172,13 +173,20 @@ export const distinctUntilChangedNode = defineNode({
     };
     store.set(name, stateToVariableValue(next), metadata);
 
-    ctx.log.debug("distinct_until_changed evaluated value", {
+    const summary = {
       name,
       status,
       mode,
+      path,
+      emitInitial,
       firstObservation,
       valueChanged,
-    });
+      previousExists: previous !== undefined,
+      fingerprint,
+      evaluations: next.evaluations,
+      changes: next.changes,
+    };
+    ctx.log.debug("distinct_until_changed evaluated value", summary);
 
     return {
       kind: "success",
@@ -195,6 +203,7 @@ export const distinctUntilChangedNode = defineNode({
         fingerprint,
         evaluations: next.evaluations,
         changes: next.changes,
+        summary,
       },
     };
   },

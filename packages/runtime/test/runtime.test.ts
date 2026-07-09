@@ -3822,6 +3822,44 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(first.output).toBe("changed:changed");
     expect(second.output).toBe("unchanged:unchanged");
     expect(third.output).toBe("changed:changed");
+    const firstEvents = await rt.eventBus.store.read(first.runRecord.runId);
+    const firstOutput = (
+      firstEvents.find((event) => event.kind === "node_finished" && event.nodeId === "distinct") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(firstOutput?.summary).toMatchObject({
+      name: "ORDER_STATUS_STREAM",
+      status: "changed",
+      mode: "json",
+      path: "status",
+      emitInitial: true,
+      firstObservation: true,
+      valueChanged: true,
+      previousExists: false,
+      fingerprint: '"open"',
+      evaluations: 1,
+      changes: 1,
+    });
+    const secondEvents = await rt.eventBus.store.read(second.runRecord.runId);
+    const secondOutput = (
+      secondEvents.find((event) => event.kind === "node_finished" && event.nodeId === "distinct") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(secondOutput?.summary).toMatchObject({
+      name: "ORDER_STATUS_STREAM",
+      status: "unchanged",
+      mode: "json",
+      path: "status",
+      emitInitial: true,
+      firstObservation: false,
+      valueChanged: false,
+      previousExists: true,
+      fingerprint: '"open"',
+      evaluations: 2,
+      changes: 1,
+    });
   });
 
   it("routes a dynamically named distinct_until_changed stream", async () => {
@@ -3965,6 +4003,19 @@ describe("runtime / hello-flow end-to-end", () => {
       value: "open",
       status: "unchanged",
       changedValue: true,
+      summary: {
+        name: "ORDER_DYNAMIC_POLICY_STATUS_STREAM",
+        status: "unchanged",
+        mode: "string",
+        path: "status.current",
+        emitInitial: false,
+        firstObservation: true,
+        valueChanged: true,
+        previousExists: false,
+        fingerprint: "open",
+        evaluations: 1,
+        changes: 1,
+      },
     });
   });
 
@@ -4006,6 +4057,25 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("initial:unchanged");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const distinctOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "distinct") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(distinctOutput?.summary).toMatchObject({
+      name: "BASELINE_STATUS_STREAM",
+      status: "unchanged",
+      mode: "json",
+      path: "",
+      emitInitial: false,
+      firstObservation: true,
+      valueChanged: true,
+      previousExists: false,
+      fingerprint: '"ready"',
+      evaluations: 1,
+      changes: 1,
+    });
   });
 
   it("routes node errors through retry_policy with backoff metadata", async () => {

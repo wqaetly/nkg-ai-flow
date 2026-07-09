@@ -554,6 +554,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         fingerprint: "指纹",
         evaluations: "评估次数",
         changes: "变化次数",
+        summary: "摘要",
       },
       empty_gate: {
         in: "输入",
