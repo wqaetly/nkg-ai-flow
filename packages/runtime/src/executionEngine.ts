@@ -1190,11 +1190,22 @@ export class ExecutionEngine {
   ): NodeOutputs[] {
     const inputs = this.assembleInputs(beginNode, state);
     const items = Array.isArray(inputs.items) ? inputs.items : [];
+    const config = loopConfigFromInputs(inputs);
+    const mode = readForeachMode(config.mode);
+    const concurrency = Math.max(1, Math.trunc(numberOr(config.concurrency, 1)));
+    const batchSize = Math.max(1, Math.trunc(numberOr(config.batchSize, 1)));
+    const schedule = foreachSchedule(items.length, mode, concurrency, batchSize);
     return items.map((item, index) => ({
       body: null,
       item,
       index,
       count: items.length,
+      ...foreachIterationSchedule(index, schedule),
+      effectiveConcurrency: schedule.effectiveConcurrency,
+      effectiveBatchSize: schedule.effectiveBatchSize,
+      concurrencyLimited: schedule.concurrencyLimited,
+      batchCount: schedule.batchCount,
+      batchRanges: schedule.batchRanges,
     }));
   }
 
@@ -2074,6 +2085,70 @@ function loopConfigFromInputs(inputs: Record<string, unknown>): Record<string, u
 
 function numberOr(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+interface ForeachBatchRange {
+  index: number;
+  start: number;
+  end: number;
+  count: number;
+  partial: boolean;
+}
+
+interface ForeachSchedule {
+  effectiveConcurrency: number;
+  effectiveBatchSize: number;
+  concurrencyLimited: boolean;
+  batchCount: number;
+  batchRanges: ForeachBatchRange[];
+}
+
+function readForeachMode(value: unknown): "sequential" | "parallel" {
+  return value === "parallel" ? "parallel" : "sequential";
+}
+
+function foreachSchedule(
+  count: number,
+  mode: "sequential" | "parallel",
+  concurrency: number,
+  batchSize: number,
+): ForeachSchedule {
+  const effectiveBatchSize = mode === "parallel" ? Math.max(1, batchSize) : 1;
+  const effectiveConcurrency = mode === "parallel" ? Math.max(1, concurrency) : 1;
+  const batchRanges: ForeachBatchRange[] = [];
+  for (let start = 0; start < count; start += effectiveBatchSize) {
+    const end = Math.min(count, start + effectiveBatchSize);
+    batchRanges.push({
+      index: batchRanges.length,
+      start,
+      end,
+      count: end - start,
+      partial: end - start < effectiveBatchSize,
+    });
+  }
+  return {
+    effectiveConcurrency,
+    effectiveBatchSize,
+    concurrencyLimited:
+      mode === "parallel" &&
+      count > 0 &&
+      effectiveConcurrency < Math.min(effectiveBatchSize, count),
+    batchCount: batchRanges.length,
+    batchRanges,
+  };
+}
+
+function foreachIterationSchedule(index: number, schedule: ForeachSchedule): Record<string, unknown> {
+  const range =
+    schedule.batchRanges.find((candidate) => index >= candidate.start && index < candidate.end) ??
+    null;
+  return {
+    batchIndex: range?.index ?? -1,
+    batchStart: range?.start ?? -1,
+    batchEnd: range?.end ?? -1,
+    batchItemCount: range?.count ?? 0,
+    batchPartial: range?.partial ?? false,
+  };
 }
 
 function readParallelConcurrency(

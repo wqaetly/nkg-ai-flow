@@ -21179,6 +21179,7 @@ describe("runtime / hello-flow end-to-end", () => {
           phase: "started" | "finished";
           iteration: number;
           status: string;
+          context?: Record<string, unknown>;
         },
     );
     const started = payloads.filter((payload) => payload.phase === "started");
@@ -21191,6 +21192,33 @@ describe("runtime / hello-flow end-to-end", () => {
       "started",
     ]);
     expect(payloads.slice(0, 2).map((payload) => payload.iteration)).toEqual([0, 1]);
+    expect(started[0]?.context).toMatchObject({
+      index: 0,
+      batchIndex: 0,
+      batchStart: 0,
+      batchEnd: 2,
+      batchItemCount: 2,
+      batchPartial: false,
+      batchCount: 2,
+      effectiveConcurrency: 2,
+      effectiveBatchSize: 2,
+      concurrencyLimited: false,
+      batchRanges: [
+        { index: 0, start: 0, end: 2, count: 2, partial: false },
+        { index: 1, start: 2, end: 4, count: 2, partial: false },
+      ],
+    });
+    expect(started[2]?.context).toMatchObject({
+      index: 2,
+      batchIndex: 1,
+      batchStart: 2,
+      batchEnd: 4,
+      batchItemCount: 2,
+      batchPartial: false,
+      batchCount: 2,
+      effectiveConcurrency: 2,
+      effectiveBatchSize: 2,
+    });
 
     const firstBatchFinishedAt = Math.max(
       payloads.findIndex((payload) => payload.phase === "finished" && payload.iteration === 0),
@@ -21201,6 +21229,80 @@ describe("runtime / hello-flow end-to-end", () => {
       payloads.findIndex((payload) => payload.phase === "started" && payload.iteration === 3),
     );
     expect(secondBatchStartedAt).toBeGreaterThan(firstBatchFinishedAt);
+  });
+
+  it("marks foreach batch metadata as concurrency-limited", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({
+      id: "foreach_parallel_limited_metadata_e2e",
+      version: "1.0.0",
+      registry: rt.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const items = flow.node("transform", {
+      id: "items",
+      position: { x: 100, y: 0 },
+      config: { value: ["alpha", "beta"] },
+    });
+    const begin = flow.node("foreach_begin", {
+      id: "begin",
+      position: { x: 200, y: 0 },
+      config: { mode: "parallel", concurrency: 1, batchSize: 2 },
+    });
+    const emit = flow.node("transform", {
+      id: "emit",
+      position: { x: 300, y: 0 },
+      config: { template: "item=${input}" },
+    });
+    const end = flow.node("foreach_end", {
+      id: "loop_end",
+      position: { x: 400, y: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 500, y: 0 },
+      config: { template: "results=${input}" },
+    });
+    const exit = flow.node("end", { id: "e", position: { x: 600, y: 0 } });
+
+    flow.connect(start.out("out"), items.in("in"));
+    flow.connect(items.out("out"), begin.in("in"));
+    flow.connect(items.out("output"), begin.in("items"));
+    flow.connect(begin.out("body"), emit.in("in"));
+    flow.connect(begin.out("item"), emit.in("input"));
+    flow.connect(emit.out("out"), end.in("body_done"));
+    flow.connect(emit.out("output"), end.in("result"));
+    flow.connect(end.out("done"), report.in("in"));
+    flow.connect(end.out("results"), report.in("input"));
+    flow.connect(report.out("out"), exit.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "foreach_parallel_limited_metadata_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("results=item=alpha,item=beta");
+
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const started = events
+      .filter((event) => event.kind === "node_progress" && event.nodeId === "begin")
+      .map((event) => event.payload as { phase: string; context?: Record<string, unknown> })
+      .filter((payload) => payload.phase === "started");
+    expect(started[0]?.context).toMatchObject({
+      batchIndex: 0,
+      batchStart: 0,
+      batchEnd: 2,
+      batchItemCount: 2,
+      batchPartial: false,
+      batchCount: 1,
+      effectiveConcurrency: 1,
+      effectiveBatchSize: 2,
+      concurrencyLimited: true,
+      batchRanges: [{ index: 0, start: 0, end: 2, count: 2, partial: false }],
+    });
   });
 
   it("routes foreach blocks to timeout with completed results", async () => {

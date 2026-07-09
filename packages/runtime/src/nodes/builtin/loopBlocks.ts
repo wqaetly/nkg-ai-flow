@@ -140,6 +140,16 @@ export const foreachBeginNode = defineNode({
     { id: "mode", direction: "output", kind: "data", label: "执行模式", schema: { type: "string" } },
     { id: "concurrency", direction: "output", kind: "data", label: "并发数", schema: { type: "number" } },
     { id: "batchSize", direction: "output", kind: "data", label: "批大小", schema: { type: "number" } },
+    { id: "effectiveConcurrency", direction: "output", kind: "data", label: "有效并发数", schema: { type: "number" } },
+    { id: "effectiveBatchSize", direction: "output", kind: "data", label: "有效批大小", schema: { type: "number" } },
+    { id: "concurrencyLimited", direction: "output", kind: "data", label: "是否限流", schema: { type: "boolean" } },
+    { id: "batchCount", direction: "output", kind: "data", label: "批次数量", schema: { type: "number" } },
+    { id: "batchIndex", direction: "output", kind: "data", label: "当前批次索引", schema: { type: "number" } },
+    { id: "batchStart", direction: "output", kind: "data", label: "当前批次起点", schema: { type: "number" } },
+    { id: "batchEnd", direction: "output", kind: "data", label: "当前批次终点", schema: { type: "number" } },
+    { id: "batchItemCount", direction: "output", kind: "data", label: "当前批次数量", schema: { type: "number" } },
+    { id: "batchPartial", direction: "output", kind: "data", label: "是否部分批次", schema: { type: "boolean" } },
+    { id: "batchRanges", direction: "output", kind: "data", label: "批次范围" },
     { id: "onError", direction: "output", kind: "data", label: "错误策略", schema: { type: "string" } },
     { id: "timeoutMs", direction: "output", kind: "data", label: "超时毫秒", schema: { type: "number" } },
   ],
@@ -151,6 +161,7 @@ export const foreachBeginNode = defineNode({
     const batchSize = Math.max(1, Math.trunc(readNumber(input.batchSize, Number(config.batchSize ?? 1))));
     const onError = readLoopErrorPolicyInput(input.onError ?? config.onError);
     const timeoutMs = Math.max(0, Math.trunc(readNumber(input.timeoutMs, Number(config.timeoutMs ?? 0))));
+    const schedule = foreachSchedule(items.length, mode, concurrency, batchSize);
     return {
       kind: "success",
       outputs: {
@@ -161,9 +172,15 @@ export const foreachBeginNode = defineNode({
         iterationId: "foreach_begin:0",
         iterationKey: "foreach_begin:0",
         iterationSequence: 0,
+        ...foreachIterationSchedule(0, schedule),
         mode,
         concurrency,
         batchSize,
+        effectiveConcurrency: schedule.effectiveConcurrency,
+        effectiveBatchSize: schedule.effectiveBatchSize,
+        concurrencyLimited: schedule.concurrencyLimited,
+        batchCount: schedule.batchCount,
+        batchRanges: schedule.batchRanges,
         onError,
         timeoutMs,
       },
@@ -680,6 +697,66 @@ function readCheckMode(value: unknown): "before" | "after" {
 
 function readForeachMode(value: unknown): "sequential" | "parallel" {
   return value === "parallel" ? "parallel" : "sequential";
+}
+
+interface ForeachBatchRange {
+  index: number;
+  start: number;
+  end: number;
+  count: number;
+  partial: boolean;
+}
+
+interface ForeachSchedule {
+  effectiveConcurrency: number;
+  effectiveBatchSize: number;
+  concurrencyLimited: boolean;
+  batchCount: number;
+  batchRanges: ForeachBatchRange[];
+}
+
+function foreachSchedule(
+  count: number,
+  mode: "sequential" | "parallel",
+  concurrency: number,
+  batchSize: number,
+): ForeachSchedule {
+  const effectiveBatchSize = mode === "parallel" ? Math.max(1, batchSize) : 1;
+  const effectiveConcurrency = mode === "parallel" ? Math.max(1, concurrency) : 1;
+  const batchRanges: ForeachBatchRange[] = [];
+  for (let start = 0; start < count; start += effectiveBatchSize) {
+    const end = Math.min(count, start + effectiveBatchSize);
+    batchRanges.push({
+      index: batchRanges.length,
+      start,
+      end,
+      count: end - start,
+      partial: end - start < effectiveBatchSize,
+    });
+  }
+  return {
+    effectiveConcurrency,
+    effectiveBatchSize,
+    concurrencyLimited:
+      mode === "parallel" &&
+      count > 0 &&
+      effectiveConcurrency < Math.min(effectiveBatchSize, count),
+    batchCount: batchRanges.length,
+    batchRanges,
+  };
+}
+
+function foreachIterationSchedule(index: number, schedule: ForeachSchedule): Record<string, unknown> {
+  const range =
+    schedule.batchRanges.find((candidate) => index >= candidate.start && index < candidate.end) ??
+    null;
+  return {
+    batchIndex: range?.index ?? -1,
+    batchStart: range?.start ?? -1,
+    batchEnd: range?.end ?? -1,
+    batchItemCount: range?.count ?? 0,
+    batchPartial: range?.partial ?? false,
+  };
 }
 
 function forRange(start: number, end: number, step: number): number[] {
