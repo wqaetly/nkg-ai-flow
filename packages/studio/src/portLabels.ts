@@ -1174,6 +1174,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         exhaustedValue: "是否耗尽",
         unsafeValue: "是否非幂等风险",
         stateKey: "状态键",
+        summary: "摘要",
       },
       resume_point: {
         in: "输入",
