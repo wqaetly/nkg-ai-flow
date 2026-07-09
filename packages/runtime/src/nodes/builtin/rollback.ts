@@ -160,6 +160,7 @@ export const rollbackNode = defineNode({
     { id: "partialValue", direction: "output", kind: "data", label: "Partial", schema: { type: "boolean" } },
     { id: "failedValue", direction: "output", kind: "data", label: "Failed", schema: { type: "boolean" } },
     { id: "incompleteValue", direction: "output", kind: "data", label: "Incomplete", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -394,23 +395,79 @@ function success(branch: RollbackBranch, outputs: Record<string, unknown>) {
   const successCount = readCount(outputs.successCount);
   const failureCount = readCount(outputs.failureCount);
   const pendingCount = readCount(outputs.pendingCount);
+  const successRate = count > 0 ? successCount / count : 0;
+  const failureRate = count > 0 ? failureCount / count : 0;
+  const pendingRate = count > 0 ? pendingCount / count : 0;
+  const flags = {
+    hasFailures: failureCount > 0,
+    hasPending: pendingCount > 0,
+    rollbackValue: branch === "rollback",
+    emptyValue: branch === "empty",
+    succeededValue: branch === "succeeded",
+    partialValue: branch === "partial",
+    failedValue: branch === "failed",
+    incompleteValue: branch === "incomplete",
+  };
   return {
     kind: "success" as const,
     outputs: {
       [branch]: null,
       ...outputs,
-      successRate: count > 0 ? successCount / count : 0,
-      failureRate: count > 0 ? failureCount / count : 0,
-      pendingRate: count > 0 ? pendingCount / count : 0,
-      hasFailures: failureCount > 0,
-      hasPending: pendingCount > 0,
-      rollbackValue: branch === "rollback",
-      emptyValue: branch === "empty",
-      succeededValue: branch === "succeeded",
-      partialValue: branch === "partial",
-      failedValue: branch === "failed",
-      incompleteValue: branch === "incomplete",
+      successRate,
+      failureRate,
+      pendingRate,
+      ...flags,
+      summary: rollbackSummary(branch, outputs, {
+        count,
+        successCount,
+        failureCount,
+        pendingCount,
+        successRate,
+        failureRate,
+        pendingRate,
+        ...flags,
+      }),
     },
+  };
+}
+
+function rollbackSummary(
+  branch: RollbackBranch,
+  outputs: Record<string, unknown>,
+  metrics: {
+    count: number;
+    successCount: number;
+    failureCount: number;
+    pendingCount: number;
+    successRate: number;
+    failureRate: number;
+    pendingRate: number;
+    hasFailures: boolean;
+    hasPending: boolean;
+    rollbackValue: boolean;
+    emptyValue: boolean;
+    succeededValue: boolean;
+    partialValue: boolean;
+    failedValue: boolean;
+    incompleteValue: boolean;
+  },
+): Record<string, unknown> {
+  return {
+    status: String(outputs.status ?? branch),
+    mode: String(outputs.mode ?? ""),
+    successPath: String(outputs.successPath ?? ""),
+    successValues: outputs.successValues,
+    errorPath: String(outputs.errorPath ?? ""),
+    missingResult: String(outputs.missingResult ?? ""),
+    registeredFlowIds: outputs.registeredFlowIds,
+    registeredFlowVersions: outputs.registeredFlowVersions,
+    registeredRunIds: outputs.registeredRunIds,
+    registeredNodeIds: outputs.registeredNodeIds,
+    actions: outputs.actions,
+    results: outputs.results,
+    failures: outputs.failures,
+    pending: outputs.pending,
+    ...metrics,
   };
 }
 

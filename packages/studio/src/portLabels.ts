@@ -1236,6 +1236,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         partialValue: "是否部分成功",
         failedValue: "是否失败",
         incompleteValue: "是否未完成",
+        summary: "摘要",
       },
       schedule_window: {
         in: "输入",
