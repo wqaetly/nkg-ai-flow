@@ -21334,6 +21334,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('deleted={"order":{"id":"ord_1","status":"paid"}}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deleteOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "delete") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deleteOutput?.summary).toMatchObject({
+      path: "order.temp",
+      arrayMode: "splice",
+      branch: "deleted",
+      exists: true,
+      changed: true,
+      reason: "deleted",
+      removed: true,
+    });
   });
 
   it("deletes array entries by path with delete_path splice mode", async () => {
@@ -21438,6 +21453,21 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('items={"items":["a",null,"c"]}');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deleteOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "delete") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deleteOutput?.summary).toMatchObject({
+      path: "items[1]",
+      arrayMode: "unset",
+      branch: "deleted",
+      exists: true,
+      changed: true,
+      reason: "array_unset",
+      removed: "b",
+    });
   });
 
   it("routes delete_path to missing when the target path is absent", async () => {
@@ -21477,6 +21507,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("missing=path_missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deleteOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "delete") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deleteOutput?.summary).toMatchObject({
+      path: "order.temp",
+      arrayMode: "splice",
+      branch: "missing",
+      exists: false,
+      changed: false,
+      reason: "path_missing",
+    });
   });
 
   it("routes delete_path to skipped when the path is empty", async () => {
@@ -21516,6 +21560,20 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("skipped=empty_path");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const deleteOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "delete") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(deleteOutput?.summary).toMatchObject({
+      path: "",
+      arrayMode: "splice",
+      branch: "skipped",
+      exists: false,
+      changed: false,
+      reason: "empty_path",
+    });
   });
 
   it("deep merges object sources with merge_object", async () => {

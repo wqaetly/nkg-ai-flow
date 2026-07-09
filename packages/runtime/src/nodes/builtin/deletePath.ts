@@ -104,6 +104,7 @@ export const deletePathNode = defineNode({
       label: "Reason",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -111,15 +112,17 @@ export const deletePathNode = defineNode({
     const path = String(input.path ?? config.path ?? "").trim();
     const arrayMode = readArrayMode(input.arrayMode ?? config.arrayMode);
     const result = deletePath(source, path, arrayMode);
-
-    ctx.log.debug("delete_path removed value", {
+    const summary = {
       path,
+      arrayMode,
       branch: result.branch,
       exists: result.exists,
       changed: result.changed,
       reason: result.reason,
-      arrayMode,
-    });
+      removed: result.removed,
+    };
+
+    ctx.log.debug("delete_path removed value", summary);
 
     return {
       kind: "success",
@@ -133,6 +136,7 @@ export const deletePathNode = defineNode({
         path,
         arrayMode,
         reason: result.reason,
+        summary,
       },
     };
   },

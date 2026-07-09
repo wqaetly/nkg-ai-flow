@@ -528,6 +528,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         path: "路径",
         arrayMode: "数组模式",
         reason: "原因",
+        summary: "摘要",
       },
       delay: {
         in: "输入",
