@@ -8997,6 +8997,219 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("summarizes rollback results as succeeded when every action completes", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "rollback_succeeded_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const actions = flow.node("transform", {
+      id: "actions",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a1", action: "release_inventory", payload: { sku: "book" }, registeredAt: 1 },
+          { id: "a2", action: "refund_payment", payload: { paymentId: "pay_1" }, registeredAt: 2 },
+        ],
+      },
+    });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 260, y: 0 },
+      config: {
+        value: [
+          { ok: true },
+          { status: "rolled_back" },
+        ],
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 400, y: 0 },
+      config: { mode: "summarize" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "succeeded:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), actions.in("in"));
+    flow.connect(actions.out("out"), results.in("in"));
+    flow.connect(results.out("out"), rollback.in("in"));
+    flow.connect(actions.out("output"), rollback.in("actions"));
+    flow.connect(results.out("output"), rollback.in("results"));
+    flow.connect(rollback.out("succeeded"), report.in("in"));
+    flow.connect(rollback.out("successCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_succeeded_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("succeeded:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const rollbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "rollback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(rollbackOutput).toMatchObject({
+      status: "succeeded",
+      mode: "summarize",
+      count: 2,
+      successCount: 2,
+      failureCount: 0,
+      pendingCount: 0,
+      successRate: 1,
+      failureRate: 0,
+      pendingRate: 0,
+      hasFailures: false,
+      hasPending: false,
+      succeededValue: true,
+      partialValue: false,
+      failedValue: false,
+      incompleteValue: false,
+      failures: [],
+      pending: [],
+      summary: {
+        status: "succeeded",
+        mode: "summarize",
+        count: 2,
+        successCount: 2,
+        failureCount: 0,
+        pendingCount: 0,
+        successRate: 1,
+        failureRate: 0,
+        pendingRate: 0,
+        hasFailures: false,
+        hasPending: false,
+        succeededValue: true,
+        partialValue: false,
+        failedValue: false,
+        incompleteValue: false,
+        failures: [],
+        pending: [],
+      },
+    });
+  });
+
+  it("summarizes rollback results as failed when every action fails", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "rollback_failed_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const actions = flow.node("transform", {
+      id: "actions",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "a1", action: "release_inventory", payload: { sku: "book" }, registeredAt: 1 },
+          { id: "a2", action: "refund_payment", payload: { paymentId: "pay_1" }, registeredAt: 2 },
+        ],
+      },
+    });
+    const results = flow.node("transform", {
+      id: "results",
+      position: { x: 260, y: 0 },
+      config: {
+        value: [
+          { status: "failed", error: "release_failed" },
+          { ok: false },
+        ],
+      },
+    });
+    const rollback = flow.node("rollback", {
+      id: "rollback",
+      position: { x: 400, y: 0 },
+      config: { mode: "summarize" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "failed:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), actions.in("in"));
+    flow.connect(actions.out("out"), results.in("in"));
+    flow.connect(results.out("out"), rollback.in("in"));
+    flow.connect(actions.out("output"), rollback.in("actions"));
+    flow.connect(results.out("output"), rollback.in("results"));
+    flow.connect(rollback.out("failed"), report.in("in"));
+    flow.connect(rollback.out("failureCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "rollback_failed_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("failed:2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const rollbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "rollback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(rollbackOutput).toMatchObject({
+      status: "failed",
+      mode: "summarize",
+      count: 2,
+      successCount: 0,
+      failureCount: 2,
+      pendingCount: 0,
+      successRate: 0,
+      failureRate: 1,
+      pendingRate: 0,
+      hasFailures: true,
+      hasPending: false,
+      succeededValue: false,
+      partialValue: false,
+      failedValue: true,
+      incompleteValue: false,
+      failures: [
+        {
+          action: {
+            action: "release_inventory",
+          },
+          status: "failed",
+          error: "release_failed",
+        },
+        {
+          action: {
+            action: "refund_payment",
+          },
+          status: "failed",
+          error: "rollback_failed",
+        },
+      ],
+      pending: [],
+      summary: {
+        status: "failed",
+        mode: "summarize",
+        count: 2,
+        successCount: 0,
+        failureCount: 2,
+        pendingCount: 0,
+        successRate: 0,
+        failureRate: 1,
+        pendingRate: 0,
+        hasFailures: true,
+        hasPending: false,
+        succeededValue: false,
+        partialValue: false,
+        failedValue: true,
+        incompleteValue: false,
+      },
+    });
+  });
+
   it("uses dynamic rollback summarize policy inputs", async () => {
     const rt = newRuntime();
     const flow = defineFlow({
