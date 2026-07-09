@@ -123,6 +123,28 @@ export const fallbackNode = defineNode({
       label: "Used Fallback",
       schema: { type: "boolean" },
     },
+    {
+      id: "primaryUsable",
+      direction: "output",
+      kind: "data",
+      label: "Primary Usable",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "fallbackProvided",
+      direction: "output",
+      kind: "data",
+      label: "Fallback Provided",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "selectedSource",
+      direction: "output",
+      kind: "data",
+      label: "Selected Source",
+      schema: { type: "string" },
+    },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -133,6 +155,7 @@ export const fallbackNode = defineNode({
     const statusPath = String(input.statusPath ?? config.statusPath ?? "status");
     const successValues = String(input.successValues ?? config.successValues ?? "");
     const primaryValue = selectValue(original, valuePath);
+    const fallbackProvided = input.fallback !== undefined || config.fallbackValue !== undefined;
     const fallbackValue =
       input.fallback !== undefined ? input.fallback : config.fallbackValue ?? null;
     const explicitError = input.error ?? readOptionalPath(original, errorPath);
@@ -142,12 +165,25 @@ export const fallbackNode = defineNode({
       successValues: parseSuccessValues(successValues),
     });
     const selectedValue = decision.status === "primary" ? primaryValue : fallbackValue;
-
-    ctx.log.debug("fallback selected branch", {
-      branch: decision.status,
+    const usedFallback = decision.status === "fallback";
+    const primaryUsable = decision.status === "primary";
+    const selectedSource = decision.status;
+    const summary = {
+      status: decision.status,
       reason: decision.reason,
+      usedFallback,
+      primaryUsable,
+      fallbackProvided,
+      selectedSource,
+      hasError: explicitError !== undefined && explicitError !== null,
       mode,
-    });
+      valuePath,
+      errorPath,
+      statusPath,
+      successValues,
+    };
+
+    ctx.log.debug("fallback selected branch", summary);
 
     return {
       kind: "success",
@@ -165,7 +201,11 @@ export const fallbackNode = defineNode({
         successValues,
         status: decision.status,
         reason: decision.reason,
-        usedFallback: decision.status === "fallback",
+        usedFallback,
+        primaryUsable,
+        fallbackProvided,
+        selectedSource,
+        summary,
       },
     };
   },

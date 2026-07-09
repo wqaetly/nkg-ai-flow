@@ -2672,6 +2672,32 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("selected:live");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fallbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fallback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(fallbackOutput).toMatchObject({
+      status: "primary",
+      reason: "status_match",
+      usedFallback: false,
+      primaryUsable: true,
+      fallbackProvided: true,
+      selectedSource: "primary",
+      value: "live",
+      primaryValue: "live",
+      fallbackValue: "cached",
+      summary: {
+        status: "primary",
+        reason: "status_match",
+        usedFallback: false,
+        primaryUsable: true,
+        fallbackProvided: true,
+        selectedSource: "primary",
+        hasError: false,
+      },
+    });
   });
 
   it("uses dynamic fallback policy inputs", async () => {
@@ -2746,7 +2772,24 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "primary",
       reason: "status_match",
       usedFallback: false,
+      primaryUsable: true,
+      fallbackProvided: true,
+      selectedSource: "primary",
       value: "live",
+      summary: {
+        status: "primary",
+        reason: "status_match",
+        usedFallback: false,
+        primaryUsable: true,
+        fallbackProvided: true,
+        selectedSource: "primary",
+        hasError: false,
+        mode: "status",
+        valuePath: "result.text",
+        errorPath: "meta.error",
+        statusPath: "meta.state",
+        successValues: "accepted,ready",
+      },
     });
   });
 
@@ -2791,6 +2834,33 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("selected:cached");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const fallbackOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "fallback") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(fallbackOutput).toMatchObject({
+      status: "fallback",
+      reason: "error_present",
+      usedFallback: true,
+      primaryUsable: false,
+      fallbackProvided: true,
+      selectedSource: "fallback",
+      value: "cached",
+      primaryValue: "live",
+      fallbackValue: "cached",
+      error: "upstream timeout",
+      summary: {
+        status: "fallback",
+        reason: "error_present",
+        usedFallback: true,
+        primaryUsable: false,
+        fallbackProvided: true,
+        selectedSource: "fallback",
+        hasError: true,
+      },
+    });
   });
 
   it("routes empty_gate to non_empty for populated arrays", async () => {

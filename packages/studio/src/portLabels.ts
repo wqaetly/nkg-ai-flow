@@ -608,6 +608,10 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         status: "状态",
         reason: "原因",
         usedFallback: "已用兜底",
+        primaryUsable: "主值可用",
+        fallbackProvided: "兜底已提供",
+        selectedSource: "选中来源",
+        summary: "摘要",
       },
       event_trigger: {
         event: "事件",
