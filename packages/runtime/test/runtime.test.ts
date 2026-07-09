@@ -4334,6 +4334,85 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses explicit retry_policy attempt input for capped exponential backoff", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "retry_policy_attempt_input_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const source = flow.node("transform", {
+      id: "source",
+      position: { x: 120, y: 0 },
+      config: { value: { code: "payment.timeout", retryable: true } },
+    });
+    const attempt = flow.node("transform", {
+      id: "attempt",
+      position: { x: 120, y: 120 },
+      config: { value: 3 },
+    });
+    const policy = flow.node("retry_policy", {
+      id: "policy",
+      position: { x: 300, y: 0 },
+      config: {
+        maxAttempts: 5,
+        baseDelayMs: 100,
+        multiplier: 3,
+        maxDelayMs: 500,
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 0 },
+      config: { template: "retry:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 0 } });
+
+    flow.connect(start.out("out"), source.in("in"));
+    flow.connect(start.out("out"), attempt.in("in"));
+    flow.connect(source.out("output"), policy.in("error"));
+    flow.connect(attempt.out("output"), policy.in("attempt"));
+    flow.connect(policy.out("retry"), report.in("in"));
+    flow.connect(policy.out("delayMs"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "retry_policy_attempt_input_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("retry:500");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const policyOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "policy") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(policyOutput).toMatchObject({
+      status: "retry",
+      attempt: 3,
+      nextAttempt: 4,
+      maxAttempts: 5,
+      remainingAttempts: 2,
+      delayMs: 500,
+      backoffDelayMs: 500,
+      retryAfterDelayMs: 0,
+      delaySource: "backoff",
+      decisionReason: "retry_allowed",
+      summary: {
+        status: "retry",
+        attempt: 3,
+        nextAttempt: 4,
+        maxAttempts: 5,
+        remainingAttempts: 2,
+        delayMs: 500,
+        backoffDelayMs: 500,
+        retryAfterDelayMs: 0,
+        delaySource: "backoff",
+      },
+    });
+  });
+
   it("applies deterministic jitter to retry_policy backoff", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "retry_policy_jitter_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
