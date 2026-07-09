@@ -90,6 +90,7 @@ export const policyGateNode = defineNode({
     { id: "failed", direction: "output", kind: "data", label: "Failed rules" },
     { id: "results", direction: "output", kind: "data", label: "Rule results" },
     { id: "reason", direction: "output", kind: "data", label: "Reason", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -259,6 +260,16 @@ function decision(args: {
   const failed = args.results
     .filter((result) => !result.passed)
     .map((result) => result.rule);
+  const summary = {
+    status: args.status,
+    mode: args.mode,
+    rules: args.rules,
+    ruleCount: args.results.length,
+    passed,
+    failed,
+    results: args.results,
+    reason: args.reason,
+  };
   return {
     kind: "success" as const,
     outputs: {
@@ -271,6 +282,7 @@ function decision(args: {
       failed,
       results: args.results,
       reason: args.reason,
+      summary,
     },
   };
 }

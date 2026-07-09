@@ -1619,6 +1619,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("policy:allowed");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      mode: "all",
+      ruleCount: 3,
+      status: "allowed",
+      passed: ["amount <= 100", 'tier == "gold"', "approved"],
+      failed: [],
+      reason: "",
+      summary: {
+        status: "allowed",
+        mode: "all",
+        ruleCount: 3,
+        passed: ["amount <= 100", 'tier == "gold"', "approved"],
+        failed: [],
+        reason: "",
+      },
+    });
   });
 
   it("routes policy_gate to denied and exposes failed rules", async () => {
@@ -1662,6 +1684,28 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe('denied:amount <= 100,tier == "gold"');
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      mode: "all",
+      ruleCount: 3,
+      status: "denied",
+      passed: ["approved"],
+      failed: ["amount <= 100", 'tier == "gold"'],
+      reason: "manual_review_required",
+      summary: {
+        status: "denied",
+        mode: "all",
+        ruleCount: 3,
+        passed: ["approved"],
+        failed: ["amount <= 100", 'tier == "gold"'],
+        reason: "manual_review_required",
+      },
+    });
   });
 
   it("routes policy_gate to allowed when any rule passes", async () => {
@@ -1782,6 +1826,15 @@ describe("runtime / hello-flow end-to-end", () => {
       reason: "",
       passed: ["beta"],
       failed: ['tier == "gold"', "amount <= 100"],
+      summary: {
+        mode: "any",
+        rules: 'tier == "gold"\nbeta\namount <= 100',
+        ruleCount: 3,
+        status: "allowed",
+        reason: "",
+        passed: ["beta"],
+        failed: ['tier == "gold"', "amount <= 100"],
+      },
     });
   });
 
@@ -1815,6 +1868,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("reason:no_rules");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      status: "denied",
+      ruleCount: 0,
+      reason: "no_rules",
+      summary: {
+        status: "denied",
+        ruleCount: 0,
+        passed: [],
+        failed: [],
+        reason: "no_rules",
+      },
+    });
   });
 
   it("routes compare_gate to matched for numeric thresholds", async () => {

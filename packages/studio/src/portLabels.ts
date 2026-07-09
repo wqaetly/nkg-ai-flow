@@ -1038,6 +1038,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         failed: "失败规则",
         results: "规则结果",
         reason: "原因",
+        summary: "摘要",
       },
       queue: {
         in: "输入",
