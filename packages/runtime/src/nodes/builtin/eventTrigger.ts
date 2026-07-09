@@ -40,19 +40,40 @@ export const eventTriggerNode = defineNode({
       label: "Event",
       schema: { type: "string" },
     },
+    {
+      id: "source",
+      direction: "output",
+      kind: "data",
+      label: "Source",
+      schema: { type: "string" },
+    },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
     const raw = input as Record<string, unknown>;
-    const event =
-      typeof raw.event === "string"
-        ? raw.event
-        : typeof raw.__runInput__ === "string"
-          ? raw.__runInput__
-          : config.event;
+    const configuredEvent = typeof config.event === "string" ? config.event : "";
+    let source = "config";
+    let event = configuredEvent;
+    if (typeof raw.event === "string") {
+      source = "event";
+      event = raw.event;
+    } else if (typeof raw.__runInput__ === "string") {
+      source = "run_input";
+      event = raw.__runInput__;
+    }
     return {
       kind: "success",
-      outputs: { out: null, event },
+      outputs: {
+        out: null,
+        event,
+        source,
+        summary: {
+          event,
+          configuredEvent,
+          source,
+        },
+      },
     };
   },
 });

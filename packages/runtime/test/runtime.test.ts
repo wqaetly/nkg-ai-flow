@@ -24559,9 +24559,26 @@ describe("runtime / string event triggers", () => {
     expect(senderResult.succeeded).toBe(true);
     const receiverRuns = await rt.runStore.listByFlow("event_receiver");
     expect(receiverRuns).toHaveLength(1);
-    expect(receiverRuns[0]?.status).toBe("succeeded");
-    expect(receiverRuns[0]?.input).toBe("order.created");
-    expect(receiverRuns[0]?.output).toBe("received:order.created");
+    const receiverRun = receiverRuns[0];
+    if (!receiverRun) throw new Error("expected event_receiver run");
+    expect(receiverRun.status).toBe("succeeded");
+    expect(receiverRun.input).toBe("order.created");
+    expect(receiverRun.output).toBe("received:order.created");
+    const receiverEvents = await rt.eventBus.store.read(receiverRun.runId);
+    const triggerOutput = (
+      receiverEvents.find((event) => event.kind === "node_finished" && event.nodeId === "trigger_order_created") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(triggerOutput).toMatchObject({
+      event: "order.created",
+      source: "event",
+      summary: {
+        event: "order.created",
+        configuredEvent: "order.created",
+        source: "event",
+      },
+    });
   });
 
   it("does not treat event_trigger as an ordinary manual-invoke seed", async () => {
@@ -24593,8 +24610,25 @@ describe("runtime / string event triggers", () => {
     expect(manual.succeeded).toBe(false);
     expect(manual.error?.code).toBe("execution_engine.no_start_node");
     expect(triggered).toHaveLength(1);
-    expect(triggered[0]?.succeeded).toBe(true);
-    expect(triggered[0]?.output).toBe("ping");
+    const triggeredRun = triggered[0];
+    if (!triggeredRun) throw new Error("expected triggered run");
+    expect(triggeredRun.succeeded).toBe(true);
+    expect(triggeredRun.output).toBe("ping");
+    const triggerEvents = await rt.eventBus.store.read(triggeredRun.runRecord.runId);
+    const triggerOutput = (
+      triggerEvents.find((event) => event.kind === "node_finished" && event.nodeId === "trigger_ping") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(triggerOutput).toMatchObject({
+      event: "ping",
+      source: "event",
+      summary: {
+        event: "ping",
+        configuredEvent: "ping",
+        source: "event",
+      },
+    });
   });
 });
 

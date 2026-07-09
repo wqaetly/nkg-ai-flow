@@ -625,6 +625,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
       },
       event_trigger: {
         event: "事件",
+        source: "来源",
+        summary: "摘要",
       },
       feature_flag: {
         in: "输入",
