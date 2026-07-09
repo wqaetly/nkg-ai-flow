@@ -92,6 +92,20 @@ export const uniqueItemsNode = defineNode({
       schema: { type: "array" },
     },
     {
+      id: "indexes",
+      direction: "output",
+      kind: "data",
+      label: "Kept indexes",
+      schema: { type: "array" },
+    },
+    {
+      id: "duplicateIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Duplicate indexes",
+      schema: { type: "array" },
+    },
+    {
       id: "keys",
       direction: "output",
       kind: "data",
@@ -135,6 +149,9 @@ export const uniqueItemsNode = defineNode({
     const { entries, duplicates } = dedupe(source, { path, keep, caseSensitive });
     const items = entries.map((entry) => entry.item);
     const keys = entries.map((entry) => entry.keyValue);
+    const indexes = entries.map((entry) => entry.index);
+    const duplicateItems = duplicates.map((entry) => entry.item);
+    const duplicateIndexes = duplicates.map((entry) => entry.index);
 
     ctx.log.debug("unique_items deduplicated items", {
       count: items.length,
@@ -149,7 +166,9 @@ export const uniqueItemsNode = defineNode({
       outputs: {
         out: null,
         items,
-        duplicates,
+        duplicates: duplicateItems,
+        indexes,
+        duplicateIndexes,
         keys,
         path,
         keep,
@@ -181,9 +200,9 @@ function dedupe(
     keep: KeepMode;
     caseSensitive: boolean;
   },
-): { entries: UniqueEntry[]; duplicates: unknown[] } {
+): { entries: UniqueEntry[]; duplicates: UniqueEntry[] } {
   const byKey = new Map<string, UniqueEntry>();
-  const duplicates: unknown[] = [];
+  const duplicates: UniqueEntry[] = [];
 
   source.forEach((item, index) => {
     const keyValue = valueAtPath(item, options.path);
@@ -191,10 +210,10 @@ function dedupe(
     const previous = byKey.get(key);
     if (previous) {
       if (options.keep === "last") {
-        duplicates.push(previous.item);
+        duplicates.push(previous);
         byKey.set(key, { item, key, keyValue, index });
       } else {
-        duplicates.push(item);
+        duplicates.push({ item, key, keyValue, index });
       }
     } else {
       byKey.set(key, { item, key, keyValue, index });

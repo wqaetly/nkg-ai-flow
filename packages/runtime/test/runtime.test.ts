@@ -19548,6 +19548,19 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("unique=first,second");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const uniqueOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "unique") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(uniqueOutput).toMatchObject({
+      count: 2,
+      duplicateCount: 1,
+      indexes: [0, 1],
+      duplicateIndexes: [2],
+      keys: ["A", "b"],
+    });
   });
 
   it("uses dynamic unique_items policy inputs", async () => {
@@ -19637,6 +19650,8 @@ describe("runtime / hello-flow end-to-end", () => {
       caseSensitive: false,
       count: 2,
       duplicateCount: 1,
+      indexes: [1, 2],
+      duplicateIndexes: [0],
       keys: ["b", "a"],
     });
   });

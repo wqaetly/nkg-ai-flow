@@ -1482,6 +1482,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         keep: "保留策略",
         caseSensitive: "大小写敏感",
         duplicates: "重复项",
+        indexes: "保留索引",
+        duplicateIndexes: "重复索引",
         keys: "唯一键",
         count: "唯一数量",
         duplicateCount: "重复数量",
