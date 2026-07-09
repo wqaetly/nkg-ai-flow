@@ -45,8 +45,8 @@ const DEFAULT_LLM_CONFIG = {
 // sidecar's app manifests before the first FlowEntry is built.
 let palette = registry.list();
 
-/** Default sidecar URL — kept in sync with `StudioWorkbench`'s constant. */
-const DEFAULT_SIDECAR_URL = "http://localhost:5273";
+/** Default sidecar URL - kept in sync with the local sidecar default. */
+const DEFAULT_SIDECAR_URL = "http://127.0.0.1:5173";
 const SIDECAR_STORAGE_KEY = "anf.studio.sidecarUrl";
 
 function readPersistedSidecarUrl(): string {

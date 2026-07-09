@@ -14,6 +14,10 @@ function pkgRoot(name: string): string {
   return resolve(repoRoot, "packages", name, "src");
 }
 
+function pkgFile(name: string, file: string): string {
+  return resolve(pkgRoot(name), file);
+}
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -40,16 +44,17 @@ export default defineConfig({
       // via the same alias table.
       { find: "@ai-native-flow/node-sdk", replacement: pkgEntry("node-sdk") },
       { find: "@ai-native-flow/ai-stream", replacement: pkgEntry("ai-stream") },
-      { find: "@ai-native-flow/variable-store", replacement: pkgEntry("variable-store") },
+      {
+        find: "@ai-native-flow/variable-store",
+        replacement: pkgFile("variable-store", "browser.ts"),
+      },
       { find: "@ai-native-flow/sandbox", replacement: pkgEntry("sandbox") },
     ],
   },
   server: {
     host: true,
-    // Vite dev server runs on 3000 so the AI-Native-Flow Node sidecar
-    // keeps the conventional 5273 port that Studio's
-    // `DEFAULT_SIDECAR_URL` points at out of the box. Pick a different
-    // port via `--port` if 3000 is occupied.
+    // Vite dev server runs on 3000; the AI-Native-Flow Node sidecar
+    // listens on 5173 by default.
     port: 3000,
     strictPort: true,
   },
