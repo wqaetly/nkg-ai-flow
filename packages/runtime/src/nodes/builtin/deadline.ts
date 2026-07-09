@@ -132,6 +132,7 @@ export const deadlineNode = defineNode({
       label: "Now",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -180,6 +181,18 @@ export const deadlineNode = defineNode({
         onTimeValue: !overdue,
         overdueValue: overdue,
         now,
+        summary: {
+          status,
+          deadlineAt,
+          effectiveDeadlineAt: effectiveDeadline,
+          durationMs,
+          graceMs,
+          remainingMs,
+          overdueByMs,
+          onTimeValue: !overdue,
+          overdueValue: overdue,
+          now,
+        },
       },
     };
   },

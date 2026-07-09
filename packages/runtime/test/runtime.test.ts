@@ -602,6 +602,18 @@ describe("runtime / hello-flow end-to-end", () => {
       onTimeValue: true,
       overdueValue: false,
       now: expect.any(Number),
+      summary: {
+        status: "on_time",
+        deadlineAt: expect.any(Number),
+        effectiveDeadlineAt: expect.any(Number),
+        durationMs: 0,
+        graceMs: 0,
+        remainingMs: expect.any(Number),
+        overdueByMs: 0,
+        onTimeValue: true,
+        overdueValue: false,
+        now: expect.any(Number),
+      },
     });
   });
 
@@ -727,6 +739,18 @@ describe("runtime / hello-flow end-to-end", () => {
       onTimeValue: false,
       overdueValue: true,
       now: expect.any(Number),
+      summary: {
+        status: "overdue",
+        deadlineAt: expect.any(Number),
+        effectiveDeadlineAt: expect.any(Number),
+        durationMs: 0,
+        graceMs: 0,
+        remainingMs: 0,
+        overdueByMs: expect.any(Number),
+        onTimeValue: false,
+        overdueValue: true,
+        now: expect.any(Number),
+      },
     });
   });
 

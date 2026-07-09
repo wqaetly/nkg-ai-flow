@@ -487,6 +487,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         onTimeValue: "是否准时",
         overdueValue: "是否超时",
         now: "当前时间",
+        summary: "摘要",
       },
       dead_letter: {
         in: "输入",
