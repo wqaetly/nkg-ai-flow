@@ -15849,6 +15849,20 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [0, 1],
       absentIndexes: [],
+      summary: {
+        status: "joined",
+        count: 2,
+        presentCount: 2,
+        expectedCount: 2,
+        missingCount: 0,
+        presentIndexes: [0, 1],
+        absentIndexes: [],
+        missingIndexes: [],
+        complete: true,
+        empty: false,
+        firstValue: "upper:Flow",
+        lastValue: "lower:Flow",
+      },
     });
   });
 
@@ -15918,6 +15932,20 @@ describe("runtime / hello-flow end-to-end", () => {
       ],
       presentIndexes: [1],
       absentIndexes: [0],
+      summary: {
+        status: "joined",
+        count: 2,
+        presentCount: 1,
+        expectedCount: 2,
+        missingCount: 0,
+        presentIndexes: [1],
+        absentIndexes: [0],
+        missingIndexes: [],
+        complete: true,
+        empty: false,
+        firstValue: null,
+        lastValue: "ready",
+      },
     });
   });
 
@@ -15973,6 +16001,20 @@ describe("runtime / hello-flow end-to-end", () => {
       missingIndexes: [1],
       absentIndexes: [],
       complete: false,
+      summary: {
+        status: "partial",
+        count: 1,
+        presentCount: 1,
+        expectedCount: 2,
+        missingCount: 1,
+        presentIndexes: [0],
+        absentIndexes: [],
+        missingIndexes: [1],
+        complete: false,
+        empty: false,
+        firstValue: "upper:Flow",
+        lastValue: "upper:Flow",
+      },
     });
   });
 
@@ -16016,6 +16058,20 @@ describe("runtime / hello-flow end-to-end", () => {
       absentIndexes: [],
       firstValue: null,
       lastValue: null,
+      summary: {
+        status: "empty",
+        count: 0,
+        presentCount: 0,
+        expectedCount: 0,
+        missingCount: 0,
+        presentIndexes: [],
+        absentIndexes: [],
+        missingIndexes: [],
+        complete: true,
+        empty: true,
+        firstValue: null,
+        lastValue: null,
+      },
     });
   });
 

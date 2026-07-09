@@ -833,6 +833,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         firstValue: "首个值",
         lastValue: "最后值",
         status: "状态",
+        summary: "摘要",
       },
       map_items: {
         items: "映射项",

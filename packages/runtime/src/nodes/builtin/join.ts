@@ -152,6 +152,7 @@ export const joinNode = defineNode({
       label: "Status",
       schema: { type: "string" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -181,6 +182,21 @@ export const joinNode = defineNode({
       { length: missingCount },
       (_, index) => count + index,
     );
+    const status = empty && expectedCount === 0 ? "empty" : complete ? "joined" : "partial";
+    const summary = {
+      status,
+      count,
+      presentCount: presentIndexes.length,
+      expectedCount,
+      missingCount,
+      presentIndexes,
+      absentIndexes,
+      missingIndexes,
+      complete,
+      empty,
+      firstValue: values[0] ?? null,
+      lastValue: values[count - 1] ?? null,
+    };
     return {
       kind: "success",
       outputs: {
@@ -198,7 +214,8 @@ export const joinNode = defineNode({
         empty,
         firstValue: values[0] ?? null,
         lastValue: values[count - 1] ?? null,
-        status: empty && expectedCount === 0 ? "empty" : complete ? "joined" : "partial",
+        status,
+        summary,
       },
     };
   },
