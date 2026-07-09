@@ -10191,6 +10191,93 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("preserves wait_signal locator when an existing checkpoint is received", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_LOCATED", {
+      status: "waiting",
+      signal: "approved",
+      expected: "approved",
+      waitFlowId: "wait_request_flow",
+      waitRunId: "wait_request_run",
+      waitNodeId: "wait_request_node",
+      requestedAt: Date.now() - 10_000,
+      expiresAt: Date.now() + 60_000,
+      updatedAt: Date.now() - 5_000,
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "wait_signal_preserve_locator_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const wait = flow.node("wait_signal", {
+      id: "wait",
+      position: { x: 120, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_LOCATED",
+        expected: "approved",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 260, y: 0 },
+      config: { template: "signal:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 400, y: 0 } });
+
+    flow.connect(start.out("out"), wait.in("in"));
+    flow.connect(wait.out("received"), report.in("in"));
+    flow.connect(wait.out("waitRunId"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "wait_signal_preserve_locator_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("signal:wait_request_run");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const waitOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "wait") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(waitOutput).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      waitFlowId: "wait_request_flow",
+      waitRunId: "wait_request_run",
+      waitNodeId: "wait_request_node",
+      receivedValue: true,
+      waitingValue: false,
+      expiredValue: false,
+      summary: {
+        name: "ORDER_APPROVAL_LOCATED",
+        status: "received",
+        signal: "approved",
+        expected: "approved",
+        waitFlowId: "wait_request_flow",
+        waitRunId: "wait_request_run",
+        waitNodeId: "wait_request_node",
+        receivedValue: true,
+        waitingValue: false,
+        expiredValue: false,
+      },
+    });
+    expect(variables.get("ORDER_APPROVAL_LOCATED")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      waitFlowId: "wait_request_flow",
+      waitRunId: "wait_request_run",
+      waitNodeId: "wait_request_node",
+    });
+  });
+
   it("keeps received wait_signal state terminal when a later signal mismatches", async () => {
     const variables = new InMemoryVariableStore();
     variables.set("ORDER_APPROVAL_RECEIVED", {
