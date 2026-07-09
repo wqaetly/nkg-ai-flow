@@ -1098,6 +1098,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         numericCount: "数值数量",
         numericIndexes: "数值索引",
         resultIndex: "结果索引",
+        summary: "摘要",
       },
       retry_policy: {
         error: "错误",

@@ -114,6 +114,7 @@ export const reduceItemsNode = defineNode({
       label: "Result index",
       schema: { type: ["number", "null"] },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
@@ -137,6 +138,7 @@ export const reduceItemsNode = defineNode({
       separator,
       sourceCount: source.length,
     });
+    const numericIndexes = numericEntries.map((entry) => entry.index);
 
     return {
       kind: "success",
@@ -149,7 +151,18 @@ export const reduceItemsNode = defineNode({
         separator,
         count: source.length,
         numericCount: numericEntries.length,
-        numericIndexes: numericEntries.map((entry) => entry.index),
+        numericIndexes,
+        summary: {
+          status: "reduced",
+          mode,
+          path,
+          separator,
+          result: reduced.result,
+          resultIndex: reduced.resultIndex,
+          count: source.length,
+          numericCount: numericEntries.length,
+          numericIndexes,
+        },
       },
     };
   },

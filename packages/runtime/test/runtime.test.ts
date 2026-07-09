@@ -21519,6 +21519,17 @@ describe("runtime / hello-flow end-to-end", () => {
       numericCount: 3,
       numericIndexes: [0, 1, 2],
       resultIndex: null,
+      summary: {
+        status: "reduced",
+        mode: "sum",
+        path: "amount",
+        separator: ",",
+        result: 10,
+        resultIndex: null,
+        count: 3,
+        numericCount: 3,
+        numericIndexes: [0, 1, 2],
+      },
     });
   });
 
@@ -21605,6 +21616,17 @@ describe("runtime / hello-flow end-to-end", () => {
       numericCount: 0,
       numericIndexes: [],
       resultIndex: null,
+      summary: {
+        status: "reduced",
+        mode: "join",
+        path: "label",
+        separator: "|",
+        result: "alpha|beta|gamma",
+        resultIndex: null,
+        count: 3,
+        numericCount: 0,
+        numericIndexes: [],
+      },
     });
   });
 
