@@ -63,6 +63,7 @@ export const switchCaseNode = defineNode({
     { id: "selected", direction: "output", kind: "data", label: "Selected" },
     { id: "selectedText", direction: "output", kind: "data", label: "Selected text", schema: { type: "string" } },
     { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -73,12 +74,16 @@ export const switchCaseNode = defineNode({
     const selectedText = selected == null ? "" : String(selected);
     const cases = readCases(raw, config);
     const branch = findMatchingCase(cases, selectedText) ?? "default";
-
-    ctx.log.debug("switch_case selected branch", {
+    const summary = {
       path,
-      value: selectedText,
+      selected,
+      selectedText,
       branch,
-    });
+      cases,
+      matched: branch !== "default",
+    };
+
+    ctx.log.debug("switch_case selected branch", summary);
 
     return {
       kind: "success",
@@ -89,6 +94,7 @@ export const switchCaseNode = defineNode({
         selected,
         selectedText,
         branch,
+        summary,
       },
     };
   },

@@ -1487,6 +1487,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         selected: "选中值",
         selectedText: "选中文本",
         branch: "命中分支",
+        summary: "摘要",
       },
       stringify_json: {
         value: "数据",

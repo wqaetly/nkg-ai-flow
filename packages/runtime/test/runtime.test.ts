@@ -18602,6 +18602,29 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("approved:release");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const branchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "branch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(branchOutput).toMatchObject({
+      path: "value.status",
+      selected: "approved",
+      selectedText: "approved",
+      branch: "case1",
+      summary: {
+        path: "value.status",
+        selected: "approved",
+        selectedText: "approved",
+        branch: "case1",
+        cases: {
+          case1: "approved",
+          case2: "rejected",
+        },
+        matched: true,
+      },
+    });
   });
 
   it("uses dynamic switch_case path and case values ahead of static config", async () => {
@@ -18671,6 +18694,29 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("dynamic:doc_1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const branchOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "branch") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(branchOutput).toMatchObject({
+      path: "value.type",
+      selected: "invoice",
+      selectedText: "invoice",
+      branch: "case2",
+      summary: {
+        path: "value.type",
+        selected: "invoice",
+        selectedText: "invoice",
+        branch: "case2",
+        cases: {
+          case1: "order",
+          case2: "invoice",
+        },
+        matched: true,
+      },
+    });
   });
 
   it("merges an exclusive switch_case branch before a shared end node", async () => {
