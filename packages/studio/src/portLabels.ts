@@ -1505,6 +1505,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         ignoredValue: "是否忽略",
         missingValue: "是否缺失",
         expiredValue: "是否过期",
+        summary: "摘要",
       },
       state_get: {
         name: "状态名",

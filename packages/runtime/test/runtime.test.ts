@@ -8429,6 +8429,26 @@ describe("runtime / hello-flow end-to-end", () => {
       ignoredValue: false,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        status: "resumed",
+        signal: "approved",
+        expected: "approved",
+        stateStatus: "received",
+        stateExists: true,
+        waitFlowId: "signal_resume_wait_e2e",
+        waitRunId: waiting.runRecord.runId,
+        waitNodeId: "wait",
+        matched: true,
+        createIfMissing: false,
+        requestedAt: expect.any(String),
+        expiresAt: "",
+        remainingMs: 0,
+        resumedValue: true,
+        ignoredValue: false,
+        missingValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "received",
@@ -8633,6 +8653,26 @@ describe("runtime / hello-flow end-to-end", () => {
       ignoredValue: false,
       missingValue: true,
       expiredValue: false,
+      summary: {
+        name: "MISSING_APPROVAL_SIGNAL",
+        status: "missing",
+        signal: "approved",
+        expected: "approved",
+        stateStatus: "",
+        stateExists: false,
+        waitFlowId: "",
+        waitRunId: "",
+        waitNodeId: "",
+        matched: true,
+        createIfMissing: false,
+        requestedAt: "",
+        expiresAt: "",
+        remainingMs: 0,
+        resumedValue: false,
+        ignoredValue: false,
+        missingValue: true,
+        expiredValue: false,
+      },
     });
     expect(variables.has("MISSING_APPROVAL_SIGNAL")).toBe(false);
   });
@@ -8702,6 +8742,26 @@ describe("runtime / hello-flow end-to-end", () => {
       ignoredValue: true,
       missingValue: false,
       expiredValue: false,
+      summary: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        status: "ignored",
+        signal: "denied",
+        expected: "approved",
+        stateStatus: "waiting",
+        stateExists: true,
+        waitFlowId: "signal_resume_ignored_e2e",
+        waitRunId: result.runRecord.runId,
+        waitNodeId: "resume",
+        matched: false,
+        createIfMissing: false,
+        requestedAt: expect.any(String),
+        expiresAt: "",
+        remainingMs: 0,
+        resumedValue: false,
+        ignoredValue: true,
+        missingValue: false,
+        expiredValue: false,
+      },
     });
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "waiting",
@@ -8835,6 +8895,47 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("resume:expired");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resumeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "expired",
+      stateStatus: "expired",
+      signal: "approved",
+      expected: "approved",
+      stateExists: true,
+      matched: true,
+      requestedAt: expect.any(String),
+      expiresAt: expect.any(String),
+      remainingMs: 0,
+      resumedValue: false,
+      ignoredValue: false,
+      missingValue: false,
+      expiredValue: true,
+      summary: {
+        name: "ORDER_APPROVAL_SIGNAL",
+        status: "expired",
+        signal: "approved",
+        expected: "approved",
+        stateStatus: "expired",
+        stateExists: true,
+        waitFlowId: "signal_resume_expired_e2e",
+        waitRunId: result.runRecord.runId,
+        waitNodeId: "resume",
+        matched: true,
+        createIfMissing: false,
+        requestedAt: expect.any(String),
+        expiresAt: expect.any(String),
+        remainingMs: 0,
+        resumedValue: false,
+        ignoredValue: false,
+        missingValue: false,
+        expiredValue: true,
+      },
+    });
     expect(variables.get("ORDER_APPROVAL_SIGNAL")).toMatchObject({
       status: "expired",
       signal: "approved",

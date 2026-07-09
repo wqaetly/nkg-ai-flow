@@ -121,6 +121,7 @@ export const signalResumeNode = defineNode({
     { id: "ignoredValue", direction: "output", kind: "data", label: "Ignored", schema: { type: "boolean" } },
     { id: "missingValue", direction: "output", kind: "data", label: "Missing", schema: { type: "boolean" } },
     { id: "expiredValue", direction: "output", kind: "data", label: "Expired", schema: { type: "boolean" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -217,6 +218,22 @@ export const signalResumeNode = defineNode({
         ignoredValue: decision.status === "ignored",
         missingValue: decision.status === "missing",
         expiredValue: decision.status === "expired",
+        summary: signalResumeSummary({
+          name,
+          status: decision.status,
+          signal,
+          expected,
+          stateStatus,
+          stateExists: decision.state !== null,
+          waitFlowId,
+          waitRunId,
+          waitNodeId,
+          matched,
+          createIfMissing,
+          requestedAt,
+          expiresAt,
+          remainingMs,
+        }),
       },
     };
   },
@@ -327,6 +344,44 @@ function readWaitSignalState(
 
 function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function signalResumeSummary(args: {
+  name: string;
+  status: ResumeStatus;
+  signal: VariableValue | null;
+  expected: string;
+  stateStatus: string;
+  stateExists: boolean;
+  waitFlowId: string;
+  waitRunId: string;
+  waitNodeId: string;
+  matched: boolean;
+  createIfMissing: boolean;
+  requestedAt: string;
+  expiresAt: string;
+  remainingMs: number;
+}): Record<string, unknown> {
+  return {
+    name: args.name,
+    status: args.status,
+    signal: args.signal,
+    expected: args.expected,
+    stateStatus: args.stateStatus,
+    stateExists: args.stateExists,
+    waitFlowId: args.waitFlowId,
+    waitRunId: args.waitRunId,
+    waitNodeId: args.waitNodeId,
+    matched: args.matched,
+    createIfMissing: args.createIfMissing,
+    requestedAt: args.requestedAt,
+    expiresAt: args.expiresAt,
+    remainingMs: args.remainingMs,
+    resumedValue: args.status === "resumed",
+    ignoredValue: args.status === "ignored",
+    missingValue: args.status === "missing",
+    expiredValue: args.status === "expired",
+  };
 }
 
 function readString(value: unknown): string | undefined {
