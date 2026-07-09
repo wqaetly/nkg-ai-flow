@@ -147,6 +147,7 @@ export const parallelNode = defineNode({
       kind: "data",
       label: "Branch Batches",
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -161,8 +162,8 @@ export const parallelNode = defineNode({
       parallelNodeId: ctx.nodeId,
     }));
     const branchBatches = buildBranchBatches(branches, concurrency);
-    const outputs: Record<string, unknown> = {
-      value,
+    const summary = {
+      parallelNodeId: ctx.nodeId,
       branchCount,
       concurrency,
       concurrencyLimited: concurrency < branchCount,
@@ -172,6 +173,19 @@ export const parallelNode = defineNode({
       branchNumbers: branches.map((branch) => branch.number),
       branches,
       branchBatches,
+    };
+    const outputs: Record<string, unknown> = {
+      value,
+      branchCount,
+      concurrency,
+      concurrencyLimited: summary.concurrencyLimited,
+      batchCount: branchBatches.length,
+      branchIds,
+      branchIndexes: summary.branchIndexes,
+      branchNumbers: summary.branchNumbers,
+      branches,
+      branchBatches,
+      summary,
     };
     for (let index = 1; index <= branchCount; index++) {
       outputs[`branch${index}`] = null;

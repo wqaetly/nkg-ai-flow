@@ -977,6 +977,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         branchNumbers: "分支序号",
         branches: "分支元数据",
         branchBatches: "分支批次",
+        summary: "摘要",
       },
       parse_json: {
         text: "文本",

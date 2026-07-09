@@ -17869,6 +17869,24 @@ describe("runtime / hello-flow end-to-end", () => {
           branchNumbers: [1, 2],
         },
       ],
+      summary: {
+        parallelNodeId: "fanout",
+        branchCount: 2,
+        concurrency: 2,
+        concurrencyLimited: false,
+        batchCount: 1,
+        branchIds: ["branch1", "branch2"],
+        branchIndexes: [0, 1],
+        branchNumbers: [1, 2],
+        branchBatches: [
+          {
+            index: 0,
+            branchIds: ["branch1", "branch2"],
+            branchIndexes: [0, 1],
+            branchNumbers: [1, 2],
+          },
+        ],
+      },
     });
     expect(joinOutput).toMatchObject({
       status: "joined",
@@ -18122,6 +18140,28 @@ describe("runtime / hello-flow end-to-end", () => {
           branchNumbers: [2],
         },
       ],
+      summary: {
+        parallelNodeId: "fanout",
+        branchCount: 2,
+        concurrency: 1,
+        concurrencyLimited: true,
+        batchCount: 2,
+        branchIds: ["branch1", "branch2"],
+        branchBatches: [
+          {
+            index: 0,
+            branchIds: ["branch1"],
+            branchIndexes: [0],
+            branchNumbers: [1],
+          },
+          {
+            index: 1,
+            branchIds: ["branch2"],
+            branchIndexes: [1],
+            branchNumbers: [2],
+          },
+        ],
+      },
     });
     const waitEvents = events.filter(
       (event) =>
@@ -18245,6 +18285,28 @@ describe("runtime / hello-flow end-to-end", () => {
           branchNumbers: [2],
         },
       ],
+      summary: {
+        parallelNodeId: "fanout",
+        branchCount: 2,
+        concurrency: 1,
+        concurrencyLimited: true,
+        batchCount: 2,
+        branchIds: ["branch1", "branch2"],
+        branchBatches: [
+          {
+            index: 0,
+            branchIds: ["branch1"],
+            branchIndexes: [0],
+            branchNumbers: [1],
+          },
+          {
+            index: 1,
+            branchIds: ["branch2"],
+            branchIndexes: [1],
+            branchNumbers: [2],
+          },
+        ],
+      },
     });
     const waitEvents = events.filter(
       (event) =>
