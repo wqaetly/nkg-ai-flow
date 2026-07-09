@@ -1399,6 +1399,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         childDepth: "子流程调用深度",
         localVariableCount: "局部变量数量",
         localScope: "局部变量作用域",
+        summary: "摘要",
       },
       subflow_template: {
         in: "输入",
