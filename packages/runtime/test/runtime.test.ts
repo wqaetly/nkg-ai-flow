@@ -8979,6 +8979,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(approvalOutput).toMatchObject({
       branch: "requested",
       status: "pending",
+      requestFlowId: "approval_request_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
       title: "Approve high value order",
       assignee: "finance",
       requestedAt: expect.any(String),
@@ -8995,6 +8998,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "pending",
+      requestFlowId: "approval_request_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
       title: "Approve high value order",
       assignee: "finance",
       payload: { orderId: "order-1", amount: 4200 },
@@ -9290,6 +9296,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(approvalOutput).toMatchObject({
       branch: "rejected",
       status: "rejected",
+      requestFlowId: "approval_resolve_rejected_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
       title: "Approve order",
       assignee: "finance",
       decision: "rejected",
@@ -9306,6 +9315,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "rejected",
+      requestFlowId: "approval_resolve_rejected_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
       decision: "rejected",
       comment: "budget exceeded",
     });
@@ -9370,6 +9382,9 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(approvalOutput).toMatchObject({
       branch: "expired",
       status: "expired",
+      requestFlowId: "approval_expired_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
       title: "Approve order",
       assignee: "finance",
       requestedAt: expect.any(String),
@@ -9385,6 +9400,9 @@ describe("runtime / hello-flow end-to-end", () => {
     });
     expect(variables.get("ORDER_APPROVAL")).toMatchObject({
       status: "expired",
+      requestFlowId: "approval_expired_e2e",
+      requestRunId: result.runRecord.runId,
+      requestNodeId: "approval",
     });
   });
 

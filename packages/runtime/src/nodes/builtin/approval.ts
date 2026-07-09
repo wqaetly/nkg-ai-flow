@@ -36,6 +36,9 @@ type ApprovalBranch =
 interface ApprovalState {
   name: string;
   status: ApprovalStatus;
+  requestFlowId: string;
+  requestRunId: string;
+  requestNodeId: string;
   title: string;
   assignee: string;
   payload: VariableValue | null;
@@ -139,6 +142,9 @@ export const approvalNode = defineNode({
     { id: "mode", direction: "output", kind: "data", label: "Mode", schema: { type: "string" } },
     { id: "branch", direction: "output", kind: "data", label: "Branch", schema: { type: "string" } },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "requestFlowId", direction: "output", kind: "data", label: "Request Flow Id", schema: { type: "string" } },
+    { id: "requestRunId", direction: "output", kind: "data", label: "Request Run Id", schema: { type: "string" } },
+    { id: "requestNodeId", direction: "output", kind: "data", label: "Request Node Id", schema: { type: "string" } },
     { id: "title", direction: "output", kind: "data", label: "Title", schema: { type: "string" } },
     { id: "assignee", direction: "output", kind: "data", label: "Assignee", schema: { type: "string" } },
     { id: "payload", direction: "output", kind: "data", label: "Payload" },
@@ -185,10 +191,12 @@ export const approvalNode = defineNode({
 
     const now = Date.now();
     const mode = readMode(input.mode) ?? readMode(config.mode) ?? "request";
-    const previous = normalizeExpired(readApprovalState(store.get(name)), now);
+    const locator = { requestFlowId: ctx.flowId, requestRunId: ctx.runId, requestNodeId: ctx.nodeId };
+    const previous = normalizeExpired(readApprovalState(store.get(name), locator), now);
     const decision = applyMode(previous, {
       name,
       mode,
+      locator,
       title: String(input.title ?? config.title ?? ""),
       assignee: String(input.assignee ?? config.assignee ?? ""),
       payload: toJsonValue(input.payload ?? input.input ?? input.in ?? null),
@@ -238,6 +246,9 @@ export const approvalNode = defineNode({
         mode,
         branch: decision.branch,
         status,
+        requestFlowId: state?.requestFlowId ?? "",
+        requestRunId: state?.requestRunId ?? "",
+        requestNodeId: state?.requestNodeId ?? "",
         title: state?.title ?? "",
         assignee: state?.assignee ?? "",
         payload: state?.payload ?? null,
@@ -267,6 +278,7 @@ function applyMode(
   options: {
     name: string;
     mode: ApprovalMode;
+    locator: { requestFlowId: string; requestRunId: string; requestNodeId: string };
     title: string;
     assignee: string;
     payload: VariableValue | undefined;
@@ -276,7 +288,7 @@ function applyMode(
     now: number;
   },
 ): { branch: ApprovalBranch; state: ApprovalState | null } {
-  const { name, mode, title, assignee, payload, decision, comment, timeoutMs, now } = options;
+  const { name, mode, locator, title, assignee, payload, decision, comment, timeoutMs, now } = options;
   if (mode === "clear") {
     return previous ? { branch: "cleared", state: null } : { branch: "missing", state: null };
   }
@@ -286,6 +298,9 @@ function applyMode(
       state: {
         name,
         status: "pending",
+        requestFlowId: locator.requestFlowId,
+        requestRunId: locator.requestRunId,
+        requestNodeId: locator.requestNodeId,
         title: title.trim(),
         assignee: assignee.trim(),
         payload: payload ?? null,
@@ -342,7 +357,10 @@ function normalizeExpired(state: ApprovalState | null, now: number): ApprovalSta
   return state;
 }
 
-function readApprovalState(value: unknown): ApprovalState | null {
+function readApprovalState(
+  value: unknown,
+  locator: { requestFlowId: string; requestRunId: string; requestNodeId: string },
+): ApprovalState | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const name = typeof record.name === "string" ? record.name : "";
@@ -350,6 +368,9 @@ function readApprovalState(value: unknown): ApprovalState | null {
   return {
     name,
     status: readStatus(record.status),
+    requestFlowId: readString(record.requestFlowId) ?? locator.requestFlowId,
+    requestRunId: readString(record.requestRunId) ?? locator.requestRunId,
+    requestNodeId: readString(record.requestNodeId) ?? locator.requestNodeId,
     title: typeof record.title === "string" ? record.title : "",
     assignee: typeof record.assignee === "string" ? record.assignee : "",
     payload: toJsonValue(record.payload) ?? null,
@@ -411,6 +432,10 @@ function readTimestamp(value: unknown): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+function readString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
 function asMutableVariableStore(value: unknown): MutableVariableStore | undefined {
   if (
     value &&
@@ -454,6 +479,9 @@ function toVariableValue(state: ApprovalState): VariableValue {
   return {
     name: state.name,
     status: state.status,
+    requestFlowId: state.requestFlowId,
+    requestRunId: state.requestRunId,
+    requestNodeId: state.requestNodeId,
     title: state.title,
     assignee: state.assignee,
     payload: state.payload,
