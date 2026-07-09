@@ -782,6 +782,9 @@ describe("runtime / hello-flow end-to-end", () => {
       timedOut: true,
       remainingMs: 0,
       overdueByMs: 150,
+      decisionReason: "elapsed_exceeded_timeout",
+      onTimeValue: false,
+      unknownValue: false,
     });
   });
 
@@ -865,6 +868,9 @@ describe("runtime / hello-flow end-to-end", () => {
       timedOut: true,
       remainingMs: 0,
       overdueByMs: 50,
+      decisionReason: "elapsed_exceeded_timeout",
+      onTimeValue: false,
+      unknownValue: false,
     });
   });
 
@@ -923,7 +929,57 @@ describe("runtime / hello-flow end-to-end", () => {
       graceMs: 0,
       effectiveTimeoutMs: 500,
       timedOut: false,
+      onTimeValue: true,
+      unknownValue: false,
+      decisionReason: "elapsed_within_timeout",
       remainingMs: 250,
+      overdueByMs: 0,
+    });
+  });
+
+  it("routes branch_timeout to unknown when timeout is disabled", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "branch_timeout_unknown_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const timeout = flow.node("branch_timeout", {
+      id: "timeout",
+      position: { x: 140, y: 0 },
+      config: { timeoutMs: 0 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 280, y: 0 },
+      config: { template: "timeout:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 420, y: 0 } });
+
+    flow.connect(start.out("out"), timeout.in("in"));
+    flow.connect(timeout.out("unknown"), report.in("in"));
+    flow.connect(timeout.out("status"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "branch_timeout_unknown_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("timeout:unknown");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const timeoutOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "timeout") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(timeoutOutput).toMatchObject({
+      status: "unknown",
+      decisionReason: "timeout_disabled",
+      timedOut: false,
+      onTimeValue: false,
+      unknownValue: true,
+      remainingMs: 0,
       overdueByMs: 0,
     });
   });

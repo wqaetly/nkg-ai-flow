@@ -111,6 +111,7 @@ export const branchTimeoutNode = defineNode({
     { id: "unknown", direction: "output", kind: "control", label: "Unknown" },
     { id: "branch", direction: "output", kind: "data", label: "Branch result" },
     { id: "status", direction: "output", kind: "data", label: "Status", schema: { type: "string" } },
+    { id: "decisionReason", direction: "output", kind: "data", label: "Decision Reason", schema: { type: "string" } },
     {
       id: "elapsedMs",
       direction: "output",
@@ -168,6 +169,20 @@ export const branchTimeoutNode = defineNode({
       schema: { type: "boolean" },
     },
     {
+      id: "onTimeValue",
+      direction: "output",
+      kind: "data",
+      label: "On time",
+      schema: { type: "boolean" },
+    },
+    {
+      id: "unknownValue",
+      direction: "output",
+      kind: "data",
+      label: "Unknown",
+      schema: { type: "boolean" },
+    },
+    {
       id: "remainingMs",
       direction: "output",
       kind: "data",
@@ -202,9 +217,18 @@ export const branchTimeoutNode = defineNode({
     const overdueByMs = unknown ? 0 : Math.max(0, elapsedMs - effectiveTimeoutMs);
     const remainingMs = unknown ? 0 : Math.max(0, effectiveTimeoutMs - elapsedMs);
     const status = unknown ? "unknown" : overdueByMs > 0 ? "timed_out" : "on_time";
+    const decisionReason =
+      timeoutMs <= 0
+        ? "timeout_disabled"
+        : elapsedMs === undefined
+          ? "elapsed_unknown"
+          : overdueByMs > 0
+            ? "elapsed_exceeded_timeout"
+            : "elapsed_within_timeout";
 
     ctx.log.debug("branch_timeout selected branch", {
       status,
+      decisionReason,
       elapsedMs: elapsedMs ?? null,
       timeoutMs,
       graceMs,
@@ -221,6 +245,7 @@ export const branchTimeoutNode = defineNode({
         [status]: null,
         branch,
         status,
+        decisionReason,
         elapsedMs: elapsedMs ?? null,
         timeoutMs,
         graceMs,
@@ -229,6 +254,8 @@ export const branchTimeoutNode = defineNode({
         startedAtPath,
         finishedAtPath,
         timedOut: status === "timed_out",
+        onTimeValue: status === "on_time",
+        unknownValue: status === "unknown",
         remainingMs,
         overdueByMs,
       },
