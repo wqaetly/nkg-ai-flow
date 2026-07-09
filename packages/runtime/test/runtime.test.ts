@@ -10702,6 +10702,110 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("uses dynamic signal_resume signal input ahead of static config", async () => {
+    const variables = new InMemoryVariableStore();
+    variables.set("ORDER_APPROVAL_DYNAMIC_SIGNAL_RESUME", {
+      status: "waiting",
+      signal: null,
+      expected: "approved",
+      waitFlowId: "wait_flow",
+      waitRunId: "wait_run",
+      waitNodeId: "wait_node",
+      requestedAt: Date.now(),
+      expiresAt: Date.now() + 60_000,
+      updatedAt: Date.now(),
+    });
+    const rt = createRuntime({
+      variables,
+      llmProvider: new DeterministicLlmProvider(),
+    });
+    const flow = defineFlow({ id: "signal_resume_dynamic_signal_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const signal = flow.node("transform", {
+      id: "signal",
+      position: { x: 120, y: 0 },
+      config: { value: "approved" },
+    });
+    const resume = flow.node("signal_resume", {
+      id: "resume",
+      position: { x: 260, y: 0 },
+      config: {
+        name: "ORDER_APPROVAL_DYNAMIC_SIGNAL_RESUME",
+        signal: "denied",
+      },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 400, y: 0 },
+      config: { template: "resume:${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 540, y: 0 } });
+
+    flow.connect(start.out("out"), signal.in("in"));
+    flow.connect(signal.out("out"), resume.in("in"));
+    flow.connect(signal.out("output"), resume.in("signal"));
+    flow.connect(resume.out("resumed"), report.in("in"));
+    flow.connect(resume.out("signal"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "signal_resume_dynamic_signal_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("resume:approved");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const resumeOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "resume") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(resumeOutput).toMatchObject({
+      status: "resumed",
+      signal: "approved",
+      expected: "approved",
+      stateStatus: "received",
+      stateExists: true,
+      waitFlowId: "wait_flow",
+      waitRunId: "wait_run",
+      waitNodeId: "wait_node",
+      matched: true,
+      createIfMissing: false,
+      resumedValue: true,
+      ignoredValue: false,
+      missingValue: false,
+      expiredValue: false,
+      summary: {
+        name: "ORDER_APPROVAL_DYNAMIC_SIGNAL_RESUME",
+        status: "resumed",
+        signal: "approved",
+        expected: "approved",
+        stateStatus: "received",
+        stateExists: true,
+        waitFlowId: "wait_flow",
+        waitRunId: "wait_run",
+        waitNodeId: "wait_node",
+        matched: true,
+        createIfMissing: false,
+        resumedValue: true,
+        ignoredValue: false,
+        missingValue: false,
+        expiredValue: false,
+      },
+    });
+    expect(variables.get("ORDER_APPROVAL_DYNAMIC_SIGNAL_RESUME")).toMatchObject({
+      status: "received",
+      signal: "approved",
+      expected: "approved",
+      waitFlowId: "wait_flow",
+      waitRunId: "wait_run",
+      waitNodeId: "wait_node",
+    });
+  });
+
   it("creates a missing wait_signal checkpoint with a dynamic createIfMissing input", async () => {
     const variables = new InMemoryVariableStore();
     const rt = createRuntime({
