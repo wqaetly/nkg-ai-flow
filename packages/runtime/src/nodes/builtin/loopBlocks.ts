@@ -579,19 +579,30 @@ export const loopBreakNode = defineNode({
     { id: "iterationId", direction: "output", kind: "data", label: "迭代 ID", schema: { type: "string" } },
     { id: "iterationKey", direction: "output", kind: "data", label: "迭代定位键" },
     { id: "iterationSequence", direction: "output", kind: "data", label: "迭代序号", schema: { type: "number" } },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config }) {
     const reason = readLoopControlReason(input.reason, config.reason);
+    const iterationId = input.iterationId ?? null;
+    const iterationKey = input.iterationKey ?? null;
+    const iterationSequence = input.iterationSequence ?? null;
     return {
       kind: "success",
       outputs: {
         break: null,
         reason,
         status: "break",
-        iterationId: input.iterationId ?? null,
-        iterationKey: input.iterationKey ?? null,
-        iterationSequence: input.iterationSequence ?? null,
+        iterationId,
+        iterationKey,
+        iterationSequence,
+        summary: {
+          status: "break",
+          reason,
+          iterationId,
+          iterationKey,
+          iterationSequence,
+        },
       },
     };
   },
