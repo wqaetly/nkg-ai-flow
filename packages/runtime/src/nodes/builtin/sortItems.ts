@@ -170,6 +170,8 @@ export const sortItemsNode = defineNode({
     const sortedEntries = source
       .map((item, index): SortEntry => ({ item, key: valueAtPath(item, path), index }))
       .sort((left, right) => {
+        const missingCompared = compareMissing(left.key, right.key, nulls);
+        if (missingCompared !== null) return missingCompared;
         const compared = compareKeys(left.key, right.key, { type, nulls });
         if (compared !== 0) return direction === "asc" ? compared : -compared;
         return left.index - right.index;
@@ -264,6 +266,19 @@ function compareKeys(
   if (options.type === "date") return compareDates(left, right);
   if (options.type === "string") return compareStrings(left, right);
   return compareAuto(left, right);
+}
+
+function compareMissing(
+  left: unknown,
+  right: unknown,
+  nulls: NullPlacement,
+): number | null {
+  const leftMissing = left === undefined || left === null;
+  const rightMissing = right === undefined || right === null;
+  if (!leftMissing && !rightMissing) return null;
+  if (leftMissing && rightMissing) return 0;
+  const missingFirst = nulls === "first" ? -1 : 1;
+  return leftMissing ? missingFirst : -missingFirst;
 }
 
 function compareAuto(left: unknown, right: unknown): number {

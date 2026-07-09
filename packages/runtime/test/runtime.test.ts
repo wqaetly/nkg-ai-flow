@@ -23470,6 +23470,89 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("keeps null sort_items keys last when sorting descending", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "sort_items_desc_nulls_last_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const input = flow.node("transform", {
+      id: "input",
+      position: { x: 120, y: 0 },
+      config: {
+        value: [
+          { id: "high", priority: 3 },
+          { id: "missing" },
+          { id: "middle", priority: 2 },
+          { id: "low", priority: 1 },
+        ],
+      },
+    });
+    const sort = flow.node("sort_items", {
+      id: "sort",
+      position: { x: 260, y: 0 },
+      config: {
+        path: "priority",
+        direction: "desc",
+        type: "number",
+        nulls: "last",
+      },
+    });
+    const map = flow.node("map_items", {
+      id: "map",
+      position: { x: 400, y: 0 },
+      config: { template: "${item.id}" },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 540, y: 0 },
+      config: { template: "sorted=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 680, y: 0 } });
+
+    flow.connect(start.out("out"), input.in("in"));
+    flow.connect(input.out("out"), sort.in("in"));
+    flow.connect(input.out("output"), sort.in("items"));
+    flow.connect(sort.out("out"), map.in("in"));
+    flow.connect(sort.out("items"), map.in("items"));
+    flow.connect(map.out("out"), report.in("in"));
+    flow.connect(map.out("items"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "sort_items_desc_nulls_last_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("sorted=high,middle,low,missing");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const sortOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "sort") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(sortOutput).toMatchObject({
+      direction: "desc",
+      nulls: "last",
+      indexes: [0, 2, 3, 1],
+      first: { id: "high", priority: 3 },
+      last: { id: "missing" },
+      count: 4,
+      sourceCount: 4,
+      summary: {
+        status: "sorted",
+        direction: "desc",
+        nulls: "last",
+        indexes: [0, 2, 3, 1],
+        first: { id: "high", priority: 3 },
+        last: { id: "missing" },
+        count: 4,
+        sourceCount: 4,
+      },
+    });
+  });
+
   it("uses dynamic sort_items policy inputs", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "sort_items_dynamic_policy_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
