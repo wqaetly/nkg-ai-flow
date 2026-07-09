@@ -21,6 +21,13 @@ interface MissingMapping {
   reason: string;
 }
 
+interface MappedMapping {
+  targetPath: string;
+  sourceExpr: string;
+  usedDefault: boolean;
+  value: unknown;
+}
+
 const schemaTransformConfig = z
   .object({
     mappings: z
@@ -94,6 +101,8 @@ export const schemaTransformNode = defineNode({
       schema: { type: "boolean" },
     },
     { id: "ruleCount", direction: "output", kind: "data", label: "Rule count", schema: { type: "number" } },
+    { id: "mappedMappings", direction: "output", kind: "data", label: "Mapped mappings" },
+    { id: "mappedTargets", direction: "output", kind: "data", label: "Mapped targets", schema: { type: "array" } },
     { id: "missingMappings", direction: "output", kind: "data", label: "Missing mappings" },
     { id: "mappedCount", direction: "output", kind: "data", label: "Mapped count", schema: { type: "number" } },
     { id: "missingCount", direction: "output", kind: "data", label: "Missing count", schema: { type: "number" } },
@@ -114,6 +123,7 @@ export const schemaTransformNode = defineNode({
       ? { ...(source as Record<string, unknown>) }
       : {};
     const missingMappings: MissingMapping[] = [];
+    const mappedMappings: MappedMapping[] = [];
     let mappedCount = 0;
 
     for (const rule of rules) {
@@ -126,7 +136,14 @@ export const schemaTransformNode = defineNode({
         });
         continue;
       }
-      setPath(output, rule.targetPath, resolved.exists ? resolved.value : defaultValue);
+      const value = resolved.exists ? resolved.value : defaultValue;
+      setPath(output, rule.targetPath, value);
+      mappedMappings.push({
+        targetPath: rule.targetPath,
+        sourceExpr: rule.sourceExpr,
+        usedDefault: !resolved.exists,
+        value,
+      });
       mappedCount += 1;
     }
 
@@ -150,6 +167,8 @@ export const schemaTransformNode = defineNode({
         defaultValue: hasDefaultValue ? defaultValue : null,
         hasDefaultValue,
         ruleCount: rules.length,
+        mappedMappings,
+        mappedTargets: mappedMappings.map((mapping) => mapping.targetPath),
         missingMappings,
         mappedCount,
         missingCount,

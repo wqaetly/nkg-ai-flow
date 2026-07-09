@@ -2096,6 +2096,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("mapped=u1:Ada:customer");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mapperOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "mapper") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mapperOutput).toMatchObject({
+      ruleCount: 4,
+      mappedCount: 4,
+      missingCount: 0,
+      mappedTargets: ["user.id", "user.name", "state", "kind"],
+      mappedMappings: [
+        { targetPath: "user.id", sourceExpr: "id", usedDefault: false, value: "u1" },
+        { targetPath: "user.name", sourceExpr: "profile.name", usedDefault: false, value: "Ada" },
+        { targetPath: "state", sourceExpr: "status", usedDefault: false, value: "active" },
+        { targetPath: "kind", sourceExpr: "\"customer\"", usedDefault: false, value: "customer" },
+      ],
+    });
   });
 
   it("routes schema_transform to missing when required mappings are absent", async () => {
@@ -2141,6 +2159,24 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("missing=1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const mapperOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "mapper") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(mapperOutput).toMatchObject({
+      status: "missing",
+      mappedCount: 1,
+      missingCount: 1,
+      mappedTargets: ["user.id"],
+      mappedMappings: [
+        { targetPath: "user.id", sourceExpr: "id", usedDefault: false, value: "u1" },
+      ],
+      missingMappings: [
+        { targetPath: "user.email", sourceExpr: "email", reason: "source_missing" },
+      ],
+    });
   });
 
   it("uses dynamic schema_transform policy inputs", async () => {
@@ -2242,6 +2278,13 @@ describe("runtime / hello-flow end-to-end", () => {
       ruleCount: 4,
       mappedCount: 4,
       missingCount: 0,
+      mappedTargets: ["user.id", "user.name", "user.email", "state"],
+      mappedMappings: [
+        { targetPath: "user.id", sourceExpr: "id", usedDefault: false, value: "u1" },
+        { targetPath: "user.name", sourceExpr: "profile.name", usedDefault: false, value: "Ada" },
+        { targetPath: "user.email", sourceExpr: "email", usedDefault: true, value: "unknown" },
+        { targetPath: "state", sourceExpr: "status", usedDefault: false, value: "active" },
+      ],
       status: "transformed",
       value: {
         id: "u1",

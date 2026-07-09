@@ -1227,6 +1227,8 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         transformed: "已转换",
         missing: "缺失映射",
         value: "转换结果",
+        mappedMappings: "已映射列表",
+        mappedTargets: "已映射目标",
         missingMappings: "缺失映射列表",
         mappedCount: "映射数量",
         missingCount: "缺失数量",
