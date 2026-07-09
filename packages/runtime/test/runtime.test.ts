@@ -6093,6 +6093,34 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("available:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "FILE_WORKER_POOL",
+      owner: "worker-1",
+      capacity: 2,
+      used: 1,
+      available: 1,
+      mode: "acquire",
+      ttlMs: 60_000,
+      summary: {
+        name: "FILE_WORKER_POOL",
+        mode: "acquire",
+        branch: "acquired",
+        owner: "worker-1",
+        capacity: 2,
+        used: 1,
+        available: 1,
+        ttlMs: 60_000,
+        remainingMs: expect.any(Number),
+        holderOwners: ["worker-1"],
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
       capacity: 2,
       holders: [{ owner: "worker-1" }],
@@ -6227,6 +6255,19 @@ describe("runtime / hello-flow end-to-end", () => {
       used: 1,
       available: 2,
       remainingMs: expect.any(Number),
+      summary: {
+        name: "FILE_DYNAMIC_POLICY_POOL",
+        mode: "acquire",
+        branch: "acquired",
+        owner: "worker-policy",
+        capacity: 3,
+        used: 1,
+        available: 2,
+        ttlMs: 45_000,
+        remainingMs: expect.any(Number),
+        holderOwners: ["worker-policy"],
+        updatedAt: expect.any(Number),
+      },
     });
     expect(variables.get("FILE_DYNAMIC_POLICY_POOL")).toMatchObject({
       capacity: 3,
@@ -6291,6 +6332,33 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("saturated:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "FILE_WORKER_POOL",
+      owner: "worker-2",
+      capacity: 1,
+      used: 1,
+      available: 0,
+      mode: "acquire",
+      summary: {
+        name: "FILE_WORKER_POOL",
+        mode: "acquire",
+        branch: "saturated",
+        owner: "worker-2",
+        capacity: 1,
+        used: 1,
+        available: 0,
+        ttlMs: 60_000,
+        remainingMs: 0,
+        holderOwners: ["worker-1"],
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
       holders: [{ owner: "worker-1" }],
     });
@@ -6354,6 +6422,34 @@ describe("runtime / hello-flow end-to-end", () => {
 
     expect(result.succeeded).toBe(true);
     expect(result.output).toBe("available:1");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const gateOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "gate") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(gateOutput).toMatchObject({
+      name: "FILE_WORKER_POOL",
+      owner: "worker-1",
+      capacity: 2,
+      used: 1,
+      available: 1,
+      mode: "release",
+      remainingMs: 0,
+      summary: {
+        name: "FILE_WORKER_POOL",
+        mode: "release",
+        branch: "released",
+        owner: "worker-1",
+        capacity: 2,
+        used: 1,
+        available: 1,
+        ttlMs: 300_000,
+        remainingMs: 0,
+        holderOwners: ["worker-2"],
+        updatedAt: expect.any(Number),
+      },
+    });
     expect(variables.get("FILE_WORKER_POOL")).toMatchObject({
       holders: [{ owner: "worker-2" }],
     });

@@ -139,6 +139,7 @@ export const semaphoreNode = defineNode({
       label: "Remaining ms",
       schema: { type: "number" },
     },
+    { id: "summary", direction: "output", kind: "data", label: "Summary" },
   ],
   validateInput: false,
   run({ input, config, ctx }) {
@@ -170,17 +171,22 @@ export const semaphoreNode = defineNode({
     const used = decision.state.holders.length;
     const available = Math.max(0, capacity - used);
     const remainingMs = ownerRemainingMs(decision.state, owner, now);
-
-    store.set(name, toVariableValue(decision.state), metadata(ctx.flowId));
-    ctx.log.debug("semaphore selected branch", {
+    const summary = {
       name,
       mode,
-      owner,
       branch: decision.branch,
+      owner,
       capacity,
       used,
       available,
-    });
+      ttlMs,
+      remainingMs,
+      holderOwners: decision.state.holders.map((holder) => holder.owner),
+      updatedAt: decision.state.updatedAt,
+    };
+
+    store.set(name, toVariableValue(decision.state), metadata(ctx.flowId));
+    ctx.log.debug("semaphore selected branch", summary);
 
     return {
       kind: "success",
@@ -195,6 +201,7 @@ export const semaphoreNode = defineNode({
         mode,
         ttlMs,
         remainingMs,
+        summary,
       },
     };
   },
