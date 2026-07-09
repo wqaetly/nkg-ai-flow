@@ -14666,6 +14666,7 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "met",
       metValue: true,
       count: 2,
+      presentCount: 2,
       threshold: 2,
       remaining: 0,
       firstValue: "upper:Flow",
@@ -14676,6 +14677,80 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 1, value: "lower:Flow", present: true },
       ],
       presentIndexes: [0, 1],
+      absentIndexes: [],
+    });
+  });
+
+  it("reports absent quorum values separately from arrived count", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "quorum_absent_values_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 120 } });
+    const first = flow.node("transform", {
+      id: "first",
+      position: { x: 120, y: 40 },
+      config: { value: "a" },
+    });
+    const empty = flow.node("transform", {
+      id: "empty",
+      position: { x: 120, y: 140 },
+      config: { value: null },
+    });
+    const third = flow.node("transform", {
+      id: "third",
+      position: { x: 120, y: 240 },
+      config: { value: "c" },
+    });
+    const quorum = flow.node("quorum", {
+      id: "quorum",
+      position: { x: 300, y: 120 },
+      config: { threshold: 3 },
+    });
+    const report = flow.node("transform", {
+      id: "report",
+      position: { x: 460, y: 120 },
+      config: { template: "present=${input}" },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 620, y: 120 } });
+
+    flow.connect(start.out("out"), first.in("in"));
+    flow.connect(start.out("out"), empty.in("in"));
+    flow.connect(start.out("out"), third.in("in"));
+    flow.connect(first.out("output"), quorum.in("values"));
+    flow.connect(empty.out("output"), quorum.in("values"));
+    flow.connect(third.out("output"), quorum.in("values"));
+    flow.connect(quorum.out("met"), report.in("in"));
+    flow.connect(quorum.out("presentCount"), report.in("input"));
+    flow.connect(report.out("out"), end.in("in"));
+
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "quorum_absent_values_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(result.output).toBe("present=2");
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    const quorumOutput = (
+      events.find((event) => event.kind === "node_finished" && event.nodeId === "quorum") as
+        | { payload?: { output?: Record<string, unknown> } }
+        | undefined
+    )?.payload?.output;
+    expect(quorumOutput).toMatchObject({
+      status: "met",
+      metValue: true,
+      count: 3,
+      presentCount: 2,
+      threshold: 3,
+      remaining: 0,
+      indexedValues: [
+        { index: 0, value: "a", present: true },
+        { index: 1, value: null, present: false },
+        { index: 2, value: "c", present: true },
+      ],
+      presentIndexes: [0, 2],
+      absentIndexes: [1],
     });
   });
 
@@ -14732,6 +14807,7 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "unmet",
       metValue: false,
       count: 2,
+      presentCount: 2,
       threshold: 3,
       remaining: 1,
       firstValue: "upper:Flow",
@@ -14741,6 +14817,7 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 1, value: "lower:Flow", present: true },
       ],
       presentIndexes: [0, 1],
+      absentIndexes: [],
     });
     expect(quorumOutput?.quorumRate).toBeCloseTo(2 / 3);
   });
@@ -14809,6 +14886,7 @@ describe("runtime / hello-flow end-to-end", () => {
       status: "met",
       metValue: true,
       count: 2,
+      presentCount: 2,
       threshold: 2,
       remaining: 0,
       firstValue: "first:Flow",
@@ -14819,6 +14897,7 @@ describe("runtime / hello-flow end-to-end", () => {
         { index: 1, value: "second:Flow", present: true },
       ],
       presentIndexes: [0, 1],
+      absentIndexes: [],
     });
   });
 

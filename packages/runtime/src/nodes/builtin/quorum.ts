@@ -64,6 +64,13 @@ export const quorumNode = defineNode({
       label: "Present Indexes",
       schema: { type: "array", items: { type: "number" } },
     },
+    {
+      id: "absentIndexes",
+      direction: "output",
+      kind: "data",
+      label: "Absent Indexes",
+      schema: { type: "array", items: { type: "number" } },
+    },
     { id: "firstValue", direction: "output", kind: "data", label: "First Value" },
     { id: "lastValue", direction: "output", kind: "data", label: "Last Value" },
     {
@@ -74,6 +81,7 @@ export const quorumNode = defineNode({
       schema: { type: "boolean" },
     },
     { id: "count", direction: "output", kind: "data", label: "Count", schema: { type: "number" } },
+    { id: "presentCount", direction: "output", kind: "data", label: "Present Count", schema: { type: "number" } },
     {
       id: "threshold",
       direction: "output",
@@ -108,6 +116,9 @@ export const quorumNode = defineNode({
     const presentIndexes = indexedValues
       .filter((entry) => entry.present)
       .map((entry) => entry.index);
+    const absentIndexes = indexedValues
+      .filter((entry) => !entry.present)
+      .map((entry) => entry.index);
     const threshold = readIntegerAtLeast(input.threshold, 1) ?? readIntegerAtLeast(config.threshold, 1) ?? 2;
     const met = values.length >= threshold;
     const status = met ? "met" : "unmet";
@@ -127,10 +138,12 @@ export const quorumNode = defineNode({
         values,
         indexedValues,
         presentIndexes,
+        absentIndexes,
         firstValue: values[0] ?? null,
         lastValue: values[values.length - 1] ?? null,
         metValue: met,
         count: values.length,
+        presentCount: presentIndexes.length,
         threshold,
         remaining,
         quorumRate,
