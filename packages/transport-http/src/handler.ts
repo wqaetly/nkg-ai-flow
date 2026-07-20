@@ -29,6 +29,8 @@ import type { Runtime } from "@ai-native-flow/runtime";
 import {
   InMemoryVariableStore,
   chainVariableStores,
+  overlayVariableStore,
+  type MutableVariableStore,
   type VariableStore,
   type VariableValue,
 } from "@ai-native-flow/variable-store/browser";
@@ -548,7 +550,9 @@ function buildEnvOverrides(
         metadata: { source: "request" },
       })),
     );
-    result.variables = chainVariableStores(store, runtime.variables);
+    result.variables = isMutableVariableStore(runtime.variables)
+      ? overlayVariableStore(store, runtime.variables)
+      : chainVariableStores(store, runtime.variables);
   }
   return result;
 }
@@ -618,6 +622,11 @@ async function materialiseOverrides(
     status: "staging",
   });
   return derivedVersion;
+}
+
+function isMutableVariableStore(value: VariableStore): value is MutableVariableStore {
+  const candidate = value as { set?: unknown; delete?: unknown };
+  return typeof candidate.set === "function" && typeof candidate.delete === "function";
 }
 
 async function createPortableOverrideVersion(

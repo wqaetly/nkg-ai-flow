@@ -19,6 +19,7 @@ import {
   throwVariableTypeMismatch,
 } from "./errors.js";
 import type {
+  MutableVariableStore,
   SecretStore,
   VariableEntry,
   VariableStore,
@@ -33,6 +34,42 @@ export function chainVariableStores(
   ...layers: ReadonlyArray<VariableStore>
 ): VariableStore {
   return new ChainedVariableStore(layers);
+}
+
+/**
+ * Read request-scoped values from `overlay` while routing mutations to a
+ * durable base store. This keeps API keys ephemeral and still lets checkpoint
+ * nodes persist their own state through the Runtime's writable store.
+ */
+export function overlayVariableStore(
+  overlay: VariableStore,
+  writableBase: MutableVariableStore,
+): MutableVariableStore {
+  return new OverlayVariableStore(overlay, writableBase);
+}
+
+class OverlayVariableStore implements MutableVariableStore {
+  private readonly reads: VariableStore;
+
+  constructor(
+    overlay: VariableStore,
+    private readonly writableBase: MutableVariableStore,
+  ) {
+    this.reads = chainVariableStores(overlay, writableBase);
+  }
+
+  get(name: string): VariableValue | undefined { return this.reads.get(name); }
+  getRequired(name: string): VariableValue { return this.reads.getRequired(name); }
+  getString(name: string): string | undefined { return this.reads.getString(name); }
+  getNumber(name: string): number | undefined { return this.reads.getNumber(name); }
+  getBoolean(name: string): boolean | undefined { return this.reads.getBoolean(name); }
+  has(name: string): boolean { return this.reads.has(name); }
+  list(): readonly VariableEntry[] { return this.reads.list(); }
+  describe(name: string): VariableEntry | undefined { return this.reads.describe(name); }
+  set(name: string, value: VariableValue, metadata?: VariableEntry["metadata"]): void {
+    this.writableBase.set(name, value, metadata);
+  }
+  delete(name: string): boolean { return this.writableBase.delete(name); }
 }
 
 class ChainedVariableStore implements VariableStore {

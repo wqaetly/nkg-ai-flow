@@ -9,6 +9,7 @@ import {
   bootstrapDefaults,
   chainSecretStores,
   chainVariableStores,
+  overlayVariableStore,
   collectRefs,
   createFlowScopedStores,
   getDefaultVariableStore,
@@ -87,6 +88,22 @@ describe("variable-store / chain", () => {
     expect(chain.get("MODEL")).toBe("override");
     expect(chain.get("BASE")).toBe("https://api.example.com");
     expect(chain.list().map((e) => e.name).sort()).toEqual(["BASE", "MODEL"]);
+  });
+
+  it("keeps request overrides ephemeral while persisting mutations to the writable base", () => {
+    const request = new InMemoryVariableStore([
+      { name: "LLM_API_KEY", value: "request-only" },
+    ]);
+    const durable = new InMemoryVariableStore([
+      { name: "MODEL", value: "default" },
+    ]);
+    const overlay = overlayVariableStore(request, durable);
+
+    overlay.set("checkpoint:order", { version: 1 });
+
+    expect(overlay.get("LLM_API_KEY")).toBe("request-only");
+    expect(durable.has("LLM_API_KEY")).toBe(false);
+    expect(durable.get("checkpoint:order")).toEqual({ version: 1 });
   });
 
   it("legacy secret chain is the variable chain", () => {
