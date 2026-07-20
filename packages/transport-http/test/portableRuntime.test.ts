@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { defineFlow } from "@ai-native-flow/flow-builder";
 import type { LlmProvider } from "@ai-native-flow/runtime/browser";
-import { createPortableHttpRuntime } from "../src/index.js";
+import { createPortableHttpRuntime } from "@ai-native-flow/transport-http/portable";
 
 describe("portable HTTP Runtime composition", () => {
   it("registers Flow objects before exposing an in-process handler", async () => {

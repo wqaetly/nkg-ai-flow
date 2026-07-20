@@ -33,6 +33,7 @@
       "@ai-native-flow/sandbox": ["packages/sandbox/src/index.ts"],
       "@ai-native-flow/runtime": ["packages/runtime/src/index.ts"],
       "@ai-native-flow/runtime/browser": ["packages/runtime/src/browser.ts"],
+      "@ai-native-flow/transport-http/portable": ["packages/transport-http/src/portableRuntime.ts"],
       "@ai-native-flow/transport-http": ["packages/transport-http/src/index.ts"],
       "@ai-native-flow/transport-sdk": ["packages/transports/sdk/src/index.ts"],
       "@ai-native-flow/transport-cli": ["packages/transports/cli/src/index.ts"],

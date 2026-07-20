@@ -22,6 +22,7 @@ export default defineConfig({
       { find: "@ai-native-flow/sandbox", replacement: pkg("packages/sandbox/src/index.ts") },
       { find: "@ai-native-flow/runtime/browser", replacement: pkg("packages/runtime/src/browser.ts") },
       { find: "@ai-native-flow/runtime", replacement: pkg("packages/runtime/src/index.ts") },
+      { find: "@ai-native-flow/transport-http/portable", replacement: pkg("packages/transport-http/src/portableRuntime.ts") },
       { find: "@ai-native-flow/transport-http", replacement: pkg("packages/transport-http/src/index.ts") },
       { find: "@ai-native-flow/transport-sdk", replacement: pkg("packages/transports/sdk/src/index.ts") },
       { find: "@ai-native-flow/transport-cli", replacement: pkg("packages/transports/cli/src/index.ts") },
