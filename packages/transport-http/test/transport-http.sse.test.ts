@@ -117,7 +117,7 @@ async function registerHello(rt: ReturnType<typeof createRuntime>) {
 }
 
 describe("transport-http / SSE", () => {
-  it("starts execution only after the SSE subscription is live", async () => {
+  it("exposes an active, cancellable run before the first SSE frame is read", async () => {
     const { rt, handler } = buildHandler({ slow: true });
     const flow = defineFlow({ id: "sse_live_start", version: "1.0.0", registry: rt.nodeTypeRegistry });
     const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
@@ -139,20 +139,22 @@ describe("transport-http / SSE", () => {
         body: JSON.stringify({ input: {} }),
       }),
     );
-    const reader = res.body!.getReader();
-    const firstFrame = readOneSseFrame(reader);
-    const timeout = new Promise<"timeout">((resolve) => setTimeout(() => resolve("timeout"), 20));
-    const first = await Promise.race([firstFrame, timeout]);
-    expect(first).not.toBe("timeout");
-    expect(first).toContain("event: run_started");
-
-    const parsed = parseSseStream(first as string)[0];
-    const event = JSON.parse(parsed?.data ?? "{}") as { runId: string };
-    const record = await rt.runManager.get(event.runId);
+    const runId = res.headers.get("x-nkg-run-id");
+    expect(runId).toBeTypeOf("string");
+    expect(res.headers.get("access-control-expose-headers")).toContain("x-nkg-run-id");
+    const record = await rt.runManager.get(runId!);
     expect(record?.status).toBe("running");
 
-    await reader.cancel();
-    await rt.runManager.cancel(event.runId).catch(() => undefined);
+    const cancelled = await handler(new Request(`http://test/runs/${runId}/cancel`, {
+      method: "POST",
+    }));
+    expect(cancelled.status).toBe(202);
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      if ((await rt.runManager.get(runId!))?.status === "cancelled") break;
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect((await rt.runManager.get(runId!))?.status).toBe("cancelled");
+    await res.body?.cancel();
   });
 
   it("POST /flows/:id/stream pushes run lifecycle events and terminates", async () => {

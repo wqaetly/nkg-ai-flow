@@ -8,7 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./builtin-definitions": "./src/builtinDefinitions.ts"
+    "./builtin-definitions": "./src/builtinDefinitions.ts",
+    "./browser": "./src/browser.ts"
   },
   "scripts": {
     "test": "vitest run"

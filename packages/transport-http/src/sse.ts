@@ -44,6 +44,8 @@ export interface SsePushOptions {
    * true so a finished invoke closes its SSE response cleanly.
    */
   closeOnTerminal?: boolean;
+  /** Called synchronously when response stream construction begins. */
+  onStart?: () => void;
   /** Called after replay is drained and the live subscription is active. */
   onSubscribed?: () => void;
 }
@@ -73,6 +75,10 @@ export function streamRunEvents(
 
   const body = new ReadableStream<Uint8Array>({
     async start(controller) {
+      // A newly created run must be active before the Response and its
+      // x-nkg-run-id header become visible. Events emitted before the live
+      // subscription are recovered by the replay and catch-up reads below.
+      options.onStart?.();
       let closed = false;
       let unsubscribe: (() => void) | undefined;
       let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
@@ -171,6 +177,8 @@ export function streamRunEvents(
       "cache-control": "no-cache, no-transform",
       connection: "keep-alive",
       "x-accel-buffering": "no",
+      "x-nkg-run-id": runId,
+      "access-control-expose-headers": "x-nkg-run-id",
     },
   });
 }

@@ -43,7 +43,7 @@ import {
   resolveRefs,
   type SecretStore,
   type VariableStore,
-} from "@ai-native-flow/variable-store";
+} from "@ai-native-flow/variable-store/browser";
 import type {
   NodeContext,
   NodeInputs,
@@ -369,6 +369,13 @@ export class ExecutionEngine {
       await this.publishRunFailed(error);
       return { succeeded: false, cancelled: false, error };
     }
+
+    // The signal can flip while Promise.race is waiting for an in-flight
+    // runner. A cancellable runner such as `delay` then resolves with skip,
+    // the queue drains, and the loop exits before its next leading signal
+    // check. Re-sample here so cancellation never degrades into an
+    // end_unreachable failure.
+    if (signal?.aborted) cancelled = true;
 
     if (cancelled) {
       await eventBus.publish({

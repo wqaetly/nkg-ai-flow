@@ -16,7 +16,7 @@ import {
   type VariableMetadata,
   type VariableStore,
   type VariableValue,
-} from "@ai-native-flow/variable-store";
+} from "@ai-native-flow/variable-store/browser";
 import { controlIn, errorOut } from "./_helpers.js";
 import { readSchema, validateValue, type SchemaIssue } from "./schemaGuard.js";
 

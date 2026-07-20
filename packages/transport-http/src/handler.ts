@@ -18,7 +18,6 @@
  * else that speaks the WHATWG fetch API.
  */
 
-import { createHash } from "node:crypto";
 import {
   RuntimeErrorException,
   createRuntimeError,
@@ -32,7 +31,7 @@ import {
   chainVariableStores,
   type VariableStore,
   type VariableValue,
-} from "@ai-native-flow/variable-store";
+} from "@ai-native-flow/variable-store/browser";
 import { pickCursor, streamRunEvents } from "./sse.js";
 
 export interface CreateHttpHandlerOptions {
@@ -47,6 +46,16 @@ export interface CreateHttpHandlerOptions {
    * (the default; same-origin or non-browser callers don't need it).
    */
   cors?: "*" | readonly string[];
+  /**
+   * Generates the one-shot version id used for per-invocation node overrides.
+   * Defaults to Web Crypto; injectable for deterministic hosts and tests.
+   */
+  createOverrideVersion?: (
+    graphJson: string,
+    baseVersion: string,
+  ) => Promise<string>;
+  /** Optional host authentication gate, evaluated before Runtime routes. */
+  authorize?: (request: Request) => boolean | Promise<boolean>;
 }
 
 export type HttpHandler = (request: Request) => Promise<Response>;
@@ -106,6 +115,8 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
   const { runtime } = options;
   const base = options.basePath ?? "";
   const cors = options.cors;
+  const createOverrideVersion =
+    options.createOverrideVersion ?? createPortableOverrideVersion;
 
   /**
    * Decide what value to echo into `Access-Control-Allow-Origin`. We
@@ -128,7 +139,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
     return {
       "access-control-allow-origin": origin,
       "access-control-allow-methods": "GET, POST, OPTIONS",
-      "access-control-allow-headers": "content-type, last-event-id",
+      "access-control-allow-headers": "authorization, content-type, last-event-id",
       // SSE responses include `Last-Event-ID`; expose it so resume code
       // running in the browser can read it back.
       "access-control-expose-headers": "last-event-id",
@@ -157,6 +168,14 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
         status: 204,
         headers: corsHeaders(request),
       });
+    }
+    if (options.authorize && !(await options.authorize(request))) {
+      return withCors(json(401, {
+        error: {
+          code: "transport.unauthorized",
+          message: "Runtime authentication failed",
+        },
+      }), request);
     }
     // Run the real router and decorate every response with CORS in
     // one place \u2014 saves us from threading `withCors(\u2026)` through every
@@ -219,6 +238,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const result = await runtime.invocationRouter.invoke({
           flowId,
@@ -262,6 +282,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const result = await runtime.invocationRouter.invokeNode({
           flowId,
@@ -297,6 +318,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const resumePointName = body.resumePointName ?? body.name ?? "";
         const result = await runtime.invocationRouter.resumeFromPoint({
@@ -367,6 +389,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const started = await runtime.invocationRouter.startDeferred({
           flowId,
@@ -385,7 +408,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
         return streamRunEvents(runtime.eventBus, started.runRecord.runId, {
           ...(cursor !== undefined ? { cursor } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
-          onSubscribed: () => started.startExecution(),
+          onStart: () => started.startExecution(),
         });
       }
 
@@ -407,6 +430,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const started = await runtime.invocationRouter.startNodeDeferred({
           flowId,
@@ -423,7 +447,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
         return streamRunEvents(runtime.eventBus, started.runRecord.runId, {
           ...(cursor !== undefined ? { cursor } : {}),
           ...(request.signal ? { signal: request.signal } : {}),
-          onSubscribed: () => started.startExecution(),
+          onStart: () => started.startExecution(),
         });
       }
 
@@ -438,6 +462,7 @@ export function createHttpHandler(options: CreateHttpHandlerOptions): HttpHandle
           flowId,
           body.flowVersion,
           body.nodeOverrides,
+          createOverrideVersion,
         );
         const started = await runtime.invocationRouter.startFromPoint({
           flowId,
@@ -569,6 +594,10 @@ async function materialiseOverrides(
   flowId: string,
   baseVersion: string | undefined,
   overrides: NodeOverridesBody | undefined,
+  createOverrideVersion: (
+    graphJson: string,
+    baseVersion: string,
+  ) => Promise<string>,
 ): Promise<string | undefined> {
   if (!overrides || Object.keys(overrides).length === 0) {
     return baseVersion;
@@ -579,12 +608,7 @@ async function materialiseOverrides(
 
   const derived = applyNodeOverrides(baseRef.graph, overrides);
   const json = JSON.stringify(derived);
-  const contentHash = createHash("sha256").update(json).digest("hex").slice(0, 12);
-  const rand = createHash("sha256")
-    .update(`${Date.now()}.${Math.random()}.${process.pid ?? 0}`)
-    .digest("hex")
-    .slice(0, 8);
-  const derivedVersion = `${baseRef.version}+ov.${contentHash}.${rand}`;
+  const derivedVersion = await createOverrideVersion(json, baseRef.version);
   const cloned: FlowGraph = { ...derived, version: derivedVersion };
   const clonedJson = JSON.stringify(cloned);
 
@@ -594,6 +618,27 @@ async function materialiseOverrides(
     status: "staging",
   });
   return derivedVersion;
+}
+
+async function createPortableOverrideVersion(
+  graphJson: string,
+  baseVersion: string,
+): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle || typeof globalThis.crypto.randomUUID !== "function") {
+    throw new Error(
+      "nodeOverrides require globalThis.crypto.subtle and crypto.randomUUID",
+    );
+  }
+  const digest = await subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(graphJson),
+  );
+  const contentHash = Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")
+  ).join("").slice(0, 12);
+  const random = globalThis.crypto.randomUUID().replace(/-/g, "").slice(0, 8);
+  return `${baseVersion}+ov.${contentHash}.${random}`;
 }
 
 function applyNodeOverrides(

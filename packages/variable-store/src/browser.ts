@@ -9,3 +9,6 @@
 export * from "./types.js";
 export * from "./errors.js";
 export * from "./inMemoryVariableStore.js";
+export * from "./inMemorySecretStore.js";
+export * from "./chain.js";
+export * from "./resolve.js";

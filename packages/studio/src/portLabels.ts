@@ -925,6 +925,7 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         summary: "摘要",
       },
       llm: {
+        prompt: "提示词",
         result: "结果",
         summary: "摘要",
       },

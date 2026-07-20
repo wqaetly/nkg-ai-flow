@@ -18,11 +18,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
+import type { ArtifactStore } from "./artifactStoreContract.js";
 
-export interface ArtifactStore {
-  putFlow(flowId: string, version: string, json: string): Promise<{ path: string; hash: string }>;
-  getFlowJson(flowId: string, version: string, expectedHash?: string): Promise<string>;
-}
+export type { ArtifactStore } from "./artifactStoreContract.js";
 
 export class FsArtifactStore implements ArtifactStore {
   constructor(private readonly root: string) {}

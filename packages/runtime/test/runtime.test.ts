@@ -486,6 +486,33 @@ describe("runtime / hello-flow end-to-end", () => {
     expect(delayFinished).toBeDefined();
   });
 
+  it("reports cancellation when a delay node is aborted while in flight", async () => {
+    const rt = newRuntime();
+    const flow = defineFlow({ id: "delay_cancel_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const delay = flow.node("delay", {
+      id: "wait",
+      position: { x: 100, y: 0 },
+      config: { durationMs: 60_000 },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 200, y: 0 } });
+    flow.connect(start.out("out"), delay.in("in"));
+    flow.connect(delay.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const started = await rt.invocationRouter.start({
+      flowId: "delay_cancel_e2e",
+      input: null,
+    });
+    await rt.runManager.cancel(started.runRecord.runId);
+    const result = await started.completed;
+
+    expect(result.cancelled).toBe(true);
+    expect(result.runRecord.status).toBe("cancelled");
+    const events = await rt.eventBus.store.read(started.runRecord.runId);
+    expect(events.some((event) => event.kind === "run_cancelled")).toBe(true);
+  });
+
   it("uses dynamic delay duration input", async () => {
     const rt = newRuntime();
     const flow = defineFlow({ id: "delay_dynamic_duration_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });

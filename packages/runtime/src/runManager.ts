@@ -23,7 +23,7 @@ import {
   type SecretStore,
   type VariableStore,
   type VariableValue,
-} from "@ai-native-flow/variable-store";
+} from "@ai-native-flow/variable-store/browser";
 import { ExecutionEngine } from "./executionEngine.js";
 import type { NodeInvokeFlow } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";

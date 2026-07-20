@@ -81,6 +81,8 @@ export interface HttpRunnerOptions {
    * the runner works regardless of the shell's CWD.
    */
   startDir?: string;
+  /** Override built-in app discovery; pass null for an isolated host/test. */
+  builtinRootDir?: string | null;
   /** Bind port. Defaults to env `ANF_HTTP_PORT`, then `8787`. */
   port?: number;
   /** Bind host. Defaults to env `ANF_HTTP_HOST`, then `127.0.0.1`. */
@@ -91,6 +93,12 @@ export interface HttpRunnerOptions {
    * to disable CORS entirely. Defaults to `"*"`.
    */
   cors?: "*" | readonly string[];
+  /**
+   * Ephemeral bearer token required by every Runtime request. When omitted,
+   * `ANF_RUNTIME_TOKEN` is used; an empty value keeps legacy unauthenticated
+   * development behaviour.
+   */
+  token?: string;
   /**
    * Optional LLM provider. When supplied it's both wired into the
    * runtime *and* forwarded to every node-pack factory through the
@@ -175,6 +183,9 @@ async function loadAvailableNodePacks<TCtx>(
 async function bootstrap(options: HttpRunnerOptions): Promise<BootstrapResult> {
   const manifest = await loadWorkspaceManifest({
     startDir: options.startDir ?? process.cwd(),
+    ...(options.builtinRootDir !== undefined
+      ? { builtinRootDir: options.builtinRootDir }
+      : {}),
   });
 
   // Reuse a caller-supplied runtime when given. We still load packs +
@@ -271,6 +282,8 @@ export async function buildHttpRunnerHandler(
   options: HttpRunnerOptions = {},
 ): Promise<HttpRunnerHandler> {
   const boot = await bootstrap(options);
+  const token = resolveToken(options);
+  const authorize = token ? bearerTokenAuthorizer(token) : undefined;
   const inner = createHttpHandler({
     runtime: boot.runtime,
     ...(options.cors !== undefined ? { cors: options.cors } : { cors: "*" }),
@@ -280,6 +293,21 @@ export async function buildHttpRunnerHandler(
 
   const handler: HttpHandler = async (request) => {
     const url = new URL(request.url);
+    if (
+      request.method.toUpperCase() !== "OPTIONS" &&
+      authorize &&
+      !authorize(request)
+    ) {
+      return new Response(JSON.stringify({
+        error: {
+          code: "transport.unauthorized",
+          message: "Runtime authentication failed",
+        },
+      }), {
+        status: 401,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      });
+    }
     if (url.pathname === "/" && request.method.toUpperCase() === "GET") {
       return new Response(JSON.stringify(listingBody, null, 2), {
         status: 200,
@@ -296,6 +324,16 @@ export async function buildHttpRunnerHandler(
     flows: boot.flows,
     packs: boot.packs,
   };
+}
+
+function resolveToken(options: HttpRunnerOptions): string | undefined {
+  const token = options.token ?? process.env.ANF_RUNTIME_TOKEN;
+  return token?.trim() || undefined;
+}
+
+function bearerTokenAuthorizer(token: string): (request: Request) => boolean {
+  const expected = `Bearer ${token}`;
+  return (request) => request.headers.get("authorization") === expected;
 }
 
 /**

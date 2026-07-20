@@ -45,6 +45,10 @@ export default defineConfig({
       { find: "@ai-native-flow/node-sdk", replacement: pkgEntry("node-sdk") },
       { find: "@ai-native-flow/ai-stream", replacement: pkgEntry("ai-stream") },
       {
+        find: /^@ai-native-flow\/variable-store\/browser$/,
+        replacement: pkgFile("variable-store", "browser.ts"),
+      },
+      {
         find: "@ai-native-flow/variable-store",
         replacement: pkgFile("variable-store", "browser.ts"),
       },

@@ -26,13 +26,13 @@
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Next"
+          "label": "下一步"
         },
         {
           "id": "runInput",
           "direction": "output",
           "kind": "data",
-          "label": "Run Input"
+          "label": "运行输入"
         }
       ],
       "config": {}
@@ -55,7 +55,7 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "Run"
+          "label": "运行"
         }
       ],
       "config": {}
@@ -78,14 +78,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "skill_def",
@@ -100,7 +100,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -126,14 +126,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "skill_def",
@@ -154,7 +154,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -186,14 +186,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "skill_def",
@@ -220,7 +220,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -251,14 +251,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "skill_def",
@@ -291,7 +291,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -324,14 +324,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "package",
@@ -358,7 +358,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -377,21 +377,21 @@
       },
       "size": {
         "width": 280,
-        "height": 258
+        "height": 286
       },
       "ports": [
         {
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "input",
@@ -406,10 +406,16 @@
           "label": "Output"
         },
         {
+          "id": "summary",
+          "direction": "output",
+          "kind": "data",
+          "label": "Summary"
+        },
+        {
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -427,21 +433,21 @@
       },
       "size": {
         "width": 280,
-        "height": 190
+        "height": 218
       },
       "ports": [
         {
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "text",
@@ -453,10 +459,16 @@
           }
         },
         {
+          "id": "summary",
+          "direction": "output",
+          "kind": "data",
+          "label": "Summary"
+        },
+        {
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {
@@ -481,14 +493,14 @@
           "id": "in",
           "direction": "input",
           "kind": "control",
-          "label": "In",
+          "label": "输入",
           "multiple": true
         },
         {
           "id": "out",
           "direction": "output",
           "kind": "control",
-          "label": "Out"
+          "label": "输出"
         },
         {
           "id": "task",
@@ -557,7 +569,7 @@
           "id": "error",
           "direction": "output",
           "kind": "error",
-          "label": "Error"
+          "label": "错误"
         }
       ],
       "config": {

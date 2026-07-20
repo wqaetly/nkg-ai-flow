@@ -114,6 +114,13 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
       },
       ports: [
         {
+          id: "prompt",
+          direction: "input",
+          kind: "data",
+          label: "提示词",
+          schema: { type: "string" },
+        },
+        {
           id: "result",
           direction: "output",
           kind: "data",

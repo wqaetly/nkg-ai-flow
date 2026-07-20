@@ -22,12 +22,12 @@ import {
   type NodeTypeRegistry,
 } from "@ai-native-flow/flow-ir";
 import { validateFlow } from "@ai-native-flow/flow-validator";
-import type { ArtifactStore } from "./storage/artifactStore.js";
+import type { ArtifactStore } from "./storage/artifactStoreContract.js";
 import type { RegistryStore } from "./storage/registryStore.js";
 import {
   InMemoryRegistryStore,
 } from "./storage/registryStore.js";
-import { sha256Hex } from "./storage/artifactStore.js";
+import { sha256HexPortable } from "./storage/hash.js";
 import type { FlowVersionRef } from "./types.js";
 
 export interface EventTriggerRef {
@@ -44,12 +44,15 @@ export interface RuntimeRegistryOptions {
   artifactStore?: ArtifactStore;
   /** Used when validating registered flows. Defaults to the built-in registry. */
   nodeTypeRegistry?: NodeTypeRegistry;
+  /** Browser-safe content hasher; defaults to Web Crypto SHA-256. */
+  hashText?: (input: string) => Promise<string>;
 }
 
 export class RuntimeRegistry {
   private readonly store: RegistryStore;
   private readonly artifactStore: ArtifactStore | undefined;
   private readonly nodeTypeRegistry: NodeTypeRegistry;
+  private readonly hashText: (input: string) => Promise<string>;
   /** In-memory cache: `${flowId}@${version}` -> FlowVersionRef. */
   private readonly cache = new Map<string, FlowVersionRef>();
   /** Active event triggers, keyed by event string. */
@@ -59,6 +62,7 @@ export class RuntimeRegistry {
     this.store = options.registryStore ?? new InMemoryRegistryStore();
     this.artifactStore = options.artifactStore;
     this.nodeTypeRegistry = options.nodeTypeRegistry ?? createDefaultRegistry();
+    this.hashText = options.hashText ?? sha256HexPortable;
   }
 
   /**
@@ -90,7 +94,7 @@ export class RuntimeRegistry {
     }
 
     const json = args.json ?? JSON.stringify(graph);
-    const hash = sha256Hex(json);
+    const hash = await this.hashText(json);
 
     if (this.artifactStore) {
       await this.artifactStore.putFlow(graph.id, graph.version, json);
