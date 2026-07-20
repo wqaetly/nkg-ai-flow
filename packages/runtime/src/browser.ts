@@ -27,3 +27,9 @@ export {
   type LlmCompletionResponse,
 } from "./nodes/llmProvider.js";
 export type { Runtime } from "./createRuntime.js";
+export type {
+  AgentToolCall,
+  AgentToolHost,
+  AgentToolName,
+  AgentToolResult,
+} from "./nodes/builtin/agent.js";
