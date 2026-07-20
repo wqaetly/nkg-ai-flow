@@ -2,8 +2,8 @@
  * Browser/mobile-safe built-in runner catalogue.
  *
  * This module deliberately does not import `agentTools.node.ts`. Agent and
- * tool runners are installed only when the native host injects a restricted
- * `AgentToolHost`; without one, workflows cannot accidentally gain filesystem
+ * tool contracts stay visible on every host, while a restricted injected
+ * `AgentToolHost` controls execution; the fallback host grants no filesystem
  * or process access.
  */
 import {
@@ -55,7 +55,7 @@ import {
   forBeginNode,
   forEndNode,
   groupItemsNode,
-  httpNode,
+  createHttpNode,
   idempotencyKeyNode,
   joinNode,
   llmNode,
@@ -117,8 +117,10 @@ export interface CreateBrowserBuiltinRunnerRegistryOptions {
   llmProvider?: LlmProvider;
   sandboxAdapter?: SandboxAdapter;
   nodeTypeRegistry?: InMemoryNodeTypeRegistry;
-  /** Native/mobile-safe tools only. Omit to exclude agent and tool nodes. */
+  /** Native/mobile-safe tools only. Omit to install a deny-all host. */
   toolHost?: AgentToolHost;
+  /** Host-owned HTTP implementation used by HTTP and the default LLM provider. */
+  fetch?: typeof fetch;
 }
 
 export function createBrowserBuiltinRunnerRegistry(
@@ -127,7 +129,8 @@ export function createBrowserBuiltinRunnerRegistry(
   const registry = new InMemoryNodeRunnerRegistry(
     options.sandboxAdapter ? { sandboxAdapter: options.sandboxAdapter } : {},
   );
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
+  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({ fetchImpl });
   const toolHost: AgentToolHost = options.toolHost ?? {
     async callTool() {
       return { ok: false, error: "runtime tool host is unavailable" };
@@ -169,7 +172,7 @@ export function createBrowserBuiltinRunnerRegistry(
     flattenItemsNode,
     firstSuccessNode,
     groupItemsNode,
-    httpNode,
+    createHttpNode(fetchImpl),
     idempotencyKeyNode,
     joinNode,
     mapItemsNode,

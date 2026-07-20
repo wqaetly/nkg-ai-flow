@@ -38,7 +38,8 @@ const httpConfig = z
   })
   .passthrough();
 
-export const httpNode = defineNode({
+export function createHttpNode(fetchImpl: typeof fetch) {
+  return defineNode({
   type: "http",
   typeVersion: "1.0.0",
   title: "HTTP",
@@ -102,7 +103,7 @@ export const httpNode = defineNode({
           : typeof config.body === "string"
             ? config.body
             : JSON.stringify(config.body ?? raw.input ?? {});
-      const res = await fetch(url, {
+      const res = await fetchImpl(url, {
         method,
         headers,
         body,
@@ -154,7 +155,11 @@ export const httpNode = defineNode({
       ctx.signal.removeEventListener("abort", onAbort);
     }
   },
-});
+  });
+}
+
+/** Default definition retained for Studio metadata and source compatibility. */
+export const httpNode = createHttpNode((input, init) => globalThis.fetch(input, init));
 
 function valueType(value: unknown): string {
   if (Array.isArray(value)) return "array";

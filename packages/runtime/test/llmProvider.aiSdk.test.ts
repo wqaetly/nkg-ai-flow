@@ -78,8 +78,10 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
   });
 
   it("delegates OpenAI-compatible completion to AI SDK", async () => {
+    const fetchImpl = vi.fn() as unknown as typeof fetch;
     const provider = new AiSdkOpenAICompatibleLlmProvider({
       providerName: "lfzxb",
+      fetchImpl,
     });
     const result = await provider.complete(
       {
@@ -98,6 +100,7 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
       name: "lfzxb",
       baseURL: "https://api.lfzxb.top/v1",
       apiKey: "sk-test",
+      fetch: fetchImpl,
     });
     expect(mocks.providerModel).toHaveBeenCalledWith("deepseek-v4-flash");
     expect(mocks.generateText).toHaveBeenCalledWith({

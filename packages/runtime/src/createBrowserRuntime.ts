@@ -55,6 +55,8 @@ export interface CreateBrowserRuntimeOptions {
   generateRunId?: () => string;
   /** Host capabilities enforced before a Flow artifact is registered. */
   capabilities?: RuntimeCapabilityManifest;
+  /** Explicit host HTTP implementation for HTTP and LLM nodes. */
+  fetch?: typeof fetch;
 }
 
 export function createBrowserRuntime(
@@ -71,12 +73,15 @@ export function createBrowserRuntime(
   const artifactStore = options.artifactStore ?? new InMemoryArtifactStore({
     ...(options.hashText ? { hashText: options.hashText } : {}),
   });
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({
+    ...(options.fetch ? { fetchImpl: options.fetch } : {}),
+  });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();
   const runners = createBrowserBuiltinRunnerRegistry({
     llmProvider,
     nodeTypeRegistry,
     ...(options.toolHost ? { toolHost: options.toolHost } : {}),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
   });
   const registry = new RuntimeRegistry({
     registryStore,

@@ -127,6 +127,8 @@ export interface AiSdkOpenAICompatibleLlmProviderOptions {
   };
   /** Provider label passed to `createOpenAICompatible`. */
   providerName?: string;
+  /** Host-owned HTTP implementation; mobile hosts inject their native adapter. */
+  fetchImpl?: typeof fetch;
 }
 
 /**
@@ -359,6 +361,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
         jsonOutput: req.jsonOutput,
         providerOptions: req.providerOptions,
         abortSignal: ctx.signal,
+        fetchImpl: this.options.fetchImpl,
       });
       if (!completion.text.trim()) {
         throw new RuntimeErrorException(
@@ -401,6 +404,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
           jsonOutput: req.jsonOutput,
           providerOptions: req.providerOptions,
           abortSignal: ctx.signal,
+          fetchImpl: this.options.fetchImpl,
         }),
         { nodeId: ctx.nodeId, maxAttempts: 2 },
       );

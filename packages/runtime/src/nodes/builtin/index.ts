@@ -45,7 +45,7 @@ export { filterItemsNode } from "./filterItems.js";
 export { flattenItemsNode } from "./flattenItems.js";
 export { firstSuccessNode } from "./firstSuccess.js";
 export { groupItemsNode } from "./groupItems.js";
-export { httpNode } from "./http.js";
+export { createHttpNode, httpNode } from "./http.js";
 export { idempotencyKeyNode } from "./idempotencyKey.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";

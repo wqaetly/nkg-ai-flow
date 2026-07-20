@@ -86,6 +86,8 @@ export interface CreateRuntimeOptions {
   autoBootstrap?: boolean;
   /** Optional capability gate for hosts that need registration preflight. */
   capabilities?: RuntimeCapabilityManifest;
+  /** Explicit host HTTP implementation for HTTP and LLM nodes. */
+  fetch?: typeof fetch;
 }
 
 export interface Runtime {
@@ -128,9 +130,15 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
   const registryStore = options.registryStore ?? new InMemoryRegistryStore();
   const artifactStore =
     options.artifactStore ?? new FsArtifactStore("artifacts/flows");
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({
+    ...(options.fetch ? { fetchImpl: options.fetch } : {}),
+  });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();
-  const runners = createBuiltinRunnerRegistry({ llmProvider, nodeTypeRegistry });
+  const runners = createBuiltinRunnerRegistry({
+    llmProvider,
+    nodeTypeRegistry,
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
   const registry = new RuntimeRegistry({
     registryStore,
     artifactStore,

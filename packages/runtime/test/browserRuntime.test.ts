@@ -75,4 +75,45 @@ describe("browser runtime", () => {
     expect(runtime.runners.list().some((entry) => entry.type === "agent")).toBe(true);
     expect(runtime.runners.has("llm", "1.0.0")).toBe(true);
   });
+
+  it("routes HTTP nodes through the explicitly injected host client", async () => {
+    const requests: Array<{ input: string | URL | Request; init?: RequestInit }> = [];
+    const fetchImpl: typeof fetch = async (input, init) => {
+      requests.push({ input, ...(init ? { init } : {}) });
+      return new Response(JSON.stringify({ source: "native" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    };
+    const runtime = createBrowserRuntime({
+      fetch: fetchImpl,
+      generateRunId: () => "run_explicit_http",
+    });
+    const flow = defineFlow({
+      id: "explicit_http",
+      version: "1.0.0",
+      registry: runtime.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
+    const http = flow.node("http", {
+      id: "http",
+      position: { x: 160, y: 0 },
+      config: { url: "https://provider.invalid/health", method: "POST", body: { ping: true } },
+    });
+    const end = flow.node("end", { id: "end", position: { x: 320, y: 0 } });
+    flow.connect(start.out("out"), http.in("in"));
+    flow.connect(http.out("out"), end.in("in"));
+    const graph = JSON.parse(flow.dump());
+    await runtime.registry.register({ graph });
+    await runtime.registry.promote(graph.id, graph.version);
+
+    const result = await runtime.invocationRouter.invoke({ flowId: graph.id, input: null });
+
+    expect(result.succeeded).toBe(true);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      input: "https://provider.invalid/health",
+      init: { method: "POST", body: JSON.stringify({ ping: true }) },
+    });
+  });
 });

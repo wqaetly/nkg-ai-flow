@@ -11,6 +11,7 @@ export interface CreateBuiltinRunnerRegistryOptions {
   llmProvider?: LlmProvider;
   sandboxAdapter?: SandboxAdapter;
   nodeTypeRegistry?: InMemoryNodeTypeRegistry;
+  fetch?: typeof fetch;
 }
 
 export function createBuiltinRunnerRegistry(
