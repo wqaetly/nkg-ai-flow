@@ -3,4 +3,5 @@
  */
 
 export * from "./handler.js";
+export * from "./portableRuntime.js";
 export * from "./sse.js";
