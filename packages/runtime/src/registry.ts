@@ -29,6 +29,10 @@ import {
 } from "./storage/registryStore.js";
 import { sha256HexPortable } from "./storage/hash.js";
 import type { FlowVersionRef } from "./types.js";
+import {
+  assertFlowCapabilities,
+  type RuntimeCapabilityManifest,
+} from "./capabilities.js";
 
 export interface EventTriggerRef {
   event: string;
@@ -46,6 +50,7 @@ export interface RuntimeRegistryOptions {
   nodeTypeRegistry?: NodeTypeRegistry;
   /** Browser-safe content hasher; defaults to Web Crypto SHA-256. */
   hashText?: (input: string) => Promise<string>;
+  capabilities?: RuntimeCapabilityManifest;
 }
 
 export class RuntimeRegistry {
@@ -53,6 +58,7 @@ export class RuntimeRegistry {
   private readonly artifactStore: ArtifactStore | undefined;
   private readonly nodeTypeRegistry: NodeTypeRegistry;
   private readonly hashText: (input: string) => Promise<string>;
+  private readonly capabilities: RuntimeCapabilityManifest | undefined;
   /** In-memory cache: `${flowId}@${version}` -> FlowVersionRef. */
   private readonly cache = new Map<string, FlowVersionRef>();
   /** Active event triggers, keyed by event string. */
@@ -63,6 +69,7 @@ export class RuntimeRegistry {
     this.artifactStore = options.artifactStore;
     this.nodeTypeRegistry = options.nodeTypeRegistry ?? createDefaultRegistry();
     this.hashText = options.hashText ?? sha256HexPortable;
+    this.capabilities = options.capabilities;
   }
 
   /**
@@ -91,6 +98,9 @@ export class RuntimeRegistry {
           context: { errors: validation.result.errors },
         }),
       );
+    }
+    if (this.capabilities) {
+      assertFlowCapabilities(validation.flow, this.nodeTypeRegistry, this.capabilities);
     }
 
     const json = args.json ?? JSON.stringify(graph);
@@ -140,6 +150,7 @@ export class RuntimeRegistry {
         }),
       );
     }
+    this.assertCapabilities(ref.graph);
     return ref;
   }
 
@@ -149,7 +160,10 @@ export class RuntimeRegistry {
    */
   async resolve(flowId: string, version: string): Promise<FlowVersionRef> {
     const cached = this.cache.get(cacheKey(flowId, version));
-    if (cached) return cached;
+    if (cached) {
+      this.assertCapabilities(cached.graph);
+      return cached;
+    }
     const ref = await this.store.get(flowId, version);
     if (!ref) {
       throw new RuntimeErrorException(
@@ -171,6 +185,7 @@ export class RuntimeRegistry {
       );
       ref.graph = JSON.parse(json) as FlowGraph;
     }
+    this.assertCapabilities(ref.graph);
     this.cache.set(cacheKey(flowId, version), ref);
     return ref;
   }
@@ -213,6 +228,12 @@ export class RuntimeRegistry {
       } else if (remaining.length !== triggers.length) {
         this.activeEventTriggers.set(event, remaining);
       }
+    }
+  }
+
+  private assertCapabilities(graph: FlowGraph): void {
+    if (this.capabilities) {
+      assertFlowCapabilities(graph, this.nodeTypeRegistry, this.capabilities);
     }
   }
 }

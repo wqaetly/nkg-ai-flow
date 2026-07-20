@@ -9,6 +9,7 @@
 import {
   RuntimeErrorException,
   type InMemoryNodeTypeRegistry,
+  type NodeCapabilities,
   type NodeTypeDefinition,
 } from "@ai-native-flow/flow-ir";
 import { installNode, type InstallTarget } from "@ai-native-flow/node-sdk";
@@ -127,6 +128,11 @@ export function createBrowserBuiltinRunnerRegistry(
     options.sandboxAdapter ? { sandboxAdapter: options.sandboxAdapter } : {},
   );
   const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const toolHost: AgentToolHost = options.toolHost ?? {
+    async callTool() {
+      return { ok: false, error: "runtime tool host is unavailable" };
+    },
+  };
   const target = makeInstallTarget(registry, options.nodeTypeRegistry);
 
   const portableNodes = [
@@ -200,9 +206,7 @@ export function createBrowserBuiltinRunnerRegistry(
   ];
   for (const node of portableNodes) installNode(target, node);
 
-  if (options.toolHost) {
-    installNode(target, toolNode, { toolHost: options.toolHost });
-  }
+  installNode(target, toolNode, { toolHost });
 
   const postToolNodes = [
     uniqueItemsNode,
@@ -215,12 +219,7 @@ export function createBrowserBuiltinRunnerRegistry(
   for (const node of postToolNodes) installNode(target, node);
   installNode(target, llmNode, { llmProvider });
 
-  if (options.toolHost) {
-    installNode(target, agentNode, {
-      llmProvider,
-      toolHost: options.toolHost,
-    });
-  }
+  installNode(target, agentNode, { llmProvider, toolHost });
 
   const postAgentNodes = [
     eventTriggerNode,
@@ -247,10 +246,10 @@ function makeInstallTarget(
   types: InMemoryNodeTypeRegistry | undefined,
 ): InstallTarget {
   return {
-    registerType(definition: NodeTypeDefinition): void {
+    registerType(definition: NodeTypeDefinition, capabilities?: NodeCapabilities): void {
       if (!types || types.has(definition.type, definition.typeVersion)) return;
       try {
-        types.register(definition);
+        types.register(definition, capabilities);
       } catch (cause) {
         if (
           cause instanceof RuntimeErrorException &&

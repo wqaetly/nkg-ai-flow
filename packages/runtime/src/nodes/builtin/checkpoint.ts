@@ -60,6 +60,10 @@ export const checkpointNode = defineNode({
   typeVersion: "1.0.0",
   title: "Checkpoint",
   description: "Saves, loads, touches, or clears a persisted flow checkpoint.",
+  capabilities: {
+    supportsCheckpoint: true,
+    requiredPermissions: ["lifecycle.checkpoint"],
+  },
   kind: "pseudo",
   config: checkpointConfig,
   fieldMeta: {

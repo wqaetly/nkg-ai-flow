@@ -38,6 +38,7 @@
 
 import type { z } from "zod";
 import type {
+  NodeCapabilities,
   NodeConfigSchema,
   NodeTypeDefinition,
   PortDefinition,
@@ -89,7 +90,23 @@ export function defineNode<
 >(spec: DefineNodeSpec<TInput, TConfig, TOutput>): DefinedNode {
   const definition = buildDefinition(spec);
   const runner = buildRunner(spec);
-  return { definition, runner };
+  return { definition, capabilities: buildCapabilities(spec.capabilities), runner };
+}
+
+function buildCapabilities(
+  capabilities: Partial<NodeCapabilities> | undefined,
+): NodeCapabilities {
+  return {
+    streaming: capabilities?.streaming ?? false,
+    dynamicPorts: capabilities?.dynamicPorts ?? false,
+    idempotent: capabilities?.idempotent ?? true,
+    supportsCancel: capabilities?.supportsCancel ?? true,
+    supportsCheckpoint: capabilities?.supportsCheckpoint ?? false,
+    requiredPermissions: [...(capabilities?.requiredPermissions ?? [])],
+    ...(capabilities?.requiredSecrets
+      ? { requiredSecrets: [...capabilities.requiredSecrets] }
+      : {}),
+  };
 }
 
 function buildDefinition<

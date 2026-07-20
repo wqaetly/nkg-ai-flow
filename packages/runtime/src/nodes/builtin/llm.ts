@@ -89,6 +89,11 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
       typeVersion: "1.0.0",
       title: "大语言模型",
       description: "使用提示词模板调用模型并返回结构化输出。",
+      capabilities: {
+        streaming: true,
+        supportsCancel: true,
+        requiredPermissions: ["network.http", "secret.read"],
+      },
       config: llmConfig,
       fieldMeta: {
         baseUrl: {

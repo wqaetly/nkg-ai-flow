@@ -3,6 +3,7 @@ import { InMemoryEventBus, type EventBus } from "@ai-native-flow/event-bus";
 import {
   createDefaultRegistry,
   type InMemoryNodeTypeRegistry,
+  type NodeCapabilities,
   type NodeTypeDefinition,
 } from "@ai-native-flow/flow-ir";
 import {
@@ -36,6 +37,7 @@ import {
   type RunStore,
 } from "./storage/browser.js";
 import type { Runtime } from "./createRuntime.js";
+import type { RuntimeCapabilityManifest } from "./capabilities.js";
 
 export interface CreateBrowserRuntimeOptions {
   variables?: VariableStore;
@@ -51,6 +53,8 @@ export interface CreateBrowserRuntimeOptions {
   toolHost?: AgentToolHost;
   hashText?: (input: string) => Promise<string>;
   generateRunId?: () => string;
+  /** Host capabilities enforced before a Flow artifact is registered. */
+  capabilities?: RuntimeCapabilityManifest;
 }
 
 export function createBrowserRuntime(
@@ -79,12 +83,13 @@ export function createBrowserRuntime(
     artifactStore,
     nodeTypeRegistry,
     ...(options.hashText ? { hashText: options.hashText } : {}),
+    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
   });
 
   if (options.nodes && options.nodes.length > 0) {
     const target: InstallTarget = {
-      registerType(definition: NodeTypeDefinition): void {
-        nodeTypeRegistry.register(definition);
+      registerType(definition: NodeTypeDefinition, capabilities?: NodeCapabilities): void {
+        nodeTypeRegistry.register(definition, capabilities);
       },
       registerRunner(type, typeVersion, runner): void {
         runners.register(type, typeVersion, runner as unknown as NodeRunner);

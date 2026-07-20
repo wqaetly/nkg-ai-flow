@@ -9,7 +9,7 @@
  * `NodeRunnerRegistry` pair.
  */
 
-import type { NodeTypeDefinition } from "@ai-native-flow/flow-ir";
+import type { NodeCapabilities, NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import type {
   DefinedNode,
   NodeFactory,
@@ -26,7 +26,7 @@ export interface InstallTarget {
    * Register the node-type metadata (data track). Most runtimes will
    * forward this to `RuntimeRegistry.registerNodeType()`.
    */
-  registerType(definition: NodeTypeDefinition): void;
+  registerType(definition: NodeTypeDefinition, capabilities?: NodeCapabilities): void;
 
   /**
    * Register the runner (behaviour track). Forwards to
@@ -66,7 +66,7 @@ export function installNode<TDeps>(
       ? (nodeOrFactory as NodeFactory<TDeps>)(deps as TDeps)
       : nodeOrFactory;
 
-  target.registerType(resolved.definition);
+  target.registerType(resolved.definition, resolved.capabilities);
   target.registerRunner(
     resolved.definition.type,
     resolved.definition.typeVersion,

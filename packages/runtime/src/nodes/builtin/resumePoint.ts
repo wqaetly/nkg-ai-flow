@@ -65,6 +65,10 @@ export const resumePointNode = defineNode({
   typeVersion: "1.0.0",
   title: "Resume Point",
   description: "Marks, loads, touches, or clears a durable recovery target.",
+  capabilities: {
+    supportsCheckpoint: true,
+    requiredPermissions: ["lifecycle.checkpoint"],
+  },
   kind: "pseudo",
   config: resumePointConfig,
   fieldMeta: {

@@ -68,11 +68,11 @@ describe("browser runtime", () => {
     }]);
   });
 
-  it("does not register filesystem/process agent nodes without a native tool host", () => {
+  it("publishes tool and agent contracts even when the host cannot execute tools", () => {
     const runtime = createBrowserRuntime({ llmProvider: new EchoProvider() });
 
-    expect(runtime.runners.list().some((entry) => entry.type === "tool")).toBe(false);
-    expect(runtime.runners.list().some((entry) => entry.type === "agent")).toBe(false);
+    expect(runtime.runners.list().some((entry) => entry.type === "tool")).toBe(true);
+    expect(runtime.runners.list().some((entry) => entry.type === "agent")).toBe(true);
     expect(runtime.runners.has("llm", "1.0.0")).toBe(true);
   });
 });

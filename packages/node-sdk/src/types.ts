@@ -203,6 +203,9 @@ export interface DefinedNode {
   /** Data track: shape for Studio / Builder / Validator. */
   readonly definition: NodeTypeDefinition;
 
+  /** Capability track: host permissions required before registration/run. */
+  readonly capabilities?: NodeCapabilities;
+
   /** Behaviour track: function for the Execution Engine. */
   readonly runner: SdkInternalRunner;
 }

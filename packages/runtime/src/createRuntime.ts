@@ -18,6 +18,7 @@ import {
 import {
   createDefaultRegistry,
   type InMemoryNodeTypeRegistry,
+  type NodeCapabilities,
   type NodeTypeDefinition,
 } from "@ai-native-flow/flow-ir";
 import {
@@ -32,6 +33,7 @@ import { createBuiltinRunnerRegistry } from "./nodes/createBuiltinRunnerRegistry
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
 import type { NodeRunner } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
+import type { RuntimeCapabilityManifest } from "./capabilities.js";
 import { RuntimeRegistry } from "./registry.js";
 import { RunManager } from "./runManager.js";
 import {
@@ -82,6 +84,8 @@ export interface CreateRuntimeOptions {
    * lifecycle explicit; CLIs and HTTP transports usually want true.
    */
   autoBootstrap?: boolean;
+  /** Optional capability gate for hosts that need registration preflight. */
+  capabilities?: RuntimeCapabilityManifest;
 }
 
 export interface Runtime {
@@ -131,6 +135,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     registryStore,
     artifactStore,
     nodeTypeRegistry,
+    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
   });
 
   // Install user-supplied custom nodes (SDK route). Their data track
@@ -139,8 +144,8 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
   // the runner registry. Built-ins already populated both halves.
   if (options.nodes && options.nodes.length > 0) {
     const target: InstallTarget = {
-      registerType(definition: NodeTypeDefinition): void {
-        nodeTypeRegistry.register(definition);
+      registerType(definition: NodeTypeDefinition, capabilities?: NodeCapabilities): void {
+        nodeTypeRegistry.register(definition, capabilities);
       },
       registerRunner(type, typeVersion, runner): void {
         runners.register(type, typeVersion, runner as unknown as NodeRunner);

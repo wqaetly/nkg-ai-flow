@@ -43,6 +43,10 @@ export const httpNode = defineNode({
   typeVersion: "1.0.0",
   title: "HTTP",
   description: "Call an HTTP API.",
+  capabilities: {
+    supportsCancel: true,
+    requiredPermissions: ["network.http"],
+  },
   config: httpConfig,
   fieldMeta: {
     url: { label: "URL", placeholder: "https://api.example.com/v1", order: 1 },

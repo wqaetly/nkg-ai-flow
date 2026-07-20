@@ -115,6 +115,11 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
       title: "Agent",
       description:
         "LLM tool-loop worker with small file/search/edit/bash primitives.",
+      capabilities: {
+        streaming: true,
+        supportsCancel: true,
+        requiredPermissions: ["network.http", "secret.read"],
+      },
       config: agentConfig,
       fieldMeta: {
         baseUrl: { label: "URL", placeholder: DEFAULT_LLM_BASE_URL_REF, order: 1 },
