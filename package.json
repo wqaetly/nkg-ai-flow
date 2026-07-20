@@ -13,6 +13,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "vitest run",
     "test:browser-bundle": "node scripts/verify-browser-bundle.mjs",
+    "test:example-flows": "tsx scripts/audit-example-flows.ts",
     "typecheck": "tsc --noEmit -p .",
     "app:helloagent": "tsx apps/hello-agent/build.ts",
     "dev:studio": "npm run studio:dev",

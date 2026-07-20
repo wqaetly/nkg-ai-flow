@@ -99,6 +99,9 @@ export const codeSynthesizerNode = defineNode({
   title: "Code Synthesizer (LLM parallel)",
   description:
     "Synthesize compilable defineNode TypeScript source for each NodeSpec, then assemble the FlowGraph, build.ts, and runtime.ts deterministically.",
+  capabilities: {
+    requiredPermissions: ["network.http", "secret.read"],
+  },
   config: codeSynthesizerConfig,
   fieldMeta: {
     base_url: {

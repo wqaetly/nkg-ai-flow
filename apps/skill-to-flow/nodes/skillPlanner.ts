@@ -67,6 +67,9 @@ export const skillPlannerNode = defineNode({
   title: "Skill 规划器（LLM）",
   description:
     "使用 LLM 把 SKILL 分解为有向无环执行计划：每个步骤含 kind/intent/IO/依赖，输出严格 JSON。",
+  capabilities: {
+    requiredPermissions: ["network.http", "secret.read"],
+  },
   config: skillPlannerConfig,
   fieldMeta: {
     base_url: {

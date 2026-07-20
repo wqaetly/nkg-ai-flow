@@ -72,6 +72,9 @@ export const nodeDesignerNode = defineNode({
   title: "节点设计器（LLM·并发）",
   description:
     "针对执行计划的每个步骤并发调用 LLM，输出严格 JSON 的 NodeSpec[]：包含 nodeType/config/ports/实现策略/伪码。",
+  capabilities: {
+    requiredPermissions: ["network.http", "secret.read"],
+  },
   config: nodeDesignerConfig,
   fieldMeta: {
     base_url: {

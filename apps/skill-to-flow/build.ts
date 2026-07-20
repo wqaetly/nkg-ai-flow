@@ -70,7 +70,7 @@ export function buildSkillToFlowRegistry(): InMemoryNodeTypeRegistry {
   ]) {
     installNode(
       {
-        registerType: (def) => registry.register(def),
+        registerType: (def, capabilities) => registry.register(def, capabilities),
         registerRunner: () => undefined,
       },
       node,
