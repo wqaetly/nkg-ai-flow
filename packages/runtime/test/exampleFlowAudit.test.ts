@@ -3,6 +3,7 @@ import {
   BUNDLED_EXAMPLE_SOURCES,
   auditBundledExampleFlows,
   discoverBundledExampleFlowSources,
+  semanticallyEqualFlowJson,
 } from "../../../scripts/audit-example-flows.js";
 
 describe("bundled example Flow audit", () => {
@@ -10,6 +11,13 @@ describe("bundled example Flow audit", () => {
     expect(discoverBundledExampleFlowSources()).toEqual(
       [...BUNDLED_EXAMPLE_SOURCES].sort(),
     );
+  });
+
+  it("ignores checkout-specific line endings when checking generated assets", () => {
+    expect(semanticallyEqualFlowJson(
+      "{\n  \"id\": \"flow\"\n}\n",
+      "{\r\n  \"id\": \"flow\"\r\n}\r\n",
+    )).toBe(true);
   });
 
   it("validates every asset and executes every deterministic portable example", async () => {

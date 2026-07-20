@@ -115,13 +115,17 @@ async function auditSkillToFlow(): Promise<ExampleFlowResult> {
     const registry = buildSkillToFlowRegistry();
     const generated = buildSkillToFlowFlow().dump();
     const bundled = readFileSync(resolve(root, source), "utf8");
-    if (generated.trimEnd() !== bundled.trimEnd()) {
+    if (!semanticallyEqualFlowJson(generated, bundled)) {
       throw new Error("bundled Flow JSON differs from buildSkillToFlowFlow().dump() output");
     }
     const graph = JSON.parse(bundled) as FlowGraph;
     assertValid(graph, registry);
     return resultFor(graph, registry, "not_applicable");
   });
+}
+
+export function semanticallyEqualFlowJson(left: string, right: string): boolean {
+  return JSON.stringify(JSON.parse(left)) === JSON.stringify(JSON.parse(right));
 }
 
 async function capture(
