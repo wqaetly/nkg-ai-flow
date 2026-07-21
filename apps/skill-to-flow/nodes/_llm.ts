@@ -2,6 +2,7 @@ import { z } from "zod";
 import {
   AiSdkOpenAICompatibleLlmProvider,
   type LlmCompletionRequest,
+  type LlmProvider,
   type NodeContext,
 } from "@ai-native-flow/runtime";
 
@@ -20,6 +21,8 @@ export interface ChatOptions {
     info?: (msg: string, data?: Record<string, unknown>) => void;
     warn?: (msg: string, data?: Record<string, unknown>) => void;
   };
+  /** Explicit provider supplied by the node pack/runtime composition. */
+  llmProvider?: LlmProvider;
 }
 
 export interface ChatResult {
@@ -32,7 +35,7 @@ export interface ChatResult {
   raw?: unknown;
 }
 
-const provider = new AiSdkOpenAICompatibleLlmProvider({
+const defaultProvider = new AiSdkOpenAICompatibleLlmProvider({
   providerName: "skill-to-flow",
 });
 
@@ -57,7 +60,11 @@ export async function chat(options: ChatOptions): Promise<ChatResult> {
   };
   let result;
   try {
-    result = await provider.complete(request, options.ctx as NodeContext);
+    const provider = options.llmProvider ?? defaultProvider;
+    result = await provider.complete(
+      request,
+      options.ctx as NodeContext,
+    );
   } catch (cause) {
     throw new Error(`skill-to-flow LLM: ${(cause as Error).message}`);
   }

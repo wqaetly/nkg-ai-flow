@@ -1,6 +1,7 @@
 /** Node-hosted built-in catalogue, including filesystem/process agent tools. */
 import type { InMemoryNodeTypeRegistry } from "@ai-native-flow/flow-ir";
 import type { SandboxAdapter } from "@ai-native-flow/sandbox";
+import type { AgentToolHost } from "./builtin/agent.js";
 import { createNodeAgentToolHost } from "./builtin/agentTools.node.js";
 import {
   createBrowserBuiltinRunnerRegistry,
@@ -12,6 +13,7 @@ export interface CreateBuiltinRunnerRegistryOptions {
   sandboxAdapter?: SandboxAdapter;
   nodeTypeRegistry?: InMemoryNodeTypeRegistry;
   fetch?: typeof fetch;
+  toolHost?: AgentToolHost;
 }
 
 export function createBuiltinRunnerRegistry(
@@ -19,6 +21,6 @@ export function createBuiltinRunnerRegistry(
 ) {
   return createBrowserBuiltinRunnerRegistry({
     ...options,
-    toolHost: createNodeAgentToolHost(),
+    toolHost: options.toolHost ?? createNodeAgentToolHost(),
   });
 }

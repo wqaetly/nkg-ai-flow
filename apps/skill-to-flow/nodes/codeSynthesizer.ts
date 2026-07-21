@@ -31,6 +31,7 @@ import {
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
+  type LlmProvider,
 } from "@ai-native-flow/runtime";
 import { z } from "zod";
 
@@ -93,7 +94,8 @@ const synthesisedNodeSchema = z.object({
 /* node                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const codeSynthesizerNode = defineNode({
+export function createCodeSynthesizerNode(llmProvider?: LlmProvider) {
+  return defineNode({
   type: "code_synthesizer",
   typeVersion: "1.0.0",
   title: "Code Synthesizer (LLM parallel)",
@@ -189,6 +191,7 @@ export const codeSynthesizerNode = defineNode({
           const step = plan.steps.find((s) => s.id === spec.stepId);
           const user = buildUserPrompt(skill, plan, spec, step);
           const result = await chatJson({
+            llmProvider,
             system,
             user,
             schema: synthesisedNodeSchema,
@@ -318,7 +321,10 @@ export const codeSynthesizerNode = defineNode({
       outputs: { out: null, package: pkg },
     };
   },
-});
+  });
+}
+
+export const codeSynthesizerNode = createCodeSynthesizerNode();
 
 /* -------------------------------------------------------------------------- */
 /* prompts                                                                    */

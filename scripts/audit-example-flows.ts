@@ -10,11 +10,17 @@ import {
   createRuntimeCapabilityManifest,
   inspectFlowCapabilities,
 } from "@ai-native-flow/runtime/browser";
+import { createNodeRuntime } from "@ai-native-flow/runtime/node";
 import { flow as helloAgentFlow } from "../apps/hello-agent/helloagent.flow.js";
 import {
   buildSkillToFlowFlow,
   buildSkillToFlowRegistry,
 } from "../apps/skill-to-flow/build.js";
+import {
+  createDeterministicExampleProvider,
+  createDeterministicSkillToFlowNodes,
+  InMemoryAgentToolHost,
+} from "./example-flow-fixtures.js";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 export const BUNDLED_EXAMPLE_SOURCES = [
@@ -96,22 +102,37 @@ async function auditLoopShowcase(): Promise<ExampleFlowResult> {
 
 async function auditHelloAgent(): Promise<ExampleFlowResult> {
   const source = "apps/hello-agent/helloagent.flow.ts";
-  return capture("helloagent", source, false, async () => {
+  return capture("helloagent", source, true, async () => {
     const graph = JSON.parse(helloAgentFlow.dump()) as FlowGraph;
+    const llmProvider = createDeterministicExampleProvider();
+    const portableToolHost = new InMemoryAgentToolHost();
     const runtime = createBrowserRuntime({
+      llmProvider,
+      toolHost: portableToolHost,
       capabilities: createRuntimeCapabilityManifest({
         platform: "desktop-power",
         available: RUNTIME_CAPABILITIES,
       }),
+      generateRunId: () => "example_hello_portable",
     });
     await runtime.registry.register({ graph });
-    return resultFor(graph, runtime.nodeTypeRegistry, "not_applicable");
+    await runtime.registry.promote(graph.id, graph.version);
+    const portable = await runtime.invocationRouter.invoke({ flowId: graph.id, input: {} });
+    const nodeRuntime = createNodeRuntime({
+      llmProvider,
+      toolHost: new InMemoryAgentToolHost(),
+    });
+    await nodeRuntime.registry.register({ graph });
+    await nodeRuntime.registry.promote(graph.id, graph.version);
+    const node = await nodeRuntime.invocationRouter.invoke({ flowId: graph.id, input: {} });
+    assertParity("helloagent", portable, node);
+    return resultFor(graph, runtime.nodeTypeRegistry, "passed", portable.output);
   });
 }
 
 async function auditSkillToFlow(): Promise<ExampleFlowResult> {
   const source = "apps/skill-to-flow/flows/skill-to-flow.json";
-  return capture("skill_to_flow", source, false, async () => {
+  return capture("skill_to_flow", source, true, async () => {
     const registry = buildSkillToFlowRegistry();
     const generated = buildSkillToFlowFlow().dump();
     const bundled = readFileSync(resolve(root, source), "utf8");
@@ -120,8 +141,49 @@ async function auditSkillToFlow(): Promise<ExampleFlowResult> {
     }
     const graph = JSON.parse(bundled) as FlowGraph;
     assertValid(graph, registry);
-    return resultFor(graph, registry, "not_applicable");
+    const llmProvider = createDeterministicExampleProvider();
+    const nodes = createDeterministicSkillToFlowNodes(llmProvider);
+    const runtime = createBrowserRuntime({
+      llmProvider,
+      nodes,
+      toolHost: new InMemoryAgentToolHost(),
+      capabilities: createRuntimeCapabilityManifest({
+        platform: "desktop-power",
+        available: RUNTIME_CAPABILITIES,
+      }),
+      generateRunId: () => "example_skill_portable",
+    });
+    await runtime.registry.register({ graph });
+    await runtime.registry.promote(graph.id, graph.version);
+    const input = {
+      skill_content: "---\nname: fixture-skill\ndescription: fixture\n---\nReturn a deterministic result.",
+      output_dir: "fixture-output",
+    };
+    const portable = await runtime.invocationRouter.invoke({ flowId: graph.id, input });
+    const nodeRuntime = createNodeRuntime({
+      llmProvider,
+      nodes: createDeterministicSkillToFlowNodes(llmProvider),
+      toolHost: new InMemoryAgentToolHost(),
+    });
+    await nodeRuntime.registry.register({ graph });
+    await nodeRuntime.registry.promote(graph.id, graph.version);
+    const node = await nodeRuntime.invocationRouter.invoke({ flowId: graph.id, input });
+    assertParity("skill_to_flow", portable, node);
+    return resultFor(graph, runtime.nodeTypeRegistry, "passed", portable.output);
   });
+}
+
+function assertParity(
+  id: string,
+  portable: { succeeded: boolean; output?: unknown },
+  node: { succeeded: boolean; output?: unknown },
+): void {
+  if (!portable.succeeded || !node.succeeded) {
+    throw new Error(`${id} fixture failed: portable=${JSON.stringify(portable)} node=${JSON.stringify(node)}`);
+  }
+  if (JSON.stringify(portable.output) !== JSON.stringify(node.output)) {
+    throw new Error(`${id} output differs between portable and node runtimes`);
+  }
 }
 
 export function semanticallyEqualFlowJson(left: string, right: string): boolean {

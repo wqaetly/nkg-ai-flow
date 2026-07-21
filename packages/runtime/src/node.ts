@@ -29,6 +29,12 @@ export {
   type LlmCompletionResponse,
 } from "./nodes/llmProvider.js";
 export { getBuiltinNodeDefinitions } from "./builtinDefinitions.js";
+export type {
+  AgentToolCall,
+  AgentToolHost,
+  AgentToolName,
+  AgentToolResult,
+} from "./nodes/builtin/agent.js";
 export * from "./createRuntime.js";
 export {
   createRuntime as createNodeRuntime,

@@ -12,9 +12,6 @@
  *   • { skill_file_path: string }                — read from disk
  */
 
-import { readFileSync } from "node:fs";
-import path from "node:path";
-
 import { defineNode } from "@ai-native-flow/node-sdk";
 import YAML from "yaml";
 import { z } from "zod";
@@ -43,7 +40,12 @@ type SkillParserConfig = z.infer<typeof skillParserConfig>;
 /* node                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const skillParserNode = defineNode({
+export interface SkillParserDeps {
+  readSkillFile?: (path: string) => string | Promise<string>;
+}
+
+export function createSkillParserNode(deps: SkillParserDeps = {}) {
+  return defineNode({
   type: "skill_parser",
   typeVersion: "1.0.0",
   title: "Skill 解析器",
@@ -56,6 +58,13 @@ export const skillParserNode = defineNode({
   },
   ports: [
     {
+      id: "input",
+      direction: "input",
+      kind: "data",
+      label: "运行输入",
+      schema: { type: "object" },
+    },
+    {
       id: "skill_def",
       direction: "output",
       kind: "data",
@@ -66,9 +75,13 @@ export const skillParserNode = defineNode({
   validateInput: false,
   async run({ input, config, ctx }) {
     const cfg = config as SkillParserConfig;
-    const raw = input as Record<string, unknown>;
+    const envelope = input as Record<string, unknown>;
+    const raw =
+      envelope.input && typeof envelope.input === "object"
+        ? envelope.input as Record<string, unknown>
+        : envelope;
 
-    const { content, sourcePath } = await loadSource(raw);
+    const { content, sourcePath } = await loadSource(raw, deps);
 
     if (!content || !content.trim()) {
       return {
@@ -130,7 +143,10 @@ export const skillParserNode = defineNode({
       outputs: { out: null, skill_def: definition },
     };
   },
-});
+  });
+}
+
+export const skillParserNode = createSkillParserNode();
 
 /* -------------------------------------------------------------------------- */
 /* helpers                                                                    */
@@ -141,7 +157,10 @@ interface LoadedSource {
   sourcePath: string;
 }
 
-async function loadSource(raw: Record<string, unknown>): Promise<LoadedSource> {
+async function loadSource(
+  raw: Record<string, unknown>,
+  deps: SkillParserDeps,
+): Promise<LoadedSource> {
   const inlineContent =
     typeof raw.skill_content === "string" ? raw.skill_content : undefined;
   const inlinePath =
@@ -156,11 +175,12 @@ async function loadSource(raw: Record<string, unknown>): Promise<LoadedSource> {
     };
   }
   if (filePath) {
-    const abs = path.isAbsolute(filePath)
-      ? filePath
-      : path.resolve(process.cwd(), filePath);
-    const content = readFileSync(abs, "utf8");
-    return { content, sourcePath: abs };
+    if (!deps.readSkillFile) {
+      throw new Error(
+        "skill_parser: skill_file_path requires a host-provided readSkillFile capability; use skill_content on portable hosts.",
+      );
+    }
+    return { content: await deps.readSkillFile(filePath), sourcePath: filePath };
   }
   return { content: "", sourcePath: "<missing>" };
 }
@@ -211,9 +231,13 @@ function resolveName(
 ): string {
   if (fm.name && fm.name.trim()) return fm.name.trim();
   if (sourcePath && sourcePath !== "<inline>" && sourcePath !== "<missing>") {
-    const base = path.basename(sourcePath, path.extname(sourcePath));
+    const normalized = sourcePath.replaceAll("\\", "/");
+    const fileName = normalized.slice(normalized.lastIndexOf("/") + 1);
+    const dot = fileName.lastIndexOf(".");
+    const base = dot > 0 ? fileName.slice(0, dot) : fileName;
     if (base.toLowerCase() === "skill" || base.toLowerCase() === "skill.md") {
-      const dir = path.basename(path.dirname(sourcePath));
+      const parent = normalized.slice(0, normalized.lastIndexOf("/"));
+      const dir = parent.slice(parent.lastIndexOf("/") + 1);
       if (dir && dir !== ".") return dir;
     } else if (base) {
       return base;

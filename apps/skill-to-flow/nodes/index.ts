@@ -14,11 +14,12 @@
  */
 
 import type { DefinedNode } from "@ai-native-flow/node-sdk";
+import type { LlmProvider } from "@ai-native-flow/runtime";
 
-import { skillParserNode } from "./skillParser.js";
-import { skillPlannerNode } from "./skillPlanner.js";
-import { nodeDesignerNode } from "./nodeDesigner.js";
-import { codeSynthesizerNode } from "./codeSynthesizer.js";
+import { createSkillParserNode, skillParserNode, type SkillParserDeps } from "./skillParser.js";
+import { createSkillPlannerNode, skillPlannerNode } from "./skillPlanner.js";
+import { createNodeDesignerNode, nodeDesignerNode } from "./nodeDesigner.js";
+import { createCodeSynthesizerNode, codeSynthesizerNode } from "./codeSynthesizer.js";
 import { flowValidatorNode } from "./flowValidator.js";
 
 export {
@@ -27,6 +28,10 @@ export {
   nodeDesignerNode,
   codeSynthesizerNode,
   flowValidatorNode,
+  createSkillPlannerNode,
+  createNodeDesignerNode,
+  createCodeSynthesizerNode,
+  createSkillParserNode,
 };
 
 /**
@@ -35,13 +40,13 @@ export {
  * variable / secret stores, so the factory takes no arguments.
  */
 export default function createNodes(
-  _deps: Record<string, unknown> = {},
+  deps: { llmProvider?: LlmProvider } & SkillParserDeps = {},
 ): DefinedNode[] {
   return [
-    skillParserNode,
-    skillPlannerNode,
-    nodeDesignerNode,
-    codeSynthesizerNode,
+    createSkillParserNode(deps),
+    createSkillPlannerNode(deps.llmProvider),
+    createNodeDesignerNode(deps.llmProvider),
+    createCodeSynthesizerNode(deps.llmProvider),
     flowValidatorNode,
   ];
 }

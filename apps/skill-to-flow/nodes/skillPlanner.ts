@@ -20,6 +20,7 @@ import {
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
+  type LlmProvider,
 } from "@ai-native-flow/runtime";
 import { z } from "zod";
 
@@ -61,7 +62,8 @@ type SkillPlannerConfig = z.infer<typeof skillPlannerConfig>;
 /* node                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const skillPlannerNode = defineNode({
+export function createSkillPlannerNode(llmProvider?: LlmProvider) {
+  return defineNode({
   type: "skill_planner",
   typeVersion: "1.0.0",
   title: "Skill 规划器（LLM）",
@@ -150,6 +152,7 @@ export const skillPlannerNode = defineNode({
     let plan: ExecutionPlan;
     try {
       plan = await chatJson({
+        llmProvider,
         system,
         user,
         schema: executionPlanSchema as z.ZodType<ExecutionPlan>,
@@ -206,7 +209,10 @@ export const skillPlannerNode = defineNode({
       outputs: { out: null, plan },
     };
   },
-});
+  });
+}
+
+export const skillPlannerNode = createSkillPlannerNode();
 
 /* -------------------------------------------------------------------------- */
 /* prompt construction                                                        */

@@ -30,6 +30,7 @@ import {
 } from "@ai-native-flow/variable-store";
 import { InvocationRouter } from "./invocationRouter.js";
 import { createBuiltinRunnerRegistry } from "./nodes/createBuiltinRunnerRegistry.js";
+import type { AgentToolHost } from "./nodes/builtin/agent.js";
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
 import type { NodeRunner } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
@@ -82,6 +83,8 @@ export interface CreateRuntimeOptions {
    * `ctx.variables` (see `./nodes/llmProvider.ts`).
    */
   llmProvider?: LlmProvider;
+  /** Override the Node filesystem/process tool host (for brokers and deterministic tests). */
+  toolHost?: AgentToolHost;
   /**
    * If true, call `bootstrapDefaults` automatically when neither
    * `variables` nor `secrets` is supplied. Defaults to false to keep
@@ -145,6 +148,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
   const runners = createBuiltinRunnerRegistry({
     llmProvider,
     nodeTypeRegistry,
+    ...(options.toolHost ? { toolHost: options.toolHost } : {}),
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
   const registry = new RuntimeRegistry({

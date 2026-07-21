@@ -242,6 +242,8 @@ export function buildSkillToFlowFlow(): FlowBuilder {
 
   // Control: start → parser
   flow.connect(start.out("out"), parser.in("in"));
+  // Data: the parser needs the invocation payload, not only a control token.
+  flow.connect(start.out("runInput"), parser.in("input"));
 
   // Data: parser → planner (skill_def)
   flow.connect(parser.out("skill_def"), planner.in("skill_def"));

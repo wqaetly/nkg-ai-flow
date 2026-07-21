@@ -88,6 +88,15 @@
           "label": "输出"
         },
         {
+          "id": "input",
+          "direction": "input",
+          "kind": "data",
+          "label": "运行输入",
+          "schema": {
+            "type": "object"
+          }
+        },
+        {
           "id": "skill_def",
           "direction": "output",
           "kind": "data",
@@ -610,12 +619,12 @@
     {
       "id": "edge_02",
       "from": {
-        "nodeId": "skill_parser",
-        "portId": "skill_def"
+        "nodeId": "node_start",
+        "portId": "runInput"
       },
       "to": {
-        "nodeId": "skill_planner",
-        "portId": "skill_def"
+        "nodeId": "skill_parser",
+        "portId": "input"
       }
     },
     {
@@ -625,12 +634,23 @@
         "portId": "skill_def"
       },
       "to": {
-        "nodeId": "node_designer",
+        "nodeId": "skill_planner",
         "portId": "skill_def"
       }
     },
     {
       "id": "edge_04",
+      "from": {
+        "nodeId": "skill_parser",
+        "portId": "skill_def"
+      },
+      "to": {
+        "nodeId": "node_designer",
+        "portId": "skill_def"
+      }
+    },
+    {
+      "id": "edge_05",
       "from": {
         "nodeId": "skill_planner",
         "portId": "plan"
@@ -641,7 +661,7 @@
       }
     },
     {
-      "id": "edge_05",
+      "id": "edge_06",
       "from": {
         "nodeId": "skill_parser",
         "portId": "skill_def"
@@ -652,7 +672,7 @@
       }
     },
     {
-      "id": "edge_06",
+      "id": "edge_07",
       "from": {
         "nodeId": "skill_planner",
         "portId": "plan"
@@ -663,7 +683,7 @@
       }
     },
     {
-      "id": "edge_07",
+      "id": "edge_08",
       "from": {
         "nodeId": "node_designer",
         "portId": "node_specs"
@@ -671,22 +691,22 @@
       "to": {
         "nodeId": "code_synthesizer",
         "portId": "node_specs"
-      }
-    },
-    {
-      "id": "edge_08",
-      "from": {
-        "nodeId": "code_synthesizer",
-        "portId": "package"
-      },
-      "to": {
-        "nodeId": "flow_validator",
-        "portId": "package"
       }
     },
     {
       "id": "edge_09",
       "from": {
+        "nodeId": "code_synthesizer",
+        "portId": "package"
+      },
+      "to": {
+        "nodeId": "flow_validator",
+        "portId": "package"
+      }
+    },
+    {
+      "id": "edge_10",
+      "from": {
         "nodeId": "node_designer",
         "portId": "node_specs"
       },
@@ -696,7 +716,7 @@
       }
     },
     {
-      "id": "edge_10",
+      "id": "edge_11",
       "from": {
         "nodeId": "node_start",
         "portId": "runInput"
@@ -707,7 +727,7 @@
       }
     },
     {
-      "id": "edge_11",
+      "id": "edge_12",
       "from": {
         "nodeId": "output_dir",
         "portId": "output"
@@ -718,7 +738,7 @@
       }
     },
     {
-      "id": "edge_12",
+      "id": "edge_13",
       "from": {
         "nodeId": "flow_validator",
         "portId": "artifact"
@@ -729,7 +749,7 @@
       }
     },
     {
-      "id": "edge_13",
+      "id": "edge_14",
       "from": {
         "nodeId": "materialize_task",
         "portId": "text"
@@ -740,7 +760,7 @@
       }
     },
     {
-      "id": "edge_14",
+      "id": "edge_15",
       "from": {
         "nodeId": "flow_validator",
         "portId": "out"
@@ -751,7 +771,7 @@
       }
     },
     {
-      "id": "edge_15",
+      "id": "edge_16",
       "from": {
         "nodeId": "materialize_task",
         "portId": "out"
@@ -762,7 +782,7 @@
       }
     },
     {
-      "id": "edge_16",
+      "id": "edge_17",
       "from": {
         "nodeId": "package_materializer",
         "portId": "out"

@@ -1157,7 +1157,8 @@ describe("skill-to-flow context handoff", () => {
     expect(source).toContain("AiSdkOpenAICompatibleLlmProvider");
     expect(source).toContain("type LlmCompletionRequest");
     expect(source).toContain("ctx: unknown");
-    expect(source).toContain("provider.complete(request");
+    expect(source).toContain("options.llmProvider ?? defaultProvider");
+    expect(source).toContain("provider.complete(");
     expect(source).not.toContain("getDefaultVariableStore");
     expect(source).not.toContain("new AbortController");
     expect(source).not.toContain("providerContext");

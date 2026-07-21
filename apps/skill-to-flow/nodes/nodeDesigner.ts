@@ -26,6 +26,7 @@ import {
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
   getBuiltinNodeDefinitions,
+  type LlmProvider,
 } from "@ai-native-flow/runtime";
 import { z } from "zod";
 
@@ -66,7 +67,8 @@ const RUNTIME_BUILTIN_NODE_TYPES = getBuiltinNodeDefinitions().map((definition) 
 /* node                                                                       */
 /* -------------------------------------------------------------------------- */
 
-export const nodeDesignerNode = defineNode({
+export function createNodeDesignerNode(llmProvider?: LlmProvider) {
+  return defineNode({
   type: "node_designer",
   typeVersion: "1.0.0",
   title: "节点设计器（LLM·并发）",
@@ -148,6 +150,7 @@ export const nodeDesignerNode = defineNode({
           );
           const user = buildUserPrompt(skill, plan, step);
           const designed = await chatJson({
+            llmProvider,
             system,
             user,
             schema: nodeSpecSchema as z.ZodType<NodeSpec>,
@@ -199,7 +202,10 @@ export const nodeDesignerNode = defineNode({
       outputs: { out: null, node_specs: specs },
     };
   },
-});
+  });
+}
+
+export const nodeDesignerNode = createNodeDesignerNode();
 
 /* -------------------------------------------------------------------------- */
 /* prompts                                                                    */
