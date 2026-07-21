@@ -49,6 +49,12 @@ export interface AgentToolHost {
       timeoutMs: number;
       maxOutputChars: number;
       context?: Record<string, unknown>;
+      runtime?: {
+        flowId: string;
+        flowVersion: string;
+        runId: string;
+        nodeId: string;
+      };
     },
   ): Promise<AgentToolResult>;
 }
@@ -321,6 +327,12 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
               timeoutMs: cfg.timeoutMs,
               maxOutputChars: cfg.maxOutputChars,
               context: baseContext,
+              runtime: {
+                flowId: ctx.flowId,
+                flowVersion: ctx.flowVersion,
+                runId: ctx.runId,
+                nodeId: ctx.nodeId,
+              },
             },
           );
           for (const file of result.changedFiles ?? []) changedFiles.add(file);

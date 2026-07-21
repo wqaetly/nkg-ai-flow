@@ -118,6 +118,12 @@ export const toolNode = defineNodeFactory<ToolNodeDeps>(
             timeoutMs: cfg.timeoutMs,
             maxOutputChars: cfg.maxOutputChars,
             ...(context !== undefined ? { context } : {}),
+            runtime: {
+              flowId: ctx.flowId,
+              flowVersion: ctx.flowVersion,
+              runId: ctx.runId,
+              nodeId: ctx.nodeId,
+            },
           },
         );
         await ctx.emit({
