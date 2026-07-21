@@ -37,6 +37,9 @@ export default defineConfig({
         find: "@ai-native-flow/runtime/builtin-definitions",
         replacement: `${pkgRoot("runtime")}/builtinDefinitions.ts`,
       },
+      { find: "@ai-native-flow/runtime/portable", replacement: pkgFile("runtime", "portable.ts") },
+      { find: "@ai-native-flow/runtime/browser", replacement: pkgFile("runtime", "browser.ts") },
+      { find: "@ai-native-flow/runtime/node", replacement: pkgFile("runtime", "node.ts") },
       { find: "@ai-native-flow/runtime", replacement: pkgEntry("runtime") },
       // Transitive deps pulled in by builtinDefinitions.ts ->
       // ./nodes/builtin/* and ./nodes/llmProvider.ts. They aren't

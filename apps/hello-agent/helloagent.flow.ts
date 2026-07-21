@@ -5,12 +5,12 @@ import {
   DEFAULT_LLM_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
-  createRuntime,
-} from "@ai-native-flow/runtime";
+  createNodeRuntime,
+} from "@ai-native-flow/runtime/node";
 import { join } from "node:path";
 import { homedir } from "node:os";
 
-const runtime = createRuntime();
+const runtime = createNodeRuntime();
 const desktopDir = join(homedir(), "Desktop");
 
 export const flow = defineFlow({

@@ -18,11 +18,12 @@ import {
   InMemoryVariableStore,
 } from "@ai-native-flow/variable-store";
 import {
-  createRuntime,
-  type CreateRuntimeOptions,
+  createNodeRuntime,
+  createNodeRuntime as createRuntime,
+  type CreateNodeRuntimeOptions,
   type LlmProvider,
   type Runtime,
-} from "../src/index.js";
+} from "../src/node.js";
 import { DeterministicLlmProvider } from "./helpers/deterministicLlmProvider.js";
 
 /**
@@ -33,12 +34,12 @@ function newRuntime(opts?: {
   llmProvider?: DeterministicLlmProvider;
   variables?: InMemoryVariableStore;
   secrets?: InMemorySecretStore;
-  nodes?: CreateRuntimeOptions["nodes"];
+  nodes?: CreateNodeRuntimeOptions["nodes"];
 }): Runtime {
   const variables = opts?.variables ?? new InMemoryVariableStore();
   const secrets = opts?.secrets ?? new InMemorySecretStore();
   const llmProvider = opts?.llmProvider ?? new DeterministicLlmProvider();
-  return createRuntime({
+  return createNodeRuntime({
     variables,
     secrets,
     llmProvider,
@@ -3658,7 +3659,7 @@ describe("runtime / hello-flow end-to-end", () => {
 
   it("routes cooldown_gate to ready, cooling, then ready after expiry", async () => {
     const variables = new InMemoryVariableStore();
-    const rt = createRuntime({
+    const rt = createNodeRuntime({
       variables,
       llmProvider: new DeterministicLlmProvider(),
     });

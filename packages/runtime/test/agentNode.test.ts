@@ -11,10 +11,10 @@ import {
 } from "@ai-native-flow/variable-store";
 
 import {
-  createRuntime,
-  type CreateRuntimeOptions,
+  createNodeRuntime,
+  type CreateNodeRuntimeOptions,
   type Runtime,
-} from "../src/index.js";
+} from "../src/node.js";
 import { createNodeAgentToolHost } from "../src/nodes/builtin/agentTools.node.js";
 import { DeterministicLlmProvider } from "./helpers/deterministicLlmProvider.js";
 
@@ -28,9 +28,9 @@ async function tempDir(): Promise<string> {
 
 function newRuntime(
   llmProvider: DeterministicLlmProvider,
-  nodes?: CreateRuntimeOptions["nodes"],
+  nodes?: CreateNodeRuntimeOptions["nodes"],
 ): Runtime {
-  return createRuntime({
+  return createNodeRuntime({
     variables: new InMemoryVariableStore(),
     secrets: new InMemorySecretStore(),
     llmProvider,

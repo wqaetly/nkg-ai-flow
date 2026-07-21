@@ -44,8 +44,8 @@ import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   AiSdkOpenAICompatibleLlmProvider,
-  createRuntime,
-} from "@ai-native-flow/runtime";
+  createNodeRuntime,
+} from "@ai-native-flow/runtime/node";
 import type { DefinedNode } from "@ai-native-flow/node-sdk";
 import type { NodeTypeDefinition } from "@ai-native-flow/flow-ir";
 import { createHttpHandler } from "@ai-native-flow/transport-http";
@@ -210,7 +210,7 @@ const secrets = variables;
 
 const allCustomNodes: DefinedNode[] = packs.flatMap((p) => p.nodes);
 
-const runtime = createRuntime({
+const runtime = createNodeRuntime({
   variables,
   secrets,
   llmProvider,

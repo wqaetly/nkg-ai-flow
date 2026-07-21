@@ -37,8 +37,8 @@ import {
   createHttpHandler,
   type HttpHandler,
 } from "@ai-native-flow/transport-http";
-import type { LlmProvider, Runtime } from "@ai-native-flow/runtime";
-import { createRuntime } from "@ai-native-flow/runtime";
+import type { LlmProvider, Runtime } from "@ai-native-flow/runtime/node";
+import { createNodeRuntime } from "@ai-native-flow/runtime/node";
 import type { DefinedNode } from "@ai-native-flow/node-sdk";
 import {
   InMemoryVariableStore,
@@ -117,7 +117,7 @@ export interface HttpRunnerOptions {
   extraNodes?: readonly DefinedNode[];
   /**
    * Pre-built runtime to reuse. When provided the runner skips its
-   * own `createRuntime()` call and the `llmProvider` / `variables` /
+   * own `createNodeRuntime()` call and the `llmProvider` / `variables` /
    * `secrets` / `extraNodes` / `nodePacks[]` options are *not*
    * applied to it (the caller has already wired what they want).
    * Flow registration still runs against this runtime. Tests use this
@@ -217,7 +217,7 @@ async function bootstrap(options: HttpRunnerOptions): Promise<BootstrapResult> {
     : customNodes;
 
   const variables = options.variables ?? options.secrets ?? new InMemoryVariableStore();
-  const runtime = createRuntime({
+  const runtime = createNodeRuntime({
     variables,
     secrets: variables,
     ...(options.llmProvider ? { llmProvider: options.llmProvider } : {}),

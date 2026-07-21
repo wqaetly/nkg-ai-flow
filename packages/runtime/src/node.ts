@@ -1,19 +1,18 @@
 /**
- * Backwards-compatible browser/mobile entry point.
- * New platform-neutral integrations may use `@ai-native-flow/runtime/portable`.
+ * Explicit Node.js Runtime entry point.
+ *
+ * This host includes filesystem-backed artifacts plus filesystem/process
+ * agent tools. Portable business code should import the package root.
  */
 export * from "./types.js";
+export * from "./capabilities.js";
 export * from "./nodeContext.js";
 export * from "./nodeEventChannel.js";
 export * from "./registry.js";
 export * from "./runManager.js";
 export * from "./invocationRouter.js";
 export * from "./executionEngine.js";
-export * from "./storage/browser.js";
-export * from "./builtinDefinitions.js";
-export * from "./capabilities.js";
-export * from "./createBrowserRuntime.js";
-export * from "./nodes/createBrowserBuiltinRunnerRegistry.js";
+export * from "./storage/index.js";
 export {
   AiSdkOpenAICompatibleLlmProvider,
   generateJsonCompletion,
@@ -29,10 +28,9 @@ export {
   type LlmCompletionRequest,
   type LlmCompletionResponse,
 } from "./nodes/llmProvider.js";
-export type { Runtime } from "./createRuntime.js";
-export type {
-  AgentToolCall,
-  AgentToolHost,
-  AgentToolName,
-  AgentToolResult,
-} from "./nodes/builtin/agent.js";
+export { getBuiltinNodeDefinitions } from "./builtinDefinitions.js";
+export * from "./createRuntime.js";
+export {
+  createRuntime as createNodeRuntime,
+  type CreateRuntimeOptions as CreateNodeRuntimeOptions,
+} from "./createRuntime.js";

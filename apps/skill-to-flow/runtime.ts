@@ -18,7 +18,10 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { createRuntime, type Runtime } from "@ai-native-flow/runtime";
+import {
+  createNodeRuntime,
+  type Runtime,
+} from "@ai-native-flow/runtime/node";
 import type {
   SecretStore,
   VariableStore,
@@ -56,7 +59,7 @@ export interface CreateSkillToFlowRuntimeOptions {
 export async function createSkillToFlowRuntime(
   options: CreateSkillToFlowRuntimeOptions = {},
 ): Promise<Runtime> {
-  const runtime = createRuntime({
+  const runtime = createNodeRuntime({
     variables: options.variables,
     secrets: options.secrets,
     nodes: [

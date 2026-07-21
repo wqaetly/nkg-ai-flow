@@ -5,7 +5,7 @@
  *   tsx apps/hello-agent/invoke.ts
  */
 
-import { createRuntime, type LlmProvider } from "@ai-native-flow/runtime";
+import { createNodeRuntime, type LlmProvider } from "@ai-native-flow/runtime/node";
 import { bootstrapDefaults } from "@ai-native-flow/variable-store";
 import flow from "./helloagent.flow.js";
 import { writeRunLog } from "./writeRunLog.js";
@@ -50,7 +50,7 @@ const demoProvider: LlmProvider = {
   },
 };
 
-const runtime = createRuntime({ llmProvider: demoProvider });
+const runtime = createNodeRuntime({ llmProvider: demoProvider });
 const json = flow.dump();
 await runtime.registry.register({ graph: JSON.parse(json), json });
 await runtime.registry.promote("helloagent", "1.0.0");

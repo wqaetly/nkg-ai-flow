@@ -1,7 +1,7 @@
 {
   "name": "@ai-native-flow/runtime",
   "version": "0.0.1",
-  "description": "Single-process Runtime: Run Manager, Scheduler, Execution Engine, internal Registry and Storage.",
+  "description": "Portable-by-default Flow Runtime with explicit Node and browser host entry points.",
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",
@@ -9,7 +9,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./builtin-definitions": "./src/builtinDefinitions.ts",
-    "./browser": "./src/browser.ts"
+    "./portable": "./src/portable.ts",
+    "./browser": "./src/browser.ts",
+    "./node": "./src/node.ts"
   },
   "scripts": {
     "test": "vitest run"
