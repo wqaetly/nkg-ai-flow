@@ -285,6 +285,31 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
     });
   });
 
+  it("maps base64 images to AI SDK multimodal user content", async () => {
+    const provider = new AiSdkOpenAICompatibleLlmProvider();
+    await provider.complete(
+      {
+        prompt: "describe the image",
+        images: [{ data: "aW1hZ2U=", mediaType: "image/png" }],
+      },
+      context({
+        baseUrl: "https://api.lfzxb.top/v1",
+        model: "vision-model",
+        apiKey: "sk-test",
+      }),
+    );
+
+    expect(mocks.generateText).toHaveBeenCalledWith(expect.objectContaining({
+      prompt: [{
+        role: "user",
+        content: [
+          { type: "text", text: "describe the image" },
+          { type: "image", image: "aW1hZ2U=", mediaType: "image/png" },
+        ],
+      }],
+    }));
+  });
+
   it("propagates AI SDK stream errors instead of misreporting an empty response", async () => {
     mocks.streamText.mockReturnValueOnce({
       fullStream: mocks.fullStreamOf([

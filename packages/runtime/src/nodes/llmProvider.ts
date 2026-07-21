@@ -36,6 +36,8 @@ export * from "./llmProviderDefaults.js";
 
 export interface LlmCompletionRequest {
   prompt: string;
+  /** Base64-encoded image parts attached to the user prompt. */
+  images?: LlmImageInput[];
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -68,6 +70,11 @@ export interface LlmCompletionRequest {
    * fields the SDK does not model (thinking toggles, reasoning effort, etc.).
    */
   providerOptions?: ProviderOptions;
+}
+
+export interface LlmImageInput {
+  data: string;
+  mediaType: "image/png" | "image/jpeg" | "image/webp";
 }
 
 export interface LlmCompletionResponse {
@@ -142,6 +149,8 @@ export interface GenerateCompletionParams {
   apiKey: string;
   model: string;
   prompt: string;
+  /** Base64-encoded images sent as AI SDK user content parts. */
+  images?: LlmImageInput[];
   /** Optional system instruction. Forwarded to the SDK's `system` only when set. */
   system?: string;
   temperature?: number;
@@ -248,10 +257,23 @@ function buildCallArgs(params: GenerateCompletionParams) {
     apiKey: params.apiKey,
     ...(params.fetchImpl ? { fetch: params.fetchImpl } : {}),
   });
+  const prompt = params.images?.length
+    ? [{
+      role: "user" as const,
+      content: [
+        { type: "text" as const, text: params.prompt },
+        ...params.images.map((image) => ({
+          type: "image" as const,
+          image: image.data,
+          mediaType: image.mediaType,
+        })),
+      ],
+    }]
+    : params.prompt;
   const args = {
     model: provider(params.model),
     ...(params.system ? { system: params.system } : {}),
-    prompt: params.prompt,
+    prompt,
     temperature: params.temperature,
     maxOutputTokens: params.maxTokens,
     abortSignal: params.abortSignal,
@@ -370,6 +392,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
         apiKey,
         model: modelId,
         prompt: req.prompt,
+        images: req.images,
         temperature: req.temperature,
         maxTokens: req.maxTokens,
         providerName: this.options.providerName,
@@ -413,6 +436,7 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
           apiKey,
           model: modelId,
           prompt: req.prompt,
+          images: req.images,
           temperature: req.temperature,
           maxTokens: req.maxTokens,
           providerName: this.options.providerName,

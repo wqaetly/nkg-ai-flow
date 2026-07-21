@@ -146,8 +146,10 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
         //   2. The `config.prompt` template, rendered against `input` so
         //      placeholders like `${input.text}` keep working for flows
         //      authored before the data port existed.
-        const wiredPrompt =
-          typeof raw.prompt === "string" ? (raw.prompt as string) : undefined;
+        const multimodalPrompt = readMultimodalPrompt(raw.prompt);
+        const wiredPrompt = typeof raw.prompt === "string"
+          ? raw.prompt
+          : multimodalPrompt?.prompt;
         const prompt =
           wiredPrompt !== undefined
             ? wiredPrompt
@@ -167,6 +169,7 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
           temperature: config.temperature,
           maxTokens: config.maxTokens,
           stream: wantStream || undefined,
+          ...(multimodalPrompt?.images.length ? { images: multimodalPrompt.images } : {}),
         };
         if (model !== undefined) request.model = model;
         const baseUrl = resolveConfigStringRef(config.baseUrl, ctx);
@@ -358,6 +361,7 @@ function summaryFor(args: {
     model: args.model ?? "",
     stream: args.stream,
     promptLength: args.prompt.length,
+    ...(args.request.images?.length ? { imageCount: args.request.images.length } : {}),
     resultLength: args.result.length,
     temperature: args.request.temperature,
     maxTokens: args.request.maxTokens,
@@ -365,6 +369,26 @@ function summaryFor(args: {
     apiKeyConfigured: Boolean(args.apiKey),
     finishReason: args.finishReason ?? "",
   };
+}
+
+function readMultimodalPrompt(value: unknown): {
+  prompt: string;
+  images: NonNullable<LlmCompletionRequest["images"]>;
+} | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const candidate = value as { prompt?: unknown; images?: unknown };
+  if (typeof candidate.prompt !== "string" || !Array.isArray(candidate.images)) return undefined;
+  const images: NonNullable<LlmCompletionRequest["images"]> = [];
+  for (const entry of candidate.images) {
+    if (images.length >= 8) break;
+    if (!entry || typeof entry !== "object") continue;
+    const image = entry as { data?: unknown; mediaType?: unknown };
+    if (typeof image.data !== "string" || !image.data || image.data.length > 12_000_000) continue;
+    const mediaType = image.mediaType;
+    if (mediaType !== "image/png" && mediaType !== "image/jpeg" && mediaType !== "image/webp") continue;
+    images.push({ data: image.data, mediaType });
+  }
+  return { prompt: candidate.prompt, images };
 }
 
 function resolveConfigStringRef(

@@ -29135,6 +29135,39 @@ describe("runtime / variables visible to nodes", () => {
     });
   });
 
+  it("llm node forwards structured prompt images to the provider", async () => {
+    let observed: Parameters<LlmProvider["complete"]>[0] | undefined;
+    const provider: LlmProvider = {
+      complete: async (request) => {
+        observed = request;
+        return { text: "vision ok" };
+      },
+    };
+    const rt = createRuntime({ llmProvider: provider });
+    const flow = defineFlow({ id: "llm_multimodal", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
+    const llm = flow.node("llm", { id: "vision", position: { x: 100, y: 0 }, config: { prompt: "" } });
+    const end = flow.node("end", { id: "end", position: { x: 200, y: 0 } });
+    flow.connect(start.out("out"), llm.in("in"));
+    flow.connect(start.out("runInput"), llm.in("prompt"));
+    flow.connect(llm.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "llm_multimodal",
+      input: {
+        prompt: "describe",
+        images: [{ data: "aW1hZ2U=", mediaType: "image/png" }],
+      },
+    });
+
+    expect(result.succeeded).toBe(true);
+    expect(observed).toMatchObject({
+      prompt: "describe",
+      images: [{ data: "aW1hZ2U=", mediaType: "image/png" }],
+    });
+  });
+
   it("$var and $secret references in node config get resolved", async () => {
     const variables = new InMemoryVariableStore([
       { name: "GREETING_PREFIX", value: "Bonjour" },
