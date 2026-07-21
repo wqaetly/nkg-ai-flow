@@ -13,6 +13,7 @@ import {
   type FlowEntry,
   type StudioState,
 } from "@ai-native-flow/studio";
+import { resolveInitialSidecarUrl } from "./sidecarUrl.js";
 import "@ai-native-flow/studio/reactFlowStudio.css";
 
 /**
@@ -45,19 +46,24 @@ const DEFAULT_LLM_CONFIG = {
 // sidecar's app manifests before the first FlowEntry is built.
 let palette = registry.list();
 
-/** Default sidecar URL - kept in sync with the local sidecar default. */
-const DEFAULT_SIDECAR_URL = "http://127.0.0.1:5173";
 const SIDECAR_STORAGE_KEY = "anf.studio.sidecarUrl";
 
 function readPersistedSidecarUrl(): string {
-  if (typeof window === "undefined") return DEFAULT_SIDECAR_URL;
-  const urlOverride = new URLSearchParams(window.location.search).get("sidecar");
-  if (urlOverride && /^https?:\/\//i.test(urlOverride)) return urlOverride;
-  try {
-    return localStorage.getItem(SIDECAR_STORAGE_KEY) ?? DEFAULT_SIDECAR_URL;
-  } catch {
-    return DEFAULT_SIDECAR_URL;
+  const injected = import.meta.env.VITE_ANF_SIDECAR_URL;
+  if (typeof window === "undefined") {
+    return resolveInitialSidecarUrl({ injected });
   }
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(SIDECAR_STORAGE_KEY);
+  } catch {
+    // localStorage may be disabled; the injected/default URL still works.
+  }
+  return resolveInitialSidecarUrl({
+    search: window.location.search,
+    injected,
+    stored,
+  });
 }
 
 function readRequestedFlowId(): string | undefined {

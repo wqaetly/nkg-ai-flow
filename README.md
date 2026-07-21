@@ -265,7 +265,12 @@ npm run studio:dev
 ```
 
 - 前端：<http://127.0.0.1:3000>
-- 后端：<http://127.0.0.1:8787>
+- Studio sidecar：优先使用 <http://127.0.0.1:5173>
+
+`studio:dev` 会先选择一个实际可绑定的 sidecar 端口，再把同一个 URL 注入前端。
+例如 Windows 的 WinNAT/Hyper-V 保留了 `5173` 时，sidecar 可能回退到 `5175`，
+前端会自动连接 `5175`，无需手动追加 `?sidecar=`。终端启动日志会同时打印最终的
+前端和 sidecar URL。
 
 也可以分开启动：
 
@@ -275,6 +280,9 @@ npm run studio:dev:frontend
 ```
 
 ### 5.3 通用 HTTP 服务
+
+通用 HTTP Runner 与 Studio sidecar 是两个独立入口。Runner 默认监听
+<http://127.0.0.1:8787>；它不会替代 Studio 开发模式使用的 sidecar 端口。
 
 仓库内只需一条命令即可启动面向多 Flow 的通用 HTTP 服务：
 
