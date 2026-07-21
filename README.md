@@ -128,6 +128,43 @@ npm install
 
 这种方式适合业务项目保持自己的源码、脚本、数据和部署结构，同时复用本项目的 Flow Builder、Runtime、节点注册与配置模块。
 
+#### Runtime 宿主入口
+
+`@ai-native-flow/runtime` 的包根是默认 portable Runtime。业务代码可以直接使用
+`createRuntime()`，无需判断 Browser、WebView、Worker、Android 或 iOS；默认组合不含
+任何 Node builtin，并使用可注入的 Store、HTTP、Secret、Tool、Hash 与 ID 能力。
+
+```ts
+import { createRuntime } from "@ai-native-flow/runtime";
+
+const runtime = createRuntime({
+  runStore,
+  registryStore,
+  artifactStore,
+  fetch: hostFetch,
+});
+```
+
+只有明确需要本机文件系统或子进程工具的 Node 服务、CLI、sidecar 才使用显式入口：
+
+```ts
+import { createNodeRuntime } from "@ai-native-flow/runtime/node";
+
+const runtime = createNodeRuntime();
+```
+
+公开入口的语义如下：
+
+| 入口 | 默认宿主能力 | 用途 |
+|---|---|---|
+| `@ai-native-flow/runtime` | portable 内存组合，无 Node builtin | 业务默认、Browser、WebView、Worker、移动端 |
+| `@ai-native-flow/runtime/portable` | 与包根相同 | 需要强调宿主类型的基础设施代码 |
+| `@ai-native-flow/runtime/browser` | portable 兼容别名 | 旧集成迁移 |
+| `@ai-native-flow/runtime/node` | 文件 ArtifactStore、文件与进程 ToolHost | Node CLI、HTTP runner、desktop-power sidecar |
+
+portable 与 Node 工厂都会自动启用 capability manifest。Flow 注册时即检查宿主是否支持
+节点要求的网络、存储、文件或进程能力，业务层不需要重复编写平台分支。
+
 #### 宿主 app 注册
 
 业务项目推荐参考 `kesmj` 的集成方式：

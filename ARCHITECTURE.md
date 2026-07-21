@@ -100,12 +100,16 @@ AI 应优先生成：
 
 ### 3.5 Node-first, Runtime-neutral
 
-项目默认使用 Node.js LTS、npm workspaces、`tsx` 和 Vitest 跑通开发、测试、脚本和本地示例链路；核心 Runtime 不能绑定 runtime-only API。
+项目使用 Node.js LTS、npm workspaces、`tsx` 和 Vitest 跑通开发、测试、脚本和本地示例链路；对外默认 Runtime 必须保持 portable，不能绑定 runtime-only API。
 
 推荐定位：
 
 - Node.js LTS 用于包管理、脚本、测试、本地开发、Builder Runner 和 CLI。
-- Runtime Core 保持 runtime-neutral TypeScript / ESM。
+- `@ai-native-flow/runtime` 包根导出 portable `createRuntime()`，业务层无需感知具体平台。
+- `@ai-native-flow/runtime/node` 显式导出 `createNodeRuntime()`；只有 Node CLI、HTTP runner 和 desktop-power sidecar 使用该入口。
+- `/portable` 是基础设施的显式 portable 入口，`/browser` 仅作为兼容别名保留。
+- Runtime Core 保持 runtime-neutral TypeScript / ESM；Node 文件、进程和 ArtifactStore 只能从 `/node` 到达。
+- portable 与 Node 组合均默认注入 capability manifest，在 Flow 注册和解析阶段执行能力预检。
 - Sandbox Adapter 当前只内置 in-process 实现，用于可信团队代码的统一执行、try/catch 错误归一、协作式 timeout / cancel 和 `drainAndUnregister`；Worker、子进程、容器隔离暂不作为项目目标，除非未来引入不可信第三方节点。
 - MCP、Trace、数据库、队列等生产依赖优先做 Node 兼容性验证。
 
