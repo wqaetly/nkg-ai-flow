@@ -3,6 +3,7 @@ import type { NodeEvent } from "@ai-native-flow/event-bus";
 import type { InvokeArgs, InvokeNodeArgs } from "./invocationRouter.js";
 import type { ExecuteResult } from "./runManager.js";
 import type { RunRecord } from "./types.js";
+import type { VariableValue } from "@ai-native-flow/variable-store/browser";
 
 export const RUNTIME_WORKER_PROTOCOL_VERSION = "runtime.worker.v1" as const;
 
@@ -16,6 +17,7 @@ export type RuntimeWorkerCommand =
   | "startNode"
   | "cancel"
   | "getRun"
+  | "getEvents"
   | "listRuns";
 
 export interface RuntimeWorkerRequest {
@@ -86,8 +88,17 @@ export interface StartedWorkerRun {
   completed: Promise<ExecuteResult>;
 }
 
-export type WorkerInvokeArgs = Omit<InvokeArgs, "variables" | "secrets">;
-export type WorkerInvokeNodeArgs = Omit<InvokeNodeArgs, "variables" | "secrets">;
+export interface WorkerEnvironmentOverrides {
+  variables?: Record<string, VariableValue>;
+  secrets?: Record<string, string>;
+}
+
+export type WorkerInvokeArgs = Omit<InvokeArgs, "variables" | "secrets"> & {
+  envOverrides?: WorkerEnvironmentOverrides;
+};
+export type WorkerInvokeNodeArgs = Omit<InvokeNodeArgs, "variables" | "secrets"> & {
+  envOverrides?: WorkerEnvironmentOverrides;
+};
 
 export interface RuntimeWorkerClientApi {
   register(payload: RegisterFlowPayload): Promise<unknown>;
@@ -98,6 +109,7 @@ export interface RuntimeWorkerClientApi {
   startNode(args: WorkerInvokeNodeArgs): Promise<StartedWorkerRun>;
   cancel(runId: string, reason?: string): Promise<void>;
   getRun(runId: string): Promise<RunRecord | undefined>;
+  getEvents(runId: string, cursor?: string, limit?: number): Promise<NodeEvent[]>;
   listRuns(flowId: string, limit?: number): Promise<RunRecord[]>;
 }
 

@@ -1,6 +1,7 @@
 import { createPortableRuntime, type CreatePortableRuntimeOptions } from "./portable.js";
 import type { Runtime } from "./createRuntime.js";
 import type { InvokeArgs, InvokeNodeArgs, StartedRun } from "./invocationRouter.js";
+import { InMemoryVariableStore } from "@ai-native-flow/variable-store/browser";
 import {
   RUNTIME_WORKER_PROTOCOL_VERSION,
   isRuntimeWorkerMessage,
@@ -10,6 +11,7 @@ import {
   type RegisterFlowPayload,
   type RuntimeWorkerRequest,
   type RuntimeWorkerResponse,
+  type WorkerEnvironmentOverrides,
 } from "./workerProtocol.js";
 
 export interface RuntimeWorkerEndpoint {
@@ -65,8 +67,8 @@ async function handleRequest(
   try {
     if (request.command === "start" || request.command === "startNode") {
       const started = request.command === "start"
-        ? await runtime.invocationRouter.start(request.payload as InvokeArgs)
-        : await runtime.invocationRouter.startNode(request.payload as InvokeNodeArgs);
+        ? await runtime.invocationRouter.start(toInvokeArgs(request.payload) as unknown as InvokeArgs)
+        : await runtime.invocationRouter.startNode(toInvokeArgs(request.payload) as unknown as InvokeNodeArgs);
       respond(endpoint, request.requestId, true, started.runRecord);
       forwardCompletion(endpoint, started);
       return;
@@ -91,9 +93,9 @@ async function execute(runtime: Runtime, command: RuntimeWorkerRequest["command"
       return runtime.registry.promote(input.flowId, input.flowVersion);
     }
     case "invoke":
-      return runtime.invocationRouter.invoke(payload as InvokeArgs);
+      return runtime.invocationRouter.invoke(toInvokeArgs(payload) as unknown as InvokeArgs);
     case "invokeNode":
-      return runtime.invocationRouter.invokeNode(payload as InvokeNodeArgs);
+      return runtime.invocationRouter.invokeNode(toInvokeArgs(payload) as unknown as InvokeNodeArgs);
     case "cancel": {
       const input = payload as CancelRunPayload;
       await runtime.runManager.cancel(input.runId, input.reason);
@@ -101,6 +103,13 @@ async function execute(runtime: Runtime, command: RuntimeWorkerRequest["command"
     }
     case "getRun":
       return runtime.runManager.get((payload as { runId: string }).runId);
+    case "getEvents": {
+      const input = payload as { runId: string; cursor?: string; limit?: number };
+      return runtime.eventBus.store.read(input.runId, {
+        ...(input.cursor ? { sinceEventId: input.cursor } : {}),
+        ...(input.limit ? { limit: input.limit } : {}),
+      });
+    }
     case "listRuns": {
       const input = payload as ListRunsPayload;
       return runtime.runStore.listByFlow(input.flowId, { limit: input.limit });
@@ -109,6 +118,33 @@ async function execute(runtime: Runtime, command: RuntimeWorkerRequest["command"
     case "startNode":
       throw new Error(`${command} is handled by the streaming request path`);
   }
+}
+
+function toInvokeArgs(payload: unknown): Record<string, unknown> {
+  const input = payload as Record<string, unknown> & {
+    envOverrides?: WorkerEnvironmentOverrides;
+  };
+  const { envOverrides, ...args } = input;
+  if (!envOverrides) return args;
+  return {
+    ...args,
+    ...(envOverrides.variables
+      ? { variables: storeFromRecord(envOverrides.variables) }
+      : {}),
+    ...(envOverrides.secrets
+      ? { secrets: storeFromRecord(envOverrides.secrets) }
+      : {}),
+  };
+}
+
+function storeFromRecord(values: Record<string, unknown>): InMemoryVariableStore {
+  return new InMemoryVariableStore(
+    Object.entries(values).map(([name, value]) => ({
+      name,
+      value: value as never,
+      metadata: { source: "runtime-worker-request" },
+    })),
+  );
 }
 
 function forwardCompletion(endpoint: RuntimeWorkerEndpoint, started: StartedRun): void {

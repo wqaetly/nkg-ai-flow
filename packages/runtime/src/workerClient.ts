@@ -76,6 +76,14 @@ export class RuntimeWorkerClient implements RuntimeWorkerClientApi {
     return this.request("getRun", { runId }) as Promise<RunRecord | undefined>;
   }
 
+  getEvents(runId: string, cursor?: string, limit?: number): Promise<NodeEvent[]> {
+    return this.request("getEvents", {
+      runId,
+      ...(cursor ? { cursor } : {}),
+      ...(limit ? { limit } : {}),
+    }) as Promise<NodeEvent[]>;
+  }
+
   listRuns(flowId: string, limit?: number): Promise<RunRecord[]> {
     return this.request("listRuns", { flowId, ...(limit ? { limit } : {}) }) as Promise<RunRecord[]>;
   }

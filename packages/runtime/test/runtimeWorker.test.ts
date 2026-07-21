@@ -38,6 +38,7 @@ describe("Runtime Worker transport", () => {
     expect(events).toContain("run_started");
     expect(events).toContain("run_finished");
     expect(await client.getRun(result.runRecord.runId)).toMatchObject({ status: "succeeded" });
+    expect((await client.getEvents(result.runRecord.runId)).length).toBeGreaterThan(0);
     expect(await client.listRuns(graph.id, 1)).toHaveLength(1);
 
     client.dispose();
