@@ -820,6 +820,19 @@ export const STUDIO_PORT_LABEL_DICTIONARIES: Record<
         response: "响应",
         summary: "摘要",
       },
+      web_search: {
+        query: "搜索词",
+        results: "搜索结果",
+        count: "结果数",
+        summary: "摘要",
+      },
+      image_generation: {
+        prompt: "生图提示词",
+        referenceImage: "参考图片",
+        image: "生成图片",
+        src: "图片来源",
+        summary: "摘要",
+      },
       idempotency_key: {
         in: "输入",
         namespace: "命名空间",

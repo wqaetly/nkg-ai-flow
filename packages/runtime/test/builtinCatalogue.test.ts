@@ -46,6 +46,8 @@ const BUILTIN_TYPES = [
   "first_success",
   "group_items",
   "http",
+  "web_search",
+  "image_generation",
   "idempotency_key",
   "join",
   "map_items",

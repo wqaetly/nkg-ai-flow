@@ -185,6 +185,14 @@ export const STUDIO_NODE_LABEL_DICTIONARIES: Record<
         title: "HTTP 请求",
         description: "调用外部 HTTP API。",
       },
+      web_search: {
+        title: "联网搜索",
+        description: "通过 SearXNG 兼容接口搜索网页。",
+      },
+      image_generation: {
+        title: "图片生成",
+        description: "通过 OpenAI 兼容接口生成或编辑图片。",
+      },
       idempotency_key: {
         title: "幂等键",
         description: "按业务键去重副作用流程，并复用已完成的结果。",

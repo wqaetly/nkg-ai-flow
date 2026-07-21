@@ -46,6 +46,8 @@ export { flattenItemsNode } from "./flattenItems.js";
 export { firstSuccessNode } from "./firstSuccess.js";
 export { groupItemsNode } from "./groupItems.js";
 export { createHttpNode, httpNode } from "./http.js";
+export { createWebSearchNode, webSearchNode } from "./webSearch.js";
+export { createImageGenerationNode, imageGenerationNode } from "./imageGeneration.js";
 export { idempotencyKeyNode } from "./idempotencyKey.js";
 export { joinNode } from "./join.js";
 export { mapItemsNode } from "./mapItems.js";

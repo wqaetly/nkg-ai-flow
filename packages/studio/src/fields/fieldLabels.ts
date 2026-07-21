@@ -345,6 +345,20 @@ export const STUDIO_FIELD_LABEL_DICTIONARIES: Record<
         headers: "请求头",
         body: "请求体",
       },
+      web_search: {
+        baseUrl: "搜索服务地址",
+        apiKey: "搜索 API 密钥",
+        query: "搜索词",
+        maxResults: "最大结果数",
+      },
+      image_generation: {
+        baseUrl: "生图服务地址",
+        apiKey: "生图 API 密钥",
+        model: "生图模型",
+        prompt: "生图提示词",
+        size: "图片尺寸",
+        quality: "图片质量",
+      },
       idempotency_key: {
         namespace: "命名空间",
         key: "幂等键",

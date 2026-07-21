@@ -38,6 +38,7 @@
 - **节点扩展机制**：业务节点通过 `defineNode` / `defineNodeFactory` 声明，node pack 可随 app 注册动态加载。
 - **多入口调用**：同一份 Flow 可通过 HTTP / CLI / MCP / SDK / Studio 调用，并共享 Runtime API 与事件流。
 - **配置管理**：内置 `VariableStore`，支持 `$var` 引用、可枚举、可追踪和运行级覆盖。
+- **可移植 AI 能力**：内置 LLM 流式调用与多模态图片输入、SearXNG 联网搜索、OpenAI 兼容生图/改图节点；所有网络实现均支持宿主注入 `fetch`，可运行在 Node、浏览器与移动宿主。
 - **Studio 可视化编辑**：提供 React + React Flow 编辑器，用于浏览、编辑、调试和观察 Flow 运行事件。
 - **app 注册**：本项目自带 apps 自动发现；宿主项目可通过根 `anf.apps.json` 注册宿主自己的 apps。
 
