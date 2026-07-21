@@ -11,6 +11,19 @@ const mocks = vi.hoisted(() => {
     (async function* () {
       for (const chunk of chunks) yield chunk;
     })();
+  const fullStreamOf = (
+    parts: Array<
+      | { type: "text-delta"; text: string }
+      | { type: "error"; error: unknown }
+    >,
+  ): AsyncIterable<
+    | { type: "text-delta"; text: string }
+    | { type: "error"; error: unknown }
+  > => (async function* () {
+    for (const part of parts) yield part;
+  })();
+  const textPartsOf = (chunks: string[]) =>
+    fullStreamOf(chunks.map((text) => ({ type: "text-delta" as const, text })));
   const generateText = vi.fn(async () => ({
     text: "{\"ok\":true}",
     usage: {
@@ -20,9 +33,17 @@ const mocks = vi.hoisted(() => {
     },
   }));
   const streamText = vi.fn(() => ({
-    textStream: textStreamOf(["{\"ok\"", ":true}"]),
+    fullStream: textPartsOf(["{\"ok\"", ":true}"]),
   }));
-  return { providerModel, createOpenAICompatible, generateText, streamText, textStreamOf };
+  return {
+    providerModel,
+    createOpenAICompatible,
+    generateText,
+    streamText,
+    textStreamOf,
+    fullStreamOf,
+    textPartsOf,
+  };
 });
 
 vi.mock("@ai-sdk/openai-compatible", () => ({
@@ -235,10 +256,10 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
   it("retries empty AI SDK streams before failing", async () => {
     mocks.streamText
       .mockReturnValueOnce({
-        textStream: mocks.textStreamOf([]),
+        fullStream: mocks.textPartsOf([]),
       })
       .mockReturnValueOnce({
-        textStream: mocks.textStreamOf(["{\"ok\":true}"]),
+        fullStream: mocks.textPartsOf(["{\"ok\":true}"]),
       });
     const provider = new AiSdkOpenAICompatibleLlmProvider({
       providerName: "lfzxb",
@@ -262,5 +283,29 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
       text: "{\"ok\":true}",
       finishReason: "stop",
     });
+  });
+
+  it("propagates AI SDK stream errors instead of misreporting an empty response", async () => {
+    mocks.streamText.mockReturnValueOnce({
+      fullStream: mocks.fullStreamOf([
+        { type: "error", error: new Error("WebView fetch blocked by CSP") },
+      ]),
+    });
+    const provider = new AiSdkOpenAICompatibleLlmProvider({
+      providerName: "lfzxb",
+    });
+
+    await expect(async () => {
+      for await (const _event of await provider.completeStream!(
+        { prompt: "surface transport error" },
+        context({
+          baseUrl: "https://api.lfzxb.top/v1",
+          model: "deepseek-v4-pro",
+          apiKey: "sk-test",
+        }),
+      )) {
+        // Consume the iterable so the AI SDK error part is observed.
+      }
+    }).rejects.toThrow("WebView fetch blocked by CSP");
   });
 });

@@ -295,7 +295,20 @@ export function streamCompletion(
   params: GenerateCompletionParams,
 ): () => AsyncIterable<string> {
   const args = buildCallArgs(params);
-  return () => streamText(args).textStream;
+  return async function* () {
+    // AI SDK exposes provider/transport failures as `error` parts on
+    // `fullStream`. Its convenience `textStream` filters those parts out,
+    // making a failed request indistinguishable from a successful empty
+    // completion. Consume the full stream so the real failure survives the
+    // adapter boundary while still exposing only text deltas to callers.
+    for await (const part of streamText(args).fullStream) {
+      if (part.type === "text-delta") {
+        yield part.text;
+        continue;
+      }
+      if (part.type === "error") throw part.error;
+    }
+  };
 }
 
 /**
