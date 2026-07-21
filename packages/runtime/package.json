@@ -11,6 +11,7 @@
     "./builtin-definitions": "./src/builtinDefinitions.ts",
     "./portable": "./src/portable.ts",
     "./browser": "./src/browser.ts",
+    "./worker": "./src/worker.ts",
     "./node": "./src/node.ts"
   },
   "scripts": {
