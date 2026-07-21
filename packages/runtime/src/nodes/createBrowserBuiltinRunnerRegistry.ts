@@ -108,10 +108,8 @@ import {
   windowItemsNode,
 } from "./builtin/index.js";
 import type { AgentToolHost } from "./builtin/agent.js";
-import {
-  AiSdkOpenAICompatibleLlmProvider,
-  type LlmProvider,
-} from "./llmProvider.js";
+import type { LlmProvider } from "./llmProvider.js";
+import { LazyAiSdkOpenAICompatibleLlmProvider } from "./lazyLlmProvider.js";
 
 export interface CreateBrowserBuiltinRunnerRegistryOptions {
   llmProvider?: LlmProvider;
@@ -130,7 +128,7 @@ export function createBrowserBuiltinRunnerRegistry(
     options.sandboxAdapter ? { sandboxAdapter: options.sandboxAdapter } : {},
   );
   const fetchImpl = options.fetch ?? ((input, init) => globalThis.fetch(input, init));
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({ fetchImpl });
+  const llmProvider = options.llmProvider ?? new LazyAiSdkOpenAICompatibleLlmProvider({ fetchImpl });
   const toolHost: AgentToolHost = options.toolHost ?? {
     async callTool() {
       return { ok: false, error: "runtime tool host is unavailable" };

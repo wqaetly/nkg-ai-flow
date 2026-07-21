@@ -9,9 +9,16 @@
   "exports": {
     ".": "./src/index.ts",
     "./builtin-definitions": "./src/builtinDefinitions.ts",
+    "./agent-tools": "./src/agentTools.ts",
+    "./capabilities": "./src/capabilities.ts",
+    "./retention": "./src/retention.ts",
+    "./storage/hash": "./src/storage/hash.ts",
     "./portable": "./src/portable.ts",
     "./browser": "./src/browser.ts",
     "./worker": "./src/worker.ts",
+    "./worker/client": "./src/workerClient.ts",
+    "./worker/host": "./src/workerHost.ts",
+    "./worker/protocol": "./src/workerProtocol.ts",
     "./node": "./src/node.ts"
   },
   "scripts": {

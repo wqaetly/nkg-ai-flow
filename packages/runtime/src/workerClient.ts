@@ -16,6 +16,8 @@ import {
 } from "./workerProtocol.js";
 import type { RuntimeWorkerEndpoint } from "./workerHost.js";
 
+export type { RuntimeWorkerEndpoint } from "./workerHost.js";
+
 export interface RuntimeWorkerClientOptions {
   endpoint: RuntimeWorkerEndpoint;
   generateRequestId?: () => string;

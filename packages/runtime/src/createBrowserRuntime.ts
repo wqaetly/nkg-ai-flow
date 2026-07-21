@@ -22,10 +22,8 @@ import type { NodeRunner } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
 import type { AgentToolHost } from "./nodes/builtin/agent.js";
 import { createBrowserBuiltinRunnerRegistry } from "./nodes/createBrowserBuiltinRunnerRegistry.js";
-import {
-  AiSdkOpenAICompatibleLlmProvider,
-  type LlmProvider,
-} from "./nodes/llmProvider.js";
+import type { LlmProvider } from "./nodes/llmProvider.js";
+import { LazyAiSdkOpenAICompatibleLlmProvider } from "./nodes/lazyLlmProvider.js";
 import { RuntimeRegistry } from "./registry.js";
 import { RunManager } from "./runManager.js";
 import {
@@ -76,7 +74,7 @@ export function createBrowserRuntime(
   const artifactStore = options.artifactStore ?? new InMemoryArtifactStore({
     ...(options.hashText ? { hashText: options.hashText } : {}),
   });
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({
+  const llmProvider = options.llmProvider ?? new LazyAiSdkOpenAICompatibleLlmProvider({
     ...(options.fetch ? { fetchImpl: options.fetch } : {}),
   });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();

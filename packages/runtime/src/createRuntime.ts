@@ -31,7 +31,8 @@ import {
 import { InvocationRouter } from "./invocationRouter.js";
 import { createBuiltinRunnerRegistry } from "./nodes/createBuiltinRunnerRegistry.js";
 import type { AgentToolHost } from "./nodes/builtin/agent.js";
-import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
+import type { LlmProvider } from "./nodes/llmProvider.js";
+import { LazyAiSdkOpenAICompatibleLlmProvider } from "./nodes/lazyLlmProvider.js";
 import type { NodeRunner } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
 import {
@@ -137,7 +138,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
   const registryStore = options.registryStore ?? new InMemoryRegistryStore();
   const artifactStore =
     options.artifactStore ?? new FsArtifactStore("artifacts/flows");
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider({
+  const llmProvider = options.llmProvider ?? new LazyAiSdkOpenAICompatibleLlmProvider({
     ...(options.fetch ? { fetchImpl: options.fetch } : {}),
   });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();

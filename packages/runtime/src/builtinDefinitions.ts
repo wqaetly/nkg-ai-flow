@@ -110,7 +110,7 @@ import {
   waitSignalNode,
   waitTimerNode,
 } from "./nodes/builtin/index.js";
-import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
+import type { LlmProvider } from "./nodes/llmProvider.js";
 
 /**
  * Snapshot of the built-in node-type definitions. Useful for hosts
@@ -124,7 +124,11 @@ import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmP
 export function getBuiltinNodeDefinitions(
   options: { llmProvider?: LlmProvider } = {},
 ): NodeTypeDefinition[] {
-  const llmProvider = options.llmProvider ?? new AiSdkOpenAICompatibleLlmProvider();
+  const llmProvider = options.llmProvider ?? {
+    async complete() {
+      throw new Error("definition-only LLM provider cannot execute");
+    },
+  } satisfies LlmProvider;
   const llmDefined = llmNode({ llmProvider });
   const agentDefined = agentNode({
     llmProvider,

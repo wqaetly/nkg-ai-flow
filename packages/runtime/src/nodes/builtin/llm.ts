@@ -33,7 +33,7 @@ import {
   DEFAULT_LLM_MAX_TOKENS as DEFAULT_MAX_TOKENS,
   DEFAULT_LLM_MODEL_REF as DEFAULT_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE as DEFAULT_TEMPERATURE,
-} from "../llmProvider.js";
+} from "../llmProviderDefaults.js";
 import { renderTemplate } from "./_helpers.js";
 
 const llmConfig = z
