@@ -6,6 +6,7 @@
  */
 export * from "./types.js";
 export * from "./capabilities.js";
+export * from "./retention.js";
 export * from "./nodeContext.js";
 export * from "./nodeEventChannel.js";
 export * from "./registry.js";
