@@ -42,6 +42,14 @@ export const PORTABLE_CORE_CAPABILITIES: readonly RuntimeCapability[] = [
   "lifecycle.checkpoint",
 ];
 
+/** Capabilities provided by the built-in Node host without extra adapters. */
+export const NODE_RUNTIME_CAPABILITIES: readonly RuntimeCapability[] = [
+  ...PORTABLE_CORE_CAPABILITIES,
+  "filesystem.read",
+  "filesystem.write",
+  "process.spawn",
+];
+
 export function createRuntimeCapabilityManifest(options: {
   platform?: string;
   available?: Iterable<RuntimeCapability>;

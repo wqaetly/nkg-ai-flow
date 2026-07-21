@@ -7,14 +7,10 @@ import {
   createBrowserRuntime,
   createRuntimeCapabilityManifest,
 } from "../src/browser.js";
+import { createNodeRuntime } from "../src/node.js";
 
 function toolFlow(tool: string, allowBash = false) {
-  const runtime = createBrowserRuntime({
-    capabilities: createRuntimeCapabilityManifest({
-      platform: "android",
-      available: PORTABLE_CORE_CAPABILITIES,
-    }),
-  });
+  const runtime = createBrowserRuntime();
   const flow = defineFlow({
     id: `tool_${tool}`,
     version: "1.0.0",
@@ -44,7 +40,7 @@ describe("Runtime capability preflight", () => {
       kind: "permission",
       source: { nodeId: "tool" },
       context: {
-        platform: "android",
+        platform: "portable",
         nodeType: "tool",
         missingCapabilities: ["filesystem.write"],
       },
@@ -85,6 +81,31 @@ describe("Runtime capability preflight", () => {
         context: { missingCapabilities: ["process.spawn"] },
       },
     });
+  });
+
+  it("lets the explicit Node host register filesystem and process tools", async () => {
+    const runtime = createNodeRuntime();
+    const flow = defineFlow({
+      id: "node_tools",
+      version: "1.0.0",
+      registry: runtime.nodeTypeRegistry,
+    });
+    const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
+    const write = flow.node("tool", {
+      id: "write",
+      position: { x: 100, y: 0 },
+      config: { tool: "write_files" },
+    });
+    const shell = flow.node("tool", {
+      id: "shell",
+      position: { x: 200, y: 0 },
+      config: { tool: "run_bash", allowBash: true },
+    });
+    flow.connect(start.out("out"), write.in("in"));
+    flow.connect(write.out("out"), shell.in("in"));
+
+    await expect(runtime.registry.register({ graph: JSON.parse(flow.dump()) }))
+      .resolves.toMatchObject({ flowId: "node_tools" });
   });
 
   it("rechecks capabilities when a stored Flow is resolved for execution", async () => {
@@ -132,6 +153,16 @@ describe("Runtime capability preflight", () => {
     });
     expect(runtime.nodeTypeRegistry.getCapabilities("notify").requiredPermissions)
       .toEqual(["notification.send"]);
+
+    const flow = defineFlow({ id: "notify", version: "1.0.0", registry: runtime.nodeTypeRegistry });
+    flow.node("notify", { id: "notify", position: { x: 0, y: 0 } });
+    await expect(runtime.registry.register({ graph: JSON.parse(flow.dump()) }))
+      .rejects.toMatchObject({
+        error: {
+          code: "runtime.capability_missing",
+          context: { missingCapabilities: ["notification.send"] },
+        },
+      });
   });
 
   it("publishes built-in capability metadata for Studio badges", () => {

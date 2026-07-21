@@ -33,7 +33,11 @@ import { createBuiltinRunnerRegistry } from "./nodes/createBuiltinRunnerRegistry
 import { AiSdkOpenAICompatibleLlmProvider, type LlmProvider } from "./nodes/llmProvider.js";
 import type { NodeRunner } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
-import type { RuntimeCapabilityManifest } from "./capabilities.js";
+import {
+  NODE_RUNTIME_CAPABILITIES,
+  createRuntimeCapabilityManifest,
+  type RuntimeCapabilityManifest,
+} from "./capabilities.js";
 import { RuntimeRegistry } from "./registry.js";
 import { RunManager } from "./runManager.js";
 import {
@@ -134,6 +138,10 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     ...(options.fetch ? { fetchImpl: options.fetch } : {}),
   });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();
+  const capabilities = options.capabilities ?? createRuntimeCapabilityManifest({
+    platform: "node",
+    available: NODE_RUNTIME_CAPABILITIES,
+  });
   const runners = createBuiltinRunnerRegistry({
     llmProvider,
     nodeTypeRegistry,
@@ -143,7 +151,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     registryStore,
     artifactStore,
     nodeTypeRegistry,
-    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+    capabilities,
   });
 
   // Install user-supplied custom nodes (SDK route). Their data track

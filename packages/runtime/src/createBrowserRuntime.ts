@@ -37,7 +37,10 @@ import {
   type RunStore,
 } from "./storage/browser.js";
 import type { Runtime } from "./createRuntime.js";
-import type { RuntimeCapabilityManifest } from "./capabilities.js";
+import {
+  createRuntimeCapabilityManifest,
+  type RuntimeCapabilityManifest,
+} from "./capabilities.js";
 
 export interface CreateBrowserRuntimeOptions {
   variables?: VariableStore;
@@ -77,6 +80,9 @@ export function createBrowserRuntime(
     ...(options.fetch ? { fetchImpl: options.fetch } : {}),
   });
   const nodeTypeRegistry: InMemoryNodeTypeRegistry = createDefaultRegistry();
+  const capabilities = options.capabilities ?? createRuntimeCapabilityManifest({
+    platform: "portable",
+  });
   const runners = createBrowserBuiltinRunnerRegistry({
     llmProvider,
     nodeTypeRegistry,
@@ -88,7 +94,7 @@ export function createBrowserRuntime(
     artifactStore,
     nodeTypeRegistry,
     ...(options.hashText ? { hashText: options.hashText } : {}),
-    ...(options.capabilities ? { capabilities: options.capabilities } : {}),
+    capabilities,
   });
 
   if (options.nodes && options.nodes.length > 0) {
