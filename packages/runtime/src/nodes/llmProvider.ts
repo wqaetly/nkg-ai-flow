@@ -19,10 +19,17 @@ import {
   createRuntimeError,
   normalizeError,
 } from "@ai-native-flow/flow-ir";
-import type { AiStreamAsyncIterable } from "@ai-native-flow/ai-stream";
+import type { AiStreamAsyncIterable, AiStreamEvent } from "@ai-native-flow/ai-stream";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import type { ProviderOptions } from "@ai-sdk/provider-utils";
-import { generateText, streamText } from "ai";
+import {
+  generateText,
+  jsonSchema,
+  stepCountIs,
+  streamText,
+  tool,
+  type ToolSet,
+} from "ai";
 import type { VariableStore } from "@ai-native-flow/variable-store";
 import type { NodeContext } from "../nodeContext.js";
 import {
@@ -89,6 +96,25 @@ export interface LlmCompletionResponse {
   };
 }
 
+export interface LlmToolDefinition {
+  description: string;
+  inputSchema: Record<string, unknown>;
+  execute(input: Record<string, unknown>): Promise<unknown>;
+}
+
+export interface LlmToolLoopRequest extends LlmCompletionRequest {
+  system?: string;
+  maxSteps: number;
+  tools: Record<string, LlmToolDefinition>;
+}
+
+export interface LlmToolLoopResponse extends LlmCompletionResponse {
+  finishReason?: string;
+  steps: number;
+  /** Test/custom providers may return model-owned structured context. */
+  context?: Record<string, unknown>;
+}
+
 /**
  * Boundary between node logic and a concrete model backend.
  *
@@ -115,6 +141,14 @@ export interface LlmProvider {
     req: LlmCompletionRequest,
     ctx: NodeContext,
   ): Promise<AiStreamAsyncIterable>;
+  /**
+   * Execute a native AI SDK tool loop. Agent nodes use this instead of asking
+   * the model to emit an application-defined JSON action envelope.
+   */
+  completeWithTools?(
+    req: LlmToolLoopRequest,
+    ctx: NodeContext,
+  ): Promise<LlmToolLoopResponse>;
 }
 
 export interface AiSdkOpenAICompatibleLlmProviderOptions {
@@ -315,7 +349,7 @@ export async function generateJsonCompletion(
  */
 export function streamCompletion(
   params: GenerateCompletionParams,
-): () => AsyncIterable<string> {
+): () => AiStreamAsyncIterable {
   const args = buildCallArgs(params);
   return async function* () {
     // AI SDK exposes provider/transport failures as `error` parts on
@@ -325,11 +359,43 @@ export function streamCompletion(
     // adapter boundary while still exposing only text deltas to callers.
     for await (const part of streamText(args).fullStream) {
       if (part.type === "text-delta") {
-        yield part.text;
+        yield { kind: "text_delta", text: part.text };
+        continue;
+      }
+      if (part.type === "reasoning-delta") {
+        yield { kind: "thinking_delta", text: part.text };
         continue;
       }
       if (part.type === "error") throw part.error;
     }
+  };
+}
+
+/** NodeContext-free native AI SDK tool loop used by the built-in agent node. */
+export async function generateToolLoop(
+  params: GenerateCompletionParams & Pick<LlmToolLoopRequest, "maxSteps" | "tools">,
+): Promise<LlmToolLoopResponse> {
+  const tools = Object.fromEntries(
+    Object.entries(params.tools).map(([name, definition]) => [
+      name,
+      tool({
+        description: definition.description,
+        inputSchema: jsonSchema<Record<string, unknown>>(definition.inputSchema),
+        execute: async (input) => definition.execute(input),
+      }),
+    ]),
+  ) as ToolSet;
+  const result = await generateText({
+    ...buildCallArgs(params),
+    tools,
+    stopWhen: stepCountIs(params.maxSteps),
+  });
+  return {
+    text: result.text,
+    raw: result,
+    usage: normalizeUsage(result.totalUsage),
+    finishReason: result.finishReason,
+    steps: result.steps.length,
   };
 }
 
@@ -423,6 +489,28 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
     }
   }
 
+  async completeWithTools(
+    req: LlmToolLoopRequest,
+    ctx: NodeContext,
+  ): Promise<LlmToolLoopResponse> {
+    const { baseUrl, apiKey, modelId } = this.resolveCallConfig(req, ctx);
+    return generateToolLoop({
+      baseUrl,
+      apiKey,
+      model: modelId,
+      prompt: req.prompt,
+      ...(req.system ? { system: req.system } : {}),
+      temperature: req.temperature,
+      maxTokens: req.maxTokens,
+      providerName: this.options.providerName,
+      providerOptions: req.providerOptions,
+      fetchImpl: this.options.fetchImpl,
+      abortSignal: ctx.signal,
+      maxSteps: req.maxSteps,
+      tools: req.tools,
+    });
+  }
+
   async completeStream(
     req: LlmCompletionRequest,
     ctx: NodeContext,
@@ -457,15 +545,14 @@ export class AiSdkOpenAICompatibleLlmProvider implements LlmProvider {
 }
 
 async function* aiSdkTextStreamToEvents(
-  createTextStream: () => AsyncIterable<string>,
+  createTextStream: () => AsyncIterable<AiStreamEvent>,
   options: { nodeId?: string; maxAttempts: number },
 ): AiStreamAsyncIterable {
   for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
     let text = "";
-    for await (const delta of createTextStream()) {
-      if (!delta) continue;
-      text += delta;
-      yield { kind: "text_delta", text: delta };
+    for await (const event of createTextStream()) {
+      if (event.kind === "text_delta") text += event.text;
+      yield event;
     }
     if (text.trim()) {
       yield { kind: "done", text, finishReason: "stop" };

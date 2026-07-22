@@ -7,6 +7,9 @@ import type { NodeContext } from "../src/nodeContext.js";
 const mocks = vi.hoisted(() => {
   const providerModel = vi.fn((modelId: string) => ({ modelId }));
   const createOpenAICompatible = vi.fn(() => providerModel);
+  const jsonSchema = vi.fn((schema: unknown) => ({ schema }));
+  const stepCountIs = vi.fn((maxSteps: number) => ({ maxSteps }));
+  const tool = vi.fn((definition: unknown) => definition);
   const textStreamOf = (chunks: string[]): AsyncIterable<string> =>
     (async function* () {
       for (const chunk of chunks) yield chunk;
@@ -14,10 +17,12 @@ const mocks = vi.hoisted(() => {
   const fullStreamOf = (
     parts: Array<
       | { type: "text-delta"; text: string }
+      | { type: "reasoning-delta"; text: string }
       | { type: "error"; error: unknown }
     >,
   ): AsyncIterable<
     | { type: "text-delta"; text: string }
+    | { type: "reasoning-delta"; text: string }
     | { type: "error"; error: unknown }
   > => (async function* () {
     for (const part of parts) yield part;
@@ -38,6 +43,9 @@ const mocks = vi.hoisted(() => {
   return {
     providerModel,
     createOpenAICompatible,
+    jsonSchema,
+    stepCountIs,
+    tool,
     generateText,
     streamText,
     textStreamOf,
@@ -52,7 +60,10 @@ vi.mock("@ai-sdk/openai-compatible", () => ({
 
 vi.mock("ai", () => ({
   generateText: mocks.generateText,
+  jsonSchema: mocks.jsonSchema,
+  stepCountIs: mocks.stepCountIs,
   streamText: mocks.streamText,
+  tool: mocks.tool,
 }));
 
 function context(args: {
@@ -95,7 +106,10 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
     mocks.createOpenAICompatible.mockClear();
     mocks.providerModel.mockClear();
     mocks.generateText.mockClear();
+    mocks.jsonSchema.mockClear();
+    mocks.stepCountIs.mockClear();
     mocks.streamText.mockClear();
+    mocks.tool.mockClear();
   });
 
   it("delegates OpenAI-compatible completion to AI SDK", async () => {
@@ -164,6 +178,65 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
       apiKey: "sk-override",
     });
     expect(mocks.providerModel).toHaveBeenCalledWith("override-model");
+  });
+
+  it("delegates the complete agent tool loop to AI SDK", async () => {
+    const execute = vi.fn(async (input: Record<string, unknown>) => ({ input, ok: true }));
+    mocks.generateText.mockResolvedValueOnce({
+      text: "工具执行完成",
+      finishReason: "stop",
+      steps: [{}, {}],
+      totalUsage: {
+        inputTokens: 21,
+        outputTokens: 8,
+        totalTokens: 29,
+      },
+    } as never);
+    const provider = new AiSdkOpenAICompatibleLlmProvider();
+
+    const result = await provider.completeWithTools!({
+      prompt: "查找项目状态",
+      maxSteps: 5,
+      tools: {
+        lookup_status: {
+          description: "查找项目状态",
+          inputSchema: {
+            type: "object",
+            properties: { projectId: { type: "string" } },
+            required: ["projectId"],
+            additionalProperties: false,
+          },
+          execute,
+        },
+      },
+    }, context({
+      baseUrl: "https://api.example.test/v1",
+      model: "tool-model",
+      apiKey: "sk-test",
+    }));
+
+    expect(mocks.stepCountIs).toHaveBeenCalledWith(5);
+    expect(mocks.jsonSchema).toHaveBeenCalledWith(expect.objectContaining({ type: "object" }));
+    expect(mocks.generateText).toHaveBeenCalledWith(expect.objectContaining({
+      model: { modelId: "tool-model" },
+      prompt: "查找项目状态",
+      stopWhen: { maxSteps: 5 },
+      tools: { lookup_status: expect.objectContaining({ description: "查找项目状态" }) },
+    }));
+    const sdkTool = mocks.tool.mock.calls[0]![0] as {
+      execute: (input: Record<string, unknown>) => Promise<unknown>;
+    };
+    await expect(sdkTool.execute({ projectId: "nkg" })).resolves.toEqual({
+      input: { projectId: "nkg" },
+      ok: true,
+    });
+    expect(execute).toHaveBeenCalledWith({ projectId: "nkg" });
+    expect(result).toMatchObject({
+      text: "工具执行完成",
+      finishReason: "stop",
+      steps: 2,
+      usage: { promptTokens: 21, completionTokens: 8, totalTokens: 29 },
+    });
   });
 
   it("resolves $var shorthand overrides before calling AI SDK", async () => {
@@ -250,6 +323,36 @@ describe("AiSdkOpenAICompatibleLlmProvider", () => {
       { kind: "text_delta", text: "{\"ok\"" },
       { kind: "text_delta", text: ":true}" },
       { kind: "done", text: "{\"ok\":true}", finishReason: "stop" },
+    ]);
+  });
+
+  it("preserves model reasoning as thinking deltas before the answer", async () => {
+    mocks.streamText.mockReturnValueOnce({
+      fullStream: mocks.fullStreamOf([
+        { type: "reasoning-delta", text: "先分析约束。" },
+        { type: "reasoning-delta", text: "再核对答案。" },
+        { type: "text-delta", text: "最终答案" },
+      ]),
+    });
+    const provider = new AiSdkOpenAICompatibleLlmProvider();
+    const events = [];
+
+    for await (const event of await provider.completeStream!(
+      { prompt: "请认真回答" },
+      context({
+        baseUrl: "https://api.example.test/v1",
+        model: "reasoning-model",
+        apiKey: "sk-test",
+      }),
+    )) {
+      events.push(event);
+    }
+
+    expect(events).toEqual([
+      { kind: "thinking_delta", text: "先分析约束。" },
+      { kind: "thinking_delta", text: "再核对答案。" },
+      { kind: "text_delta", text: "最终答案" },
+      { kind: "done", text: "最终答案", finishReason: "stop" },
     ]);
   });
 

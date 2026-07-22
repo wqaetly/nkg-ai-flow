@@ -33,7 +33,71 @@ export function createDeterministicExampleProvider(): LlmProvider {
     async complete(request) {
       return { text: responseFor(request) };
     },
+    async completeWithTools(request) {
+      return runDeterministicToolLoop(request);
+    },
   };
+}
+
+async function runDeterministicToolLoop(
+  request: Parameters<NonNullable<LlmProvider["completeWithTools"]>>[0],
+): Promise<Awaited<ReturnType<NonNullable<LlmProvider["completeWithTools"]>>>> {
+  const observations: string[] = [];
+  for (let step = 1; step <= request.maxSteps; step += 1) {
+    const prompt = observations.length === 0
+      ? request.prompt
+      : request.prompt.replace(
+        "Previous observations: none",
+        `Previous observations:\n${observations.join("\n\n")}`,
+      );
+    const response = responseFor({ ...request, prompt });
+    const decision = parseLegacyAgentDecision(response);
+    if (decision?.kind === "final") {
+      return {
+        text: decision.summary,
+        context: decision.context,
+        steps: step,
+        finishReason: "stop",
+      };
+    }
+    if (!decision) return { text: response, steps: step, finishReason: "stop" };
+    const definition = request.tools[decision.action];
+    if (!definition) throw new Error(`fixture requested unavailable tool ${decision.action}`);
+    const output = await definition.execute(decision.args);
+    observations.push(
+      `Step ${step} tool ${decision.action}\nargs: ${JSON.stringify(decision.args)}\nobservation: ${JSON.stringify(output)}`,
+    );
+  }
+  return { text: "", steps: request.maxSteps, finishReason: "tool-calls" };
+}
+
+function parseLegacyAgentDecision(value: string):
+  | { kind: "final"; action: "final"; summary: string; context?: Record<string, unknown> }
+  | { kind: "tool"; action: string; args: Record<string, unknown> }
+  | undefined {
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    if (parsed.action === "final") {
+      return {
+        kind: "final",
+        action: "final",
+        summary: typeof parsed.summary === "string" ? parsed.summary : "",
+        ...(parsed.context && typeof parsed.context === "object"
+          ? { context: parsed.context as Record<string, unknown> }
+          : {}),
+      };
+    }
+    if (typeof parsed.action !== "string") return undefined;
+    return {
+      kind: "tool",
+      action: parsed.action,
+      args: parsed.args && typeof parsed.args === "object"
+        ? parsed.args as Record<string, unknown>
+        : {},
+    };
+  } catch {
+    return undefined;
+  }
 }
 
 export function createDeterministicSkillToFlowNodes(

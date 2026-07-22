@@ -5,6 +5,8 @@ import type {
   LlmCompletionRequest,
   LlmCompletionResponse,
   LlmProvider,
+  LlmToolLoopRequest,
+  LlmToolLoopResponse,
 } from "./llmProvider.js";
 
 /** Loads the AI SDK provider chunk only when a Flow actually reaches an LLM node. */
@@ -28,6 +30,17 @@ export class LazyAiSdkOpenAICompatibleLlmProvider implements LlmProvider {
     if (provider.completeStream) return provider.completeStream(request, context);
     const response = await provider.complete(request, context);
     return oneShotStream(response.text);
+  }
+
+  async completeWithTools(
+    request: LlmToolLoopRequest,
+    context: NodeContext,
+  ): Promise<LlmToolLoopResponse> {
+    const provider = await this.load();
+    if (!provider.completeWithTools) {
+      throw new Error("The configured LLM provider does not support native tool calling");
+    }
+    return provider.completeWithTools(request, context);
   }
 
   private load(): Promise<LlmProvider> {

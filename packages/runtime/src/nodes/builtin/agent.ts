@@ -1,9 +1,8 @@
 /**
  * `agent` - a small Codex/Claude-Code style worker node.
  *
- * The node itself is browser-safe: it owns the LLM loop and tool-call
- * protocol, while concrete file / process tools are injected by the
- * Node runtime through `AgentToolHost`.
+ * The node itself is browser-safe: Vercel AI SDK owns the model/tool loop,
+ * while concrete file / process tools are injected through `AgentToolHost`.
  */
 
 import { z } from "zod";
@@ -15,7 +14,10 @@ import {
   DEFAULT_LLM_MODEL_REF,
   DEFAULT_LLM_TEMPERATURE,
 } from "../llmProviderDefaults.js";
-import type { LlmProvider } from "../llmProvider.js";
+import type {
+  LlmProvider,
+  LlmToolDefinition,
+} from "../llmProvider.js";
 import {
   AGENT_TOOL_NAMES,
   type AgentToolCall,
@@ -67,24 +69,70 @@ const agentConfig = z
   .passthrough();
 type AgentConfig = z.infer<typeof agentConfig>;
 
-type AgentDecision =
-  | {
-      action: AgentToolName;
-      args?: Record<string, unknown>;
-      thought?: string;
-    }
-  | {
-      action: "final";
-      summary: string;
-      context?: Record<string, unknown>;
-    };
-
 interface ToolLogEntry {
   step: number;
   tool: AgentToolName;
   args: Record<string, unknown>;
   result: AgentToolResult;
 }
+
+const TOOL_SCHEMAS: Record<AgentToolName, Omit<LlmToolDefinition, "execute">> = {
+  list_files: {
+    description: "List files below the working directory.",
+    inputSchema: objectSchema({
+      path: { type: "string" },
+      path_ref: { type: "string" },
+      recursive: { type: "boolean" },
+      max_entries: { type: "number" },
+    }),
+  },
+  read_file: {
+    description: "Read a UTF-8 text file from the working directory.",
+    inputSchema: objectSchema({
+      path: { type: "string" },
+      path_ref: { type: "string" },
+      max_chars: { type: "number" },
+    }),
+  },
+  grep: {
+    description: "Search text files with a regular expression.",
+    inputSchema: objectSchema({
+      pattern: { type: "string" },
+      path: { type: "string" },
+      path_ref: { type: "string" },
+      max_matches: { type: "number" },
+    }, ["pattern"]),
+  },
+  edit_file: {
+    description: "Replace text in one file, or create/overwrite it when requested.",
+    inputSchema: objectSchema({
+      path: { type: "string" },
+      path_ref: { type: "string" },
+      old_text: { type: "string" },
+      new_text: { type: "string" },
+      new_text_ref: { type: "string" },
+      create: { type: "boolean" },
+    }),
+  },
+  write_files: {
+    description: "Write a batch of files atomically within the working directory.",
+    inputSchema: objectSchema({
+      files_ref: { type: "string" },
+      files: {
+        type: "array",
+        items: { type: "object", additionalProperties: true },
+      },
+      create: { type: "boolean" },
+    }),
+  },
+  run_bash: {
+    description: "Run a shell command inside the working directory.",
+    inputSchema: objectSchema({
+      command: { type: "string" },
+      timeout_ms: { type: "number" },
+    }, ["command"]),
+  },
+};
 
 export const agentNode = defineNodeFactory<AgentNodeDeps>(
   ({ llmProvider, toolHost }) =>
@@ -195,7 +243,6 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
         const allowedTools = cfg.allowedTools.filter((tool) =>
           cfg.allowBash ? true : tool !== "run_bash",
         );
-        const transcript: string[] = [];
         const toolLog: ToolLogEntry[] = [];
         const changedFiles = new Set<string>();
         const baseContext =
@@ -203,65 +250,96 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
             ? (raw.context as Record<string, unknown>)
             : {};
 
-        for (let step = 1; step <= cfg.maxSteps; step += 1) {
-          const prompt = buildAgentPrompt({
-            systemPrompt: cfg.systemPrompt,
-            task,
-            context: baseContext,
-            allowedTools,
-            transcript,
-          });
-          let text: string;
-          try {
-            const response = await llmProvider.complete(
-              {
-                prompt,
-                model: resolveConfigStringRef(cfg.model, ctx) || undefined,
-                temperature: cfg.temperature,
-                maxTokens: cfg.maxTokens,
-                baseUrl: resolveConfigStringRef(cfg.baseUrl, ctx) || undefined,
-                apiKey: resolveConfigStringRef(cfg.apiKey, ctx) || undefined,
-              },
-              // The SDK ctx is structurally compatible with runtime NodeContext.
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              ctx as any,
-            );
-            text = response.text;
-          } catch (cause) {
-            return {
-              kind: "error",
-              error: {
-                code: "node.agent.llm_failed",
-                message: (cause as Error).message,
-                kind: "external",
-                category: "external",
-              },
-            };
-          }
+        if (!llmProvider.completeWithTools) {
+          return {
+            kind: "error",
+            error: {
+              code: "node.agent.native_tool_calling_unavailable",
+              message: "agent: the configured LLM provider does not support native tool calling",
+              kind: "validation",
+              category: "author",
+            },
+          };
+        }
 
-          const decision = parseDecision(text);
-          if (!decision) {
-            transcript.push(
-              `Step ${step} model output was not valid JSON: ${truncate(text, 800)}`,
-            );
-            continue;
-          }
+        let toolStep = 0;
+        const tools = Object.fromEntries(allowedTools.map((toolName) => {
+          const definition = TOOL_SCHEMAS[toolName];
+          return [toolName, {
+            ...definition,
+            execute: async (args: Record<string, unknown>) => {
+              const step = ++toolStep;
+              await ctx.emit({
+                kind: "tool_call_started",
+                payload: { toolName, args },
+              });
+              const result = await toolHost.callTool(
+                { tool: toolName, args },
+                {
+                  workingDir,
+                  allowedTools,
+                  allowBash: cfg.allowBash,
+                  timeoutMs: cfg.timeoutMs,
+                  maxOutputChars: cfg.maxOutputChars,
+                  context: baseContext,
+                  runtime: {
+                    flowId: ctx.flowId,
+                    flowVersion: ctx.flowVersion,
+                    runId: ctx.runId,
+                    nodeId: ctx.nodeId,
+                  },
+                },
+              );
+              for (const file of result.changedFiles ?? []) changedFiles.add(file);
+              toolLog.push({ step, tool: toolName, args, result });
+              await ctx.emit({
+                kind: "tool_call_finished",
+                payload: {
+                  toolName,
+                  ok: result.ok,
+                  output: result.output ?? null,
+                  error: result.error ?? null,
+                  changedFiles: result.changedFiles ?? [],
+                },
+              });
+              return result;
+            },
+          } satisfies LlmToolDefinition];
+        }));
 
-          if (decision.action === "final") {
+        try {
+          const response = await llmProvider.completeWithTools(
+            {
+              system: cfg.systemPrompt,
+              prompt: buildAgentPrompt({ task, context: baseContext, allowedTools }),
+              model: resolveConfigStringRef(cfg.model, ctx) || undefined,
+              temperature: cfg.temperature,
+              maxTokens: cfg.maxTokens,
+              baseUrl: resolveConfigStringRef(cfg.baseUrl, ctx) || undefined,
+              apiKey: resolveConfigStringRef(cfg.apiKey, ctx) || undefined,
+              maxSteps: cfg.maxSteps,
+              tools,
+            },
+            // The SDK ctx is structurally compatible with runtime NodeContext.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            ctx as any,
+          );
+          if (response.text.trim()) {
             const changedFilesList = [...changedFiles];
             const runtimeFacts = buildRuntimeFactsContext(
               baseContext,
               changedFilesList,
               toolLog,
-              decision.context,
+              response.context,
             );
             const context = {
               ...baseContext,
-              ...(decision.context ?? {}),
+              ...(response.context ?? {}),
               ...runtimeFacts,
             };
+            const summary = response.text.trim();
             const finalPayload = {
-              summary: decision.summary,
+              summary,
               context,
               changed_files: changedFilesList,
               tool_log: toolLog,
@@ -270,53 +348,23 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
               kind: "success",
               outputs: {
                 out: finalPayload,
-                summary: decision.summary,
+                summary,
                 context,
                 changed_files: finalPayload.changed_files,
                 tool_log: toolLog,
               },
             };
           }
-
-          const args = decision.args ?? {};
-          if (!allowedTools.includes(decision.action)) {
-            return {
-              kind: "error",
-              error: {
-                code: "node.agent.tool_not_allowed",
-                message: `agent: tool "${decision.action}" is not allowed by config.allowedTools / config.allowBash.`,
-                kind: "validation",
-                category: "author",
-              },
-            };
-          }
-
-          const result = await toolHost.callTool(
-            { tool: decision.action, args },
-            {
-              workingDir,
-              allowedTools,
-              allowBash: cfg.allowBash,
-              timeoutMs: cfg.timeoutMs,
-              maxOutputChars: cfg.maxOutputChars,
-              context: baseContext,
-              runtime: {
-                flowId: ctx.flowId,
-                flowVersion: ctx.flowVersion,
-                runId: ctx.runId,
-                nodeId: ctx.nodeId,
-              },
+        } catch (cause) {
+          return {
+            kind: "error",
+            error: {
+              code: "node.agent.llm_failed",
+              message: (cause as Error).message,
+              kind: "external",
+              category: "external",
             },
-          );
-          for (const file of result.changedFiles ?? []) changedFiles.add(file);
-          toolLog.push({ step, tool: decision.action, args, result });
-          transcript.push(
-            [
-              `Step ${step} tool ${decision.action}`,
-              `args: ${JSON.stringify(args)}`,
-              `observation: ${truncate(JSON.stringify(result), 2000)}`,
-            ].join("\n"),
-          );
+          };
         }
 
         const changedFilesList = [...changedFiles];
@@ -338,19 +386,14 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
 );
 
 function buildAgentPrompt(args: {
-  systemPrompt: string;
   task: string;
   context: Record<string, unknown>;
   allowedTools: readonly AgentToolName[];
-  transcript: readonly string[];
 }): string {
   return [
-    args.systemPrompt,
-    "",
-    "Use exactly one JSON object as your response. Do not include markdown.",
-    'To call a tool: {"action":"read_file","args":{"path":"src/index.ts"}}',
-    'To finish: {"action":"final","summary":"...","context":{"key":"value"}}',
-    "Only put model-owned notes in final context. Do not guess changed_files, written_files, verification_results, or validator_status; the runtime fills those from real tool logs and input context.",
+    "Use the provided native tools when they are needed, then return a concise final summary as plain text.",
+    "Only put model-owned notes in final context; express them in the final answer rather than guessing runtime facts.",
+    "Do not guess changed_files, written_files, verification_results, or validator_status; the runtime fills those from real tool logs and input context.",
     "If semantic problems remain after your work, you may include unresolved_errors. The runtime appends verification failures to unresolved_errors when commands still fail.",
     `Allowed tools: ${args.allowedTools.join(", ")}`,
     "",
@@ -372,9 +415,7 @@ function buildAgentPrompt(args: {
     "",
     `Context:\n${JSON.stringify(compactContextForPrompt(args.context))}`,
     "",
-    args.transcript.length
-      ? `Previous observations:\n${args.transcript.join("\n\n")}`
-      : "Previous observations: none",
+    "Previous observations: none",
   ].join("\n");
 }
 
@@ -386,44 +427,6 @@ function resolveConfigStringRef(
   const ref = /^\$(?:var|secret):([A-Za-z0-9_.:-]+)$/.exec(value.trim());
   if (!ref?.[1]) return value;
   return ctx.variables.getString(ref[1]) ?? value;
-}
-
-function parseDecision(text: string): AgentDecision | null {
-  const json = extractJsonObject(text);
-  if (!json) return null;
-  try {
-    const parsed = JSON.parse(json) as unknown;
-    if (!parsed || typeof parsed !== "object") return null;
-    const action = (parsed as Record<string, unknown>).action;
-    if (action === "final") {
-      const summary = (parsed as Record<string, unknown>).summary;
-      return {
-        action: "final",
-        summary: typeof summary === "string" ? summary : "",
-        context:
-          (parsed as Record<string, unknown>).context &&
-          typeof (parsed as Record<string, unknown>).context === "object"
-            ? ((parsed as Record<string, unknown>).context as Record<
-                string,
-                unknown
-              >)
-            : undefined,
-      };
-    }
-    if (AGENT_TOOL_NAMES.includes(action as AgentToolName)) {
-      const args = (parsed as Record<string, unknown>).args;
-      return {
-        action: action as AgentToolName,
-        args:
-          args && typeof args === "object"
-            ? (args as Record<string, unknown>)
-            : {},
-      };
-    }
-    return null;
-  } catch {
-    return null;
-  }
 }
 
 function buildRuntimeFactsContext(
@@ -502,16 +505,6 @@ function buildUnresolvedErrors(
     );
 }
 
-function extractJsonObject(text: string): string | null {
-  const trimmed = text.trim();
-  if (trimmed.startsWith("{") && trimmed.endsWith("}")) return trimmed;
-  const fenced = /```(?:json)?\s*({[\s\S]*?})\s*```/.exec(text);
-  if (fenced?.[1]) return fenced[1];
-  const start = text.indexOf("{");
-  const end = text.lastIndexOf("}");
-  return start >= 0 && end > start ? text.slice(start, end + 1) : null;
-}
-
 function stringOrUndefined(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value : undefined;
 }
@@ -572,6 +565,14 @@ function shouldPreserveLongContextString(path: string): boolean {
   );
 }
 
-function truncate(value: string, maxChars: number): string {
-  return value.length > maxChars ? `${value.slice(0, maxChars)}...` : value;
+function objectSchema(
+  properties: Record<string, unknown>,
+  required: string[] = [],
+): Record<string, unknown> {
+  return {
+    type: "object",
+    properties,
+    ...(required.length ? { required } : {}),
+    additionalProperties: false,
+  };
 }
