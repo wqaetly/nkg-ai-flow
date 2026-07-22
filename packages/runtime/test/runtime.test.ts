@@ -610,6 +610,55 @@ describe("runtime / hello-flow end-to-end", () => {
     });
   });
 
+  it("refreshes runtimeTimeoutMs while a model emits reasoning activity", async () => {
+    const reasoningNode = defineNode({
+      type: "reasoning_stream",
+      typeVersion: "1.0.0",
+      title: "Reasoning Stream",
+      validateInput: false,
+      async run({ ctx }) {
+        const stream = await ctx.stream("answer", { contentType: "text/markdown" }) as {
+          id: string;
+          close(): Promise<void>;
+        };
+        for (const text of ["分析约束。", "核对上下文。", "组织答案。"]) {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+          await ctx.emit({
+            kind: "stream_artifact",
+            portId: "answer",
+            streamId: stream.id,
+            payload: { kind: "thinking_delta", text },
+          });
+        }
+        await stream.close();
+        return { kind: "success", outputs: { out: null } };
+      },
+    });
+    const rt = newRuntime({ nodes: [reasoningNode] });
+    const flow = defineFlow({ id: "reasoning_timeout_activity_e2e", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "s", position: { x: 0, y: 0 } });
+    const reasoning = flow.node("reasoning_stream", {
+      id: "chat_model",
+      position: { x: 120, y: 0 },
+      config: { runtimeTimeoutMs: 60 },
+    });
+    const end = flow.node("end", { id: "e", position: { x: 240, y: 0 } });
+
+    flow.connect(start.out("out"), reasoning.in("in"));
+    flow.connect(reasoning.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({
+      flowId: "reasoning_timeout_activity_e2e",
+      input: null,
+    });
+
+    expect(result.succeeded).toBe(true);
+    const events = await rt.eventBus.store.read(result.runRecord.runId);
+    expect(events.filter((event) => event.kind === "stream_artifact" && event.nodeId === "chat_model"))
+      .toHaveLength(3);
+  });
+
   it("retries a failed node according to runtimeRetry policy", async () => {
     let calls = 0;
     const flakyNode = defineNode({
@@ -29132,6 +29181,40 @@ describe("runtime / variables visible to nodes", () => {
       baseUrlConfigured: true,
       apiKeyConfigured: true,
       finishReason: "",
+    });
+  });
+
+  it("llm node forwards JSON mode and provider options from config", async () => {
+    let observed: Parameters<LlmProvider["complete"]>[0] | undefined;
+    const provider: LlmProvider = {
+      complete: async (request) => {
+        observed = request;
+        return { text: '{"queries":[]}' };
+      },
+    };
+    const rt = createRuntime({ llmProvider: provider });
+    const flow = defineFlow({ id: "llm_json_config", version: "1.0.0", registry: rt.nodeTypeRegistry });
+    const start = flow.node("start", { id: "start", position: { x: 0, y: 0 } });
+    const llm = flow.node("llm", {
+      id: "planner",
+      position: { x: 100, y: 0 },
+      config: {
+        prompt: "Return JSON",
+        jsonOutput: true,
+        providerOptions: { "openai-compatible": { reasoningEffort: "low" } },
+      },
+    });
+    const end = flow.node("end", { id: "end", position: { x: 200, y: 0 } });
+    flow.connect(start.out("out"), llm.in("in"));
+    flow.connect(llm.out("out"), end.in("in"));
+    await registerAndPromote(rt, flow);
+
+    const result = await rt.invocationRouter.invoke({ flowId: "llm_json_config", input: null });
+
+    expect(result.succeeded).toBe(true);
+    expect(observed).toMatchObject({
+      jsonOutput: true,
+      providerOptions: { "openai-compatible": { reasoningEffort: "low" } },
     });
   });
 

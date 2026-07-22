@@ -169,8 +169,12 @@ export const llmNode = defineNodeFactory<{ llmProvider: LlmProvider }>(
           temperature: config.temperature,
           maxTokens: config.maxTokens,
           stream: wantStream || undefined,
+          jsonOutput: config.jsonOutput === true || undefined,
           ...(multimodalPrompt?.images.length ? { images: multimodalPrompt.images } : {}),
         };
+        if (config.providerOptions && typeof config.providerOptions === "object" && !Array.isArray(config.providerOptions)) {
+          request.providerOptions = config.providerOptions as LlmCompletionRequest["providerOptions"];
+        }
         if (model !== undefined) request.model = model;
         const baseUrl = resolveConfigStringRef(config.baseUrl, ctx);
         const apiKey = resolveConfigStringRef(config.apiKey, ctx);

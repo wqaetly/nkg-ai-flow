@@ -68,7 +68,7 @@ export interface ExecutionEngineOptions {
   /** @deprecated Use `variables`; treated as the same store. */
   secrets: SecretStore;
   eventBus: EventBus;
-  /** Per-node soft timeout in milliseconds. Defaults to 30s. */
+  /** Per-node soft timeout in milliseconds. Streaming output refreshes the deadline. Defaults to 30s. */
   defaultTimeoutMs?: number;
   /** External cancellation signal (e.g. from RunManager.cancel). */
   signal?: AbortSignal;
@@ -650,13 +650,16 @@ export class ExecutionEngine {
     const onAbort = () => ac.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
     let timedOut = false;
-    const timer =
-      timeoutMs > 0
-        ? setTimeout(() => {
-            timedOut = true;
-            ac.abort();
-          }, timeoutMs)
-        : undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refreshRuntimeTimeout = () => {
+      if (timeoutMs <= 0 || timedOut || ac.signal.aborted) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        timedOut = true;
+        ac.abort();
+      }, timeoutMs);
+    };
+    refreshRuntimeTimeout();
 
     // Per-(node, attempt) channel: it allocates the seq numbers for every
     // event emitted from this node (logger, ctx.emit, ctx.stream) and
@@ -673,6 +676,9 @@ export class ExecutionEngine {
       nodeVersion: node.typeVersion,
       attempt,
       initialSeq: 3,
+      onActivity: (event) => {
+        if (isRuntimeOutputActivity(event.kind)) refreshRuntimeTimeout();
+      },
     });
 
     const ctx: NodeContext = {
@@ -2216,6 +2222,16 @@ function readRuntimeTimeoutMs(config: unknown, fallback: number): number {
         : fallback;
   if (!Number.isFinite(parsed)) return Math.max(0, Math.trunc(fallback));
   return Math.max(0, Math.trunc(parsed));
+}
+
+function isRuntimeOutputActivity(kind: string): boolean {
+  return kind === "stream_delta"
+    || kind === "stream_artifact"
+    || kind === "stream_usage"
+    || kind === "tool_call_started"
+    || kind === "tool_call_delta"
+    || kind === "tool_call_finished"
+    || kind === "node_progress";
 }
 
 function readRuntimeRetryPolicy(config: unknown): RuntimeRetryPolicy {

@@ -53,6 +53,8 @@ export interface NodeEventChannelOptions {
    * Defaults to 64 which is conservative but enough for token streams.
    */
   defaultHighWaterMark?: number;
+  /** Called after a node event is durably published, for timeout activity tracking. */
+  onActivity?: (event: { kind: NodeEventKind; payload?: unknown }) => void;
 }
 
 /** Options accepted by `ctx.stream("portId", options)`. */
@@ -157,18 +159,7 @@ export class NodeEventChannel {
    * `stream_artifact`, `node_warning`).
    */
   async emit(event: NodeEmitInput): Promise<NodeEvent> {
-    const seq = this.nextSeq();
-    return this.options.eventBus.publish({
-      ...event,
-      runId: this.options.runId,
-      flowId: this.options.flowId,
-      flowVersion: this.options.flowVersion,
-      ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
-      nodeId: this.options.nodeId,
-      nodeVersion: this.options.nodeVersion,
-      attempt: this.options.attempt,
-      seq,
-    });
+    return this.publishWithSeq(this.nextSeq(), event);
   }
 
   /**
@@ -289,7 +280,7 @@ export class NodeEventChannel {
     seq: number,
     event: { kind: NodeEventKind } & Omit<NodeEmitInput, "kind">,
   ): Promise<NodeEvent> {
-    return this.options.eventBus.publish({
+    const published = await this.options.eventBus.publish({
       ...event,
       runId: this.options.runId,
       flowId: this.options.flowId,
@@ -300,6 +291,8 @@ export class NodeEventChannel {
       attempt: this.options.attempt,
       seq,
     });
+    this.options.onActivity?.({ kind: event.kind, payload: event.payload });
+    return published;
   }
 
   private waitForDrain(state: StreamState): Promise<void> {
