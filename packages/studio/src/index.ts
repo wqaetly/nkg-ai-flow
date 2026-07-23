@@ -6,6 +6,7 @@ export * from "./reactFlowAdapter.js";
 export * from "./paletteLabels.js";
 export * from "./portLabels.js";
 export * from "./ReactFlowStudio.js";
+export * from "./runtimeDebug.js";
 export * from "./StudioWorkbench.js";
 export * from "./FlowRunController.js";
 export * from "./httpClient.js";

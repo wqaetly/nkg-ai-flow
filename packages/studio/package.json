@@ -8,6 +8,8 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
+    "./flowPreview": "./src/FlowPreview.tsx",
+    "./runtimeDebug": "./src/runtimeDebug.ts",
     "./reactFlowStudio.css": "./src/reactFlowStudio.css"
   },
   "scripts": {

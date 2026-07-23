@@ -27,6 +27,7 @@ import {
 } from "./fields/fieldLabels.js";
 import { resolveNodeDisplayLabels } from "./paletteLabels.js";
 import { localizePortDefinition } from "./portLabels.js";
+import { deriveRuntimeDebugNodeState } from "./runtimeDebug.js";
 
 const DEFAULT_NODE_SIZE = { width: 220, height: 132 } as const;
 
@@ -282,8 +283,7 @@ function toCanvasNode(
   events: NodeEvent[],
   fieldLocale: StudioFieldLocale,
 ): StudioCanvasNode {
-  const nodeEvents = events.filter((event) => event.nodeId === node.id);
-  const runtime = deriveNodeRuntime(nodeEvents);
+  const debug = deriveRuntimeDebugNodeState(events, node.id);
   return {
     id: node.id,
     type: node.type,
@@ -294,8 +294,8 @@ function toCanvasNode(
     inputs: portsByDirection(node.type, node.ports, "input", fieldLocale),
     outputs: portsByDirection(node.type, node.ports, "output", fieldLocale),
     config: { ...(node.config ?? {}) },
-    status: deriveNodeStatusFromEvents(nodeEvents),
-    ...(runtime ? { runtime } : {}),
+    status: debug.status,
+    ...(debug.runtime ? { runtime: debug.runtime } : {}),
   };
 }
 
@@ -308,74 +308,6 @@ function portsByDirection(
   return ports
     .filter((port) => port.direction === direction)
     .map((port) => localizePortDefinition(nodeType, port, fieldLocale));
-}
-
-function deriveNodeStatusFromEvents(nodeEvents: NodeEvent[]) {
-  const last = nodeEvents.at(-1);
-  if (!last) return "idle";
-  if (last.kind === "node_error") return "failed";
-  if (last.kind === "node_finished") return "succeeded";
-  if (last.kind.startsWith("stream_")) return "streaming";
-  if (last.kind === "node_started" || last.kind === "node_progress") return "running";
-  return "idle";
-}
-
-/**
- * Pull execution timing out of a node's event slice so the canvas can
- * paint a small ms-level timer below the status dot.
- *
- * - For `node_started` we take the event timestamp as the wallclock
- *   anchor (`startedAt`). The card multiplies `Date.now() - startedAt`
- *   for the live readout while running.
- * - For `node_finished` / `node_error` we prefer the canonical
- *   `payload.durationMs` field emitted by the runtime; if it's missing
- *   (older fixtures, partial replays) we fall back to subtracting the
- *   matching `node_started` timestamp so the readout still works.
- *
- * Returns `undefined` when the node has no relevant lifecycle events,
- * keeping the optional field off the canvas node entirely.
- */
-function deriveNodeRuntime(
-  nodeEvents: NodeEvent[],
-): { startedAt?: number; durationMs?: number } | undefined {
-  if (nodeEvents.length === 0) return undefined;
-
-  // We want the most recent attempt's timing only — retries should
-  // reset the timer rather than show the cumulative wallclock across
-  // attempts. Walking from the end back to the latest `node_started`
-  // is sufficient because events arrive in monotonic seq order.
-  let startedAt: number | undefined;
-  let durationMs: number | undefined;
-  for (let i = nodeEvents.length - 1; i >= 0; i -= 1) {
-    const event = nodeEvents[i]!;
-    if (durationMs === undefined && (event.kind === "node_finished" || event.kind === "node_error")) {
-      const payload = event.payload as { durationMs?: number } | undefined;
-      if (typeof payload?.durationMs === "number") {
-        durationMs = payload.durationMs;
-      }
-    }
-    if (event.kind === "node_started") {
-      const ts = Date.parse(event.timestamp);
-      if (Number.isFinite(ts)) startedAt = ts;
-      break;
-    }
-  }
-
-  // Fallback: if the runtime didn't include `durationMs` but we have
-  // both bookends, derive it from timestamps.
-  if (durationMs === undefined && startedAt !== undefined) {
-    const last = nodeEvents.at(-1)!;
-    if (last.kind === "node_finished" || last.kind === "node_error") {
-      const finishedAt = Date.parse(last.timestamp);
-      if (Number.isFinite(finishedAt)) durationMs = Math.max(0, finishedAt - startedAt);
-    }
-  }
-
-  if (startedAt === undefined && durationMs === undefined) return undefined;
-  return {
-    ...(startedAt !== undefined ? { startedAt } : {}),
-    ...(durationMs !== undefined ? { durationMs } : {}),
-  };
 }
 
 export function createRunTimeline(events: NodeEvent[]): StudioTimelineItem[] {
