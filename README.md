@@ -404,3 +404,9 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 - [docs/implementation/roadmap.md](./docs/implementation/roadmap.md)：Phase 0+ 的目标与 Definition of Done
 - [docs/specs/](./docs/specs)：Flow Schema / Runtime / Streaming / Studio / Sandbox / Variable Store 等规格
 - [docs/decisions/](./docs/decisions)：Hot Swap / Event Channel / Node-first / Schema Versioning 等 ADR
+
+---
+
+## 九、许可证
+
+本项目基于 [MIT License](./LICENSE) 开源。

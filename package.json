@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "AI Native Flow Runtime monorepo (Phase 0: Graph Contract & Builder)",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "packages/*",
