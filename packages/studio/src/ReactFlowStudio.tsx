@@ -1,4 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from "react";
 import {
   Background,
   BackgroundVariant,
@@ -85,10 +96,37 @@ export interface ReactFlowStudioProps {
    * entry on every field.
    */
   envEntries?: EnvVarEntry[];
+  /**
+   * Optional host renderer for node cards. It receives a `renderDefaultNode`
+   * callback so product-specific cards can decorate the built-in card without
+   * reimplementing ports, inline fields, selection, or runtime state.
+   */
+  nodeRenderer?: StudioNodeRenderer;
 }
 
+export interface StudioDefaultNodeOptions {
+  /** Extra class names applied to the built-in `.anf-node` card. */
+  className?: string;
+  /** Replaces the generated one-letter icon in the node header. */
+  icon?: ReactNode;
+  /** Content rendered beside the node title. */
+  titleAddon?: ReactNode;
+  /** Content rendered after flow-control pins and before editable fields. */
+  beforeFields?: ReactNode;
+  /** Content rendered after editable fields and before remaining data ports. */
+  afterFields?: ReactNode;
+}
+
+export interface StudioNodeRendererProps extends NodeProps<ReactFlowStudioNode> {
+  renderDefaultNode: (options?: StudioDefaultNodeOptions) => ReactNode;
+}
+
+export type StudioNodeRenderer = ComponentType<StudioNodeRendererProps>;
+
+const StudioNodeRendererContext = createContext<StudioNodeRenderer | undefined>(undefined);
+
 const nodeTypes = {
-  studioNode: StudioNodeCard,
+  studioNode: StudioNodeRendererBridge,
 };
 
 const edgeTypes = {
@@ -111,6 +149,7 @@ function ReactFlowStudioInner({
   headerSlot,
   palette,
   envEntries,
+  nodeRenderer,
 }: ReactFlowStudioProps) {
   const [state, setState] = useState(initialState);
 
@@ -174,15 +213,15 @@ function ReactFlowStudioInner({
   }, [commitState]));
 
   /**
-   * Sync per-node *runtime decorations* (`data.status`, `data.runtime`)
+   * Sync per-node non-topological data (`config`, status and runtime)
    * from the projected view into the live ReactFlow `nodes` array
    * without disturbing position / selection / measured size.
    *
    * The sibling `topologyKey` effect above only re-projects on
-   * structural changes (add/remove node-or-edge); status / timer
+   * structural changes (add/remove node-or-edge); config and status
    * changes are intentionally *not* topological so they don't trigger
-   * full re-projection. This effect closes that gap by patching just
-   * the two affected fields, leaving everything else intact.
+   * full re-projection. This effect closes that gap while leaving
+   * position, selection and measured dimensions intact.
    *
    * The early-bail `same` check keeps this cheap: most state updates
    * won't flip status/runtime, so we re-render only when there's
@@ -196,9 +235,11 @@ function ReactFlowStudioInner({
         if (!projectedNode) return rfNode;
         const nextStatus = projectedNode.data.status;
         const nextRuntime = projectedNode.data.runtime;
+        const nextConfig = projectedNode.data.config;
         const same =
           rfNode.data.status === nextStatus &&
-          shallowRuntimeEqual(rfNode.data.runtime, nextRuntime);
+          shallowRuntimeEqual(rfNode.data.runtime, nextRuntime) &&
+          shallowRecordEqual(rfNode.data.config, nextConfig);
         if (same) return rfNode;
         changed = true;
         return {
@@ -206,6 +247,7 @@ function ReactFlowStudioInner({
           data: {
             ...rfNode.data,
             status: nextStatus,
+            config: nextConfig,
             // Preserve the optional-field shape: omit the key entirely
             // when there's no runtime info, matching the adapter.
             ...(nextRuntime ? { runtime: nextRuntime } : { runtime: undefined }),
@@ -592,6 +634,7 @@ function ReactFlowStudioInner({
 
   return (
     <EnvVarsProvider entries={envList}>
+    <StudioNodeRendererContext.Provider value={nodeRenderer}>
     <div className="anf-studio-root">
       <header className="anf-studio-header">
         <div className="anf-studio-header-text">
@@ -681,6 +724,7 @@ function ReactFlowStudioInner({
         ) : null}
       </main>
     </div>
+    </StudioNodeRendererContext.Provider>
     </EnvVarsProvider>
   );
 }
@@ -1041,7 +1085,33 @@ function fmt(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2);
 }
 
-function StudioNodeCard({ id, data, selected }: NodeProps<ReactFlowStudioNode>) {
+function StudioNodeRendererBridge(props: NodeProps<ReactFlowStudioNode>) {
+  const NodeRenderer = useContext(StudioNodeRendererContext);
+  if (!NodeRenderer) return <StudioNodeCard {...props} />;
+  return (
+    <NodeRenderer
+      {...props}
+      renderDefaultNode={(options) => <StudioNodeCard {...props} options={options} />}
+    />
+  );
+}
+
+function shallowRecordEqual(
+  a: Record<string, unknown>,
+  b: Record<string, unknown>,
+): boolean {
+  if (a === b) return true;
+  const aKeys = Object.keys(a);
+  const bKeys = Object.keys(b);
+  return aKeys.length === bKeys.length && aKeys.every((key) => Object.is(a[key], b[key]));
+}
+
+function StudioNodeCard({
+  id,
+  data,
+  selected,
+  options,
+}: NodeProps<ReactFlowStudioNode> & { options?: StudioDefaultNodeOptions }) {
   const status = data.status ?? "idle";
   const initial = (data.label || data.type || "?").trim().charAt(0).toUpperCase() || "?";
 
@@ -1103,7 +1173,14 @@ function StudioNodeCard({ id, data, selected }: NodeProps<ReactFlowStudioNode>) 
     data.type === "text_input" && visibleFieldNames.has("value");
 
   return (
-    <div className={`anf-node ${selected ? "anf-node--selected" : ""} anf-node--${status}`}>
+    <div
+      className={[
+        "anf-node",
+        selected ? "anf-node--selected" : "",
+        `anf-node--${status}`,
+        options?.className ?? "",
+      ].filter(Boolean).join(" ")}
+    >
       {/*
         Right-top corner stack: status dot on top, ms-level runtime
         timer directly below it. Both used to live in separate
@@ -1132,9 +1209,12 @@ function StudioNodeCard({ id, data, selected }: NodeProps<ReactFlowStudioNode>) 
       */}
       <div className="anf-node-head">
         <div className={`anf-node-icon anf-node-icon--${kindForType(data.type)}`} aria-hidden>
-          {initial}
+          {options?.icon ?? initial}
         </div>
         <strong className="anf-node-title">{data.label}</strong>
+        {options?.titleAddon ? (
+          <span className="anf-node-title-addon">{options.titleAddon}</span>
+        ) : null}
       </div>
 
       {hasFlowRow ? (
@@ -1164,6 +1244,8 @@ function StudioNodeCard({ id, data, selected }: NodeProps<ReactFlowStudioNode>) 
         </div>
       ) : null}
 
+      {options?.beforeFields ?? null}
+
       {hasFields ? (
         <NodeFieldsPanel
           nodeId={id}
@@ -1176,6 +1258,8 @@ function StudioNodeCard({ id, data, selected }: NodeProps<ReactFlowStudioNode>) 
           disabled={status === "running" || status === "streaming"}
         />
       ) : null}
+
+      {options?.afterFields ?? null}
 
       {hasDataRows ? (
         <div className="anf-node-ports">
