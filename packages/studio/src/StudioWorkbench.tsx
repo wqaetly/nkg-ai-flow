@@ -29,7 +29,7 @@ import {
 } from "./envState.js";
 // Bundlers resolve this to a URL; the ambient declaration in assets.d.ts
 // keeps the import type-safe.
-import iconUrl from "./icon.webp";
+import iconUrl from "./icon.png";
 
 /** Default sidecar location - single-machine local dev convention. */
 const DEFAULT_SIDECAR_URL = "http://127.0.0.1:5173";
