@@ -42,6 +42,7 @@ import {
 } from "./capabilities.js";
 import { RuntimeRegistry } from "./registry.js";
 import { RunManager } from "./runManager.js";
+import { RunGuidanceInbox } from "./runControl.js";
 import {
   FsArtifactStore,
   InMemoryRegistryStore,
@@ -96,6 +97,8 @@ export interface CreateRuntimeOptions {
   capabilities?: RuntimeCapabilityManifest;
   /** Explicit host HTTP implementation for HTTP and LLM nodes. */
   fetch?: typeof fetch;
+  /** Optional shared Run guidance inbox; defaults to a bounded in-memory inbox. */
+  guidanceInbox?: RunGuidanceInbox;
 }
 
 export interface Runtime {
@@ -122,6 +125,7 @@ export interface Runtime {
   registry: RuntimeRegistry;
   runManager: RunManager;
   invocationRouter: InvocationRouter;
+  guidanceInbox: RunGuidanceInbox;
 }
 
 export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
@@ -134,6 +138,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
       : options.variables ?? options.secrets ?? getDefaultVariableStore();
   const secrets = variables;
   const eventBus = options.eventBus ?? new InMemoryEventBus();
+  const guidanceInbox = options.guidanceInbox ?? new RunGuidanceInbox();
   const runStore = options.runStore ?? new InMemoryRunStore();
   const registryStore = options.registryStore ?? new InMemoryRegistryStore();
   const artifactStore =
@@ -182,6 +187,7 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     runners,
     variables,
     secrets,
+    guidanceInbox,
     triggerEvent: async (event) => {
       return invocationRouter.triggerEvent({ event });
     },
@@ -203,5 +209,6 @@ export function createRuntime(options: CreateRuntimeOptions = {}): Runtime {
     registry,
     runManager,
     invocationRouter,
+    guidanceInbox,
   };
 }

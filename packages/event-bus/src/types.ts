@@ -25,6 +25,9 @@ export type NodeEventKind =
   | "run_finished"
   | "run_failed"
   | "run_cancelled"
+  | "run_suspended"
+  | "run_resumed"
+  | "run_advisory"
   | "node_started"
   | "node_progress"
   | "stream_open"
@@ -86,6 +89,22 @@ export interface RunFailedPayload {
 }
 export interface RunCancelledPayload {
   reason?: string;
+}
+export interface RunSuspendedPayload {
+  reason: string;
+}
+export interface RunResumedPayload {
+  reason?: string;
+}
+export interface RunAdvisoryPayload {
+  advisorId: string;
+  severity: "nit" | "concern" | "blocker";
+  code: string;
+  message: string;
+  suggestion?: string;
+  evidence?: unknown;
+  dedupeKey: string;
+  sourceEventId?: string;
 }
 export interface NodeStartedPayload {
   input: Record<string, unknown>;

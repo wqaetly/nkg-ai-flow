@@ -270,6 +270,15 @@ interface ArtifactRef {
 - Stream 是运行时事件，不等同于最终输出；需要持久结果时必须在 `stream_close` 或节点完成时生成 Artifact。
 - Checkpoint 保存 Run State snapshot、event cursor、artifact refs 和 scheduler cursor，不保存 Secret 明文。
 - Replay 默认从事件和 checkpoint 恢复；是否重新调用 LLM / Tool 必须由 replay policy 决定。
+
+#### Run Advisor 安全边界暂停
+
+可选 Advisor 模块可以在 `node_finished` 等语义边界产生 `run_advisory`。`gate` 模式下的
+`blocker` 将 RunRecord 标为 `suspended`，已经执行中的节点完成，但任何新节点在
+`RunPauseGate` 放行前不得启动。`resume()` 写入 `run_resumed` 并继续原调度栈。
+
+当前实现是进程内暂停，不等同于进程重启后的持久调度恢复；完整语义见
+[Advisor Runtime](./advisor-runtime.md)。
 - Artifact 应不可变，使用 hash 校验，仍被 active / running Run 引用时不得 GC。
 
 ### 5.8 Artifact 生命周期

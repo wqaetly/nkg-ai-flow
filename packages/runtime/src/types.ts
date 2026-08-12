@@ -19,6 +19,7 @@ export type RunRecordSchemaVersion = typeof RUN_RECORD_SCHEMA_VERSION;
 export type RunStatus =
   | "queued"      // created, not yet started
   | "running"
+  | "suspended"
   | "succeeded"
   | "failed"
   | "cancelled";
@@ -41,6 +42,9 @@ export interface RunRecord {
   /** ISO-8601 timestamp of Run creation. */
   createdAt: string;
   startedAt?: string;
+  suspendedAt?: string;
+  suspensionReason?: string;
+  resumedAt?: string;
   finishedAt?: string;
   /** Optional human-supplied trace id for correlating across services. */
   traceId?: string;

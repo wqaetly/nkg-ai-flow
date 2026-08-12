@@ -17,6 +17,7 @@
     "test:example-flows": "tsx scripts/audit-example-flows.ts",
     "typecheck": "tsc --noEmit -p .",
     "app:helloagent": "tsx apps/hello-agent/build.ts",
+    "app:advisor-demo": "tsx apps/advisor-demo/runtime.ts",
     "dev:studio": "npm run studio:dev",
     "dev:sidecar": "npm run studio:dev:backend",
     "dev:web": "npm run studio:dev:frontend",

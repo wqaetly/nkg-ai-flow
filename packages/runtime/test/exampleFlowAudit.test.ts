@@ -23,8 +23,8 @@ describe("bundled example Flow audit", () => {
   it("validates every asset and executes every deterministic portable example", async () => {
     const audit = await auditBundledExampleFlows();
 
-    expect(audit.structural).toEqual({ passed: 3, total: 3, rate: 1 });
-    expect(audit.deterministicExecution).toEqual({ passed: 3, total: 3, rate: 1 });
+    expect(audit.structural).toEqual({ passed: 5, total: 5, rate: 1 });
+    expect(audit.deterministicExecution).toEqual({ passed: 5, total: 5, rate: 1 });
     expect(audit.flows).toEqual(expect.arrayContaining([
       expect.objectContaining({
         id: "loop_block_showcase",
@@ -46,6 +46,20 @@ describe("bundled example Flow audit", () => {
         execution: "passed",
         hostClass: "desktop-power",
         missingPortableCapabilities: ["filesystem.write", "process.spawn"],
+      }),
+      expect.objectContaining({
+        id: "advisor_demo_primary",
+        structural: "passed",
+        execution: "passed",
+        hostClass: "portable",
+        missingPortableCapabilities: [],
+      }),
+      expect.objectContaining({
+        id: "advisor_demo_reviewer",
+        structural: "passed",
+        execution: "passed",
+        hostClass: "portable",
+        missingPortableCapabilities: [],
       }),
     ]));
   });

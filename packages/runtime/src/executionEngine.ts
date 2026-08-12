@@ -39,6 +39,7 @@ import {
   type RuntimeError,
 } from "@ai-native-flow/flow-ir";
 import type { EventBus } from "@ai-native-flow/event-bus";
+import type { RunGuidanceInbox, RunPauseGate } from "./runControl.js";
 import {
   resolveRefs,
   type SecretStore,
@@ -68,6 +69,10 @@ export interface ExecutionEngineOptions {
   /** @deprecated Use `variables`; treated as the same store. */
   secrets: SecretStore;
   eventBus: EventBus;
+  /** Optional Run-level guidance source populated by supervision modules. */
+  guidanceInbox?: RunGuidanceInbox;
+  /** Optional safe-boundary pause gate owned by RunManager. */
+  pauseGate?: RunPauseGate;
   /** Per-node soft timeout in milliseconds. Streaming output refreshes the deadline. Defaults to 30s. */
   defaultTimeoutMs?: number;
   /** External cancellation signal (e.g. from RunManager.cancel). */
@@ -324,7 +329,10 @@ export class ExecutionEngine {
     };
 
     try {
-      fillReady();
+      // A run can be cancelled before execution starts. Do not let scheduling
+      // publish `node_started` before the loop gets its first chance to sample
+      // an already-aborted signal.
+      if (!signal?.aborted) fillReady();
       while (queue.length > 0 || inFlight.length > 0) {
         if (signal?.aborted) {
           cancelled = true;
@@ -385,7 +393,7 @@ export class ExecutionEngine {
         ...(this.options.traceId !== undefined ? { traceId: this.options.traceId } : {}),
         seq: 0,
         kind: "run_cancelled",
-        payload: { reason: "external cancellation" },
+        payload: { reason: cancellationReason(signal) },
       });
       return { succeeded: false, cancelled: true };
     }
@@ -597,7 +605,14 @@ export class ExecutionEngine {
     const retryPolicy = readRuntimeRetryPolicy(inputs.__config__);
     let attempt = 1;
     while (true) {
-      const result = await this.executeNodeAttempt(node, inputs, attempt);
+      if (this.options.pauseGate) {
+        const allowed = await this.options.pauseGate.wait(this.options.signal);
+        if (!allowed) {
+          return { kind: "skip", reason: "run cancelled while suspended" };
+        }
+      }
+      const guidance = this.options.guidanceInbox?.list(this.options.runId) ?? [];
+      const result = await this.executeNodeAttempt(node, inputs, attempt, guidance);
       if (result.kind !== "error") return result;
       if (attempt >= retryPolicy.maxAttempts) return result;
       if (!shouldRetryError(result.error, retryPolicy)) return result;
@@ -621,6 +636,7 @@ export class ExecutionEngine {
     node: NodeInstance,
     inputs: NodeInputs,
     attempt: number,
+    guidance: readonly import("./runControl.js").RunGuidance[],
   ): Promise<NodeResult> {
     const { eventBus, runId, flowId, flowVersion, signal } = this.options;
     const startedAt = Date.now();
@@ -694,6 +710,7 @@ export class ExecutionEngine {
       secrets: this.options.variables,
       log: makeNodeLogger(channel),
       signal: ac.signal,
+      guidance,
       triggerEvent:
         this.options.triggerEvent ??
         (async () => {
@@ -1980,6 +1997,13 @@ export class ExecutionEngine {
       payload: { error },
     });
   }
+}
+
+function cancellationReason(signal: AbortSignal | undefined): string {
+  const reason = signal?.reason;
+  if (typeof reason === "string" && reason.trim() !== "") return reason;
+  if (reason instanceof Error && reason.message.trim() !== "") return reason.message;
+  return "external cancellation";
 }
 
 /* -------------------------------------------------------------------------- */

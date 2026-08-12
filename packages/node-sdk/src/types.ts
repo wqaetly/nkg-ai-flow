@@ -34,6 +34,17 @@ export interface SdkNodeContext {
   readonly nodeVersion: string;
   readonly attempt: number;
   readonly signal: AbortSignal;
+  /** Optional Run-level guidance delivered by a supervision extension. */
+  readonly guidance?: readonly {
+    id: string;
+    source: string;
+    severity: "nit" | "concern" | "blocker";
+    code: string;
+    message: string;
+    suggestion?: string;
+    evidence?: unknown;
+    createdAt: string;
+  }[];
 
   readonly variables: {
     getString(name: string): string | undefined;

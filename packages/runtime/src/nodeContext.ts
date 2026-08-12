@@ -26,6 +26,7 @@ import type { RuntimeError } from "@ai-native-flow/flow-ir";
 import type { NodeEvent } from "@ai-native-flow/event-bus";
 import type { SecretStore, VariableStore } from "@ai-native-flow/variable-store";
 import type { RunRecord } from "./types.js";
+import type { RunGuidance } from "./runControl.js";
 import type {
   NodeEmitInput,
   NodeOutputStream,
@@ -90,6 +91,8 @@ export interface NodeContext {
   readonly secrets: SecretStore;
   readonly log: NodeLogger;
   readonly signal: AbortSignal;
+  /** Run-level guidance visible at this node boundary. */
+  readonly guidance?: readonly RunGuidance[];
 
   /**
    * Publish a simple string event into the Runtime trigger layer. Matching

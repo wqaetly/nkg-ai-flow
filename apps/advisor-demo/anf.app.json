@@ -1,0 +1,5 @@
+{
+  "name": "advisor-demo",
+  "flowDirs": ["artifacts/flows"],
+  "nodePacks": ["nodes/index.ts"]
+}

@@ -216,6 +216,7 @@ packages/
   builder-runner/       # 执行 Builder 代码并产出 Flow Artifact
   runtime/              # Run Manager、Scheduler、Execution Engine、内部 Registry、内部 Storage 抽象
   event-bus/            # Runtime Event Bus 与持久化事件日志抽象
+  advisor/              # 可选 Run 监督：增量审阅、guidance、backlog 与 gate
   node-sdk/             # defineNode / defineNodeFactory / installNode（节点声明唯一入口）
   ai-stream/            # AI Stream Adapter（厂商 SDK -> NodeEvent）
   variable-store/       # VariableStore + SecretStore 双轨抽象，$var / $secret 解析
@@ -269,6 +270,7 @@ apps/*/anf.app.json     # app-local 清单：声明本 app 的 flowDirs[] / node
 | [Flow Builder](docs/specs/flow-builder.md) | Builder API、`dump()`、确定性输出和 AI 生成逻辑规则 |
 | [Graph Operations](docs/specs/graph-operations.md) | Studio 与 AI Patch 使用的小粒度图修改协议 |
 | [Runtime Execution](docs/specs/runtime-execution.md) | Run lifecycle、Scheduler、Retry、Cancel、Checkpoint、Artifact 生命周期 |
+| [Advisor Runtime](docs/specs/advisor-runtime.md) | 可选 Run 监督、增量审阅、guidance 与安全边界 gate |
 | [Node System](docs/specs/node-system.md) | Node Type、Node Instance、Node Registry、Node SDK、节点热更新 |
 | [Streaming and Node Communication](docs/specs/streaming-and-node-communication.md) | `NodeEvent`、Runtime Event Bus、AI Stream Adapter、背压和跨进程通信 |
 | [Transports](docs/specs/transports.md) | HTTP、CLI、MCP、SDK 调用入口 |

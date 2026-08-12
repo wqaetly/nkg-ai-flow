@@ -28,6 +28,7 @@
 - **AI 安全参与开发**：AI 可生成 Builder 逻辑、Graph Operation 或受限节点代码，但不能直接修改核心 Runtime；执行通过 Sandbox Adapter 受控。
 - **配置可观测**：`VariableStore` 可枚举、可进入 Trace,Studio 与 Run Event 中可追踪每条值的来源。
 - **可视化协作编辑**：Studio 不只是浏览器，还支持拖拽、增删节点和多端口连边，编辑动作以 `GraphOperation` 记录。
+- **可选 Run Advisor**：旁路 Advisor Flow 增量审阅 `NodeEvent`，支持 `off` / `observe` / `steer` / `gate`，并在安全节点边界注入 guidance 或暂停 Run。
 
 ---
 
@@ -280,7 +281,17 @@ npm run studio:dev:backend
 npm run studio:dev:frontend
 ```
 
-### 5.3 通用 HTTP 服务
+### 5.3 Advisor Run 监督示例
+
+构建并运行 `apps/advisor-demo`。高风险输入会在受保护节点启动前产生 blocker，Run 进入
+`suspended`；示例随后显式调用 `resume()` 并展示下游节点收到的 guidance：
+
+```bash
+npm run build -w @ai-native-flow/advisor-demo
+npm run app:advisor-demo -- high
+```
+
+### 5.4 通用 HTTP 服务
 
 通用 HTTP Runner 与 Studio sidecar 是两个独立入口。Runner 默认监听
 <http://127.0.0.1:8787>；它不会替代 Studio 开发模式使用的 sidecar 端口。
@@ -369,6 +380,7 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 | `npm test` | 运行 Vitest 单元 / 集成测试 |
 | `npm run typecheck` | 全仓 `tsc --noEmit` 类型检查 |
 | `npm run app:helloagent` | 运行 Hello Agent app |
+| `npm run app:advisor-demo -- high` | 运行 Advisor gate 暂停/恢复示例 |
 | `npx tsx packages/transports/http-runner/src/bin.ts` | 启动通用 HTTP 服务 |
 
 ---
@@ -403,6 +415,8 @@ curl -s http://127.0.0.1:8787/runs/<runId>/events
 - [docs/implementation/ai-implementation-guide.md](./docs/implementation/ai-implementation-guide.md)：默认技术栈、实现顺序、AI 禁止事项
 - [docs/implementation/roadmap.md](./docs/implementation/roadmap.md)：Phase 0+ 的目标与 Definition of Done
 - [docs/specs/](./docs/specs)：Flow Schema / Runtime / Streaming / Studio / Sandbox / Variable Store 等规格
+- [docs/specs/advisor-runtime.md](./docs/specs/advisor-runtime.md)：Run Advisor 分层、模式、事件与暂停语义
+- [docs/implementation/oh-my-pi-runtime-lessons.md](./docs/implementation/oh-my-pi-runtime-lessons.md)：oh-my-pi 可下沉能力评估与优先级
 - [docs/decisions/](./docs/decisions)：Hot Swap / Event Channel / Node-first / Schema Versioning 等 ADR
 
 ---

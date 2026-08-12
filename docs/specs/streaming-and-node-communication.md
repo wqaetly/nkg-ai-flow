@@ -36,6 +36,13 @@ HTTP SSE / WebSocket / CLI / MCP / SDK / Studio
 
 ```ts
 type NodeEventKind =
+  | "run_started"
+  | "run_finished"
+  | "run_failed"
+  | "run_cancelled"
+  | "run_suspended"
+  | "run_resumed"
+  | "run_advisory"
   | "node_started"
   | "node_progress"
   | "stream_open"
@@ -57,9 +64,9 @@ interface NodeEvent {
   runId: string;
   flowId: string;
   flowVersion: string;
-  nodeId: string;
-  nodeVersion: string;
-  attempt: number;
+  nodeId?: string;
+  nodeVersion?: string;
+  attempt?: number;
   seq: number;
   timestamp: string;
   kind: NodeEventKind;
@@ -74,6 +81,7 @@ interface NodeEvent {
 关键约束：
 
 - `eventId` 是 Run Event Stream 的全局 cursor，由 Runtime 持久化事件时生成，用于断线续传和回放。
+- `run_advisory`、`run_suspended`、`run_resumed` 与节点事件写入同一条流，因此所有 transport 看到相同顺序。
 - `seq` 在单个节点执行尝试内单调递增，用于检测节点内部乱序、重复或丢帧。
 - `streamId` 用于区分同一节点的多个并发输出流，例如 `answer`、`tool_calls`、`patches`。
 - `portId` 必须对应节点定义中的 `stream`、`event`、`data` 或 `error` 输出端口。

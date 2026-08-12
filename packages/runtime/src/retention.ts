@@ -39,8 +39,10 @@ export function planRunRetention(
   assertPolicy(policy);
   const sorted = [...entries].sort((left, right) =>
     Date.parse(right.createdAt) - Date.parse(left.createdAt));
-  const active = sorted.filter((entry) => entry.status === "queued" || entry.status === "running");
-  const terminal = sorted.filter((entry) => entry.status !== "queued" && entry.status !== "running");
+  const active = sorted.filter((entry) =>
+    entry.status === "queued" || entry.status === "running" || entry.status === "suspended");
+  const terminal = sorted.filter((entry) =>
+    entry.status !== "queued" && entry.status !== "running" && entry.status !== "suspended");
   const decisions = new Map<string, RunRetentionDecision["reason"]>();
 
   for (const entry of terminal) {

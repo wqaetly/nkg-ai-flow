@@ -35,6 +35,7 @@ import {
   type RunStore,
 } from "./storage/browser.js";
 import type { Runtime } from "./createRuntime.js";
+import { RunGuidanceInbox } from "./runControl.js";
 import {
   createRuntimeCapabilityManifest,
   type RuntimeCapabilityManifest,
@@ -58,6 +59,7 @@ export interface CreateBrowserRuntimeOptions {
   capabilities?: RuntimeCapabilityManifest;
   /** Explicit host HTTP implementation for HTTP and LLM nodes. */
   fetch?: typeof fetch;
+  guidanceInbox?: RunGuidanceInbox;
 }
 
 export function createBrowserRuntime(
@@ -69,6 +71,7 @@ export function createBrowserRuntime(
       : options.variables ?? options.secrets ?? new InMemoryVariableStore();
   const secrets = variables;
   const eventBus = options.eventBus ?? new InMemoryEventBus();
+  const guidanceInbox = options.guidanceInbox ?? new RunGuidanceInbox();
   const runStore = options.runStore ?? new InMemoryRunStore();
   const registryStore = options.registryStore ?? new InMemoryRegistryStore();
   const artifactStore = options.artifactStore ?? new InMemoryArtifactStore({
@@ -114,6 +117,7 @@ export function createBrowserRuntime(
     runners,
     variables,
     secrets,
+    guidanceInbox,
     ...(options.generateRunId ? { generateRunId: options.generateRunId } : {}),
     triggerEvent: async (event) => invocationRouter.triggerEvent({ event }),
     invokeFlow: async (args) => invocationRouter.invoke(args),
@@ -132,5 +136,6 @@ export function createBrowserRuntime(
     registry,
     runManager,
     invocationRouter,
+    guidanceInbox,
   };
 }

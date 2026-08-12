@@ -13,6 +13,7 @@ export * from "./storage/browser.js";
 export * from "./builtinDefinitions.js";
 export * from "./capabilities.js";
 export * from "./retention.js";
+export * from "./runControl.js";
 export * from "./createBrowserRuntime.js";
 export * from "./nodes/createBrowserBuiltinRunnerRegistry.js";
 export {

@@ -19,6 +19,7 @@ export default defineConfig({
       { find: "@ai-native-flow/variable-store", replacement: pkg("packages/variable-store/src/index.ts") },
       { find: "@ai-native-flow/node-sdk", replacement: pkg("packages/node-sdk/src/index.ts") },
       { find: "@ai-native-flow/ai-stream", replacement: pkg("packages/ai-stream/src/index.ts") },
+      { find: "@ai-native-flow/advisor", replacement: pkg("packages/advisor/src/index.ts") },
       { find: "@ai-native-flow/sandbox", replacement: pkg("packages/sandbox/src/index.ts") },
       { find: "@ai-native-flow/runtime/portable", replacement: pkg("packages/runtime/src/portable.ts") },
       { find: "@ai-native-flow/runtime/browser", replacement: pkg("packages/runtime/src/browser.ts") },

@@ -4,6 +4,15 @@ import { planRunRetention } from "../src/retention.js";
 const NOW = Date.parse("2026-07-21T00:00:00.000Z");
 
 describe("run retention planner", () => {
+  it("never deletes suspended Runs", () => {
+    const plan = planRunRetention([
+      { runId: "suspended", createdAt: "2020-01-01T00:00:00.000Z", status: "suspended", bytes: 99 },
+    ], { maxAgeMs: 0, maxRuns: 0, maxBytes: 0 }, Date.parse("2026-01-01T00:00:00.000Z"));
+
+    expect(plan.keep).toEqual(["suspended"]);
+    expect(plan.delete).toEqual([]);
+  });
+
   it("applies age, count and byte quotas while protecting active runs", () => {
     const plan = planRunRetention([
       entry("running", 0, 1_000, "running"),

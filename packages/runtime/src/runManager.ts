@@ -28,6 +28,7 @@ import { ExecutionEngine } from "./executionEngine.js";
 import type { NodeInvokeFlow } from "./nodeContext.js";
 import type { NodeRunnerRegistry } from "./nodeRunnerRegistry.js";
 import type { RunStore } from "./storage/runStore.js";
+import { RunGuidanceInbox, RunPauseGate } from "./runControl.js";
 import {
   RUN_RECORD_SCHEMA_VERSION,
   type RunRecord,
@@ -39,6 +40,7 @@ export interface RunManagerOptions {
   runners: NodeRunnerRegistry;
   variables: VariableStore;
   secrets: SecretStore;
+  guidanceInbox?: RunGuidanceInbox;
   /** Dispatcher used by `send_event` nodes. */
   triggerEvent?: (event: string) => Promise<unknown>;
   /** Dispatcher used by `subflow` nodes. */
@@ -112,6 +114,7 @@ export interface ExecuteOptions {
 
 interface ActiveRun {
   controller: AbortController;
+  pauseGate: RunPauseGate;
 }
 
 export class RunManager {
@@ -234,7 +237,8 @@ export class RunManager {
     options: ExecuteOptions = {},
   ): Promise<ExecuteResult> {
     const controller = new AbortController();
-    this.active.set(record.runId, { controller });
+    const pauseGate = new RunPauseGate();
+    this.active.set(record.runId, { controller, pauseGate });
     const startedAt = new Date().toISOString();
     await this.options.runStore.update(record.runId, {
       status: "running",
@@ -260,6 +264,8 @@ export class RunManager {
         variables,
         secrets: variables,
         eventBus: this.options.eventBus,
+        guidanceInbox: this.options.guidanceInbox,
+        pauseGate,
         signal: controller.signal,
         triggerEvent: this.options.triggerEvent,
         invokeFlow: this.options.invokeFlow,
@@ -336,7 +342,59 @@ export class RunManager {
         }),
       );
     }
-    entry.controller.abort();
+    entry.controller.abort(reason ?? "external cancellation");
+  }
+
+  /** Suspend an active Run. In-flight nodes finish; no new node starts. */
+  async pause(runId: string, reason: string): Promise<RunRecord> {
+    const entry = this.active.get(runId);
+    if (!entry) throw runNotActiveError(runId, reason);
+    if (!entry.pauseGate.pause()) {
+      const current = await this.options.runStore.get(runId);
+      if (!current) throw runNotActiveError(runId, reason);
+      return current;
+    }
+    const suspendedAt = new Date().toISOString();
+    const record = await this.options.runStore.update(runId, {
+      status: "suspended",
+      suspendedAt,
+      suspensionReason: reason,
+    });
+    await this.options.eventBus.publish({
+      runId,
+      flowId: record.flowId,
+      flowVersion: record.flowVersion,
+      ...(record.traceId !== undefined ? { traceId: record.traceId } : {}),
+      seq: 0,
+      kind: "run_suspended",
+      payload: { reason },
+    });
+    return record;
+  }
+
+  /** Resume a Run previously suspended through {@link pause}. */
+  async resume(runId: string, reason?: string): Promise<RunRecord> {
+    const entry = this.active.get(runId);
+    if (!entry) throw runNotActiveError(runId, reason);
+    if (!entry.pauseGate.resume()) {
+      const current = await this.options.runStore.get(runId);
+      if (!current) throw runNotActiveError(runId, reason);
+      return current;
+    }
+    const record = await this.options.runStore.update(runId, {
+      status: "running",
+      resumedAt: new Date().toISOString(),
+    });
+    await this.options.eventBus.publish({
+      runId,
+      flowId: record.flowId,
+      flowVersion: record.flowVersion,
+      ...(record.traceId !== undefined ? { traceId: record.traceId } : {}),
+      seq: 0,
+      kind: "run_resumed",
+      payload: { ...(reason ? { reason } : {}) },
+    });
+    return record;
   }
 
   /** Read-through accessor for transports / inspectors. */
@@ -428,6 +486,19 @@ export class RunManager {
     markResumePointLoaded(name, state, variables, now);
     return state;
   }
+}
+
+function runNotActiveError(runId: string, reason?: string): RuntimeErrorException {
+  return new RuntimeErrorException(
+    createRuntimeError({
+      code: "run_manager.run_not_active",
+      kind: "not_found",
+      category: "user_input",
+      message: `run ${runId} is not active`,
+      source: { module: "run_manager" },
+      context: { runId, reason },
+    }),
+  );
 }
 
 function defaultRunId(): string {

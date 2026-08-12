@@ -11,7 +11,11 @@ import {
   inspectFlowCapabilities,
 } from "@ai-native-flow/runtime/browser";
 import { createNodeRuntime } from "@ai-native-flow/runtime/node";
+import { AdvisorRuntime, createFlowAdvisorReviewer } from "@ai-native-flow/advisor";
 import { flow as helloAgentFlow } from "../apps/hello-agent/helloagent.flow.js";
+import { primaryFlow as advisorPrimaryFlow } from "../apps/advisor-demo/primary.flow.js";
+import { reviewerFlow as advisorReviewerFlow } from "../apps/advisor-demo/reviewer.flow.js";
+import { advisorDemoNodes } from "../apps/advisor-demo/nodes/index.js";
 import {
   buildSkillToFlowFlow,
   buildSkillToFlowRegistry,
@@ -25,6 +29,8 @@ import {
 const root = fileURLToPath(new URL("..", import.meta.url));
 export const BUNDLED_EXAMPLE_SOURCES = [
   "apps/hello-agent/helloagent.flow.ts",
+  "apps/advisor-demo/primary.flow.ts",
+  "apps/advisor-demo/reviewer.flow.ts",
   "apps/skill-to-flow/flows/skill-to-flow.json",
   "apps/studio/flows/loop-block-showcase.json",
 ] as const;
@@ -57,6 +63,8 @@ export async function auditBundledExampleFlows(): Promise<ExampleFlowAudit> {
     auditLoopShowcase(),
     auditHelloAgent(),
     auditSkillToFlow(),
+    auditAdvisorPrimary(),
+    auditAdvisorReviewer(),
   ]);
   const structuralPassed = flows.filter((flow) => flow.structural === "passed").length;
   const deterministic = flows.filter((flow) => flow.deterministic);
@@ -66,6 +74,96 @@ export async function auditBundledExampleFlows(): Promise<ExampleFlowAudit> {
     structural: metric(structuralPassed, flows.length),
     deterministicExecution: metric(executionPassed, deterministic.length),
   };
+}
+
+async function auditAdvisorPrimary(): Promise<ExampleFlowResult> {
+  const source = "apps/advisor-demo/primary.flow.ts";
+  return capture("advisor_demo_primary", source, true, async () => {
+    let nextRunId = 0;
+    const runtime = createBrowserRuntime({
+      nodes: advisorDemoNodes,
+      generateRunId: () => `example_advisor_${++nextRunId}`,
+    });
+    const primary = JSON.parse(advisorPrimaryFlow.dump()) as FlowGraph;
+    const reviewer = JSON.parse(advisorReviewerFlow.dump()) as FlowGraph;
+    for (const graph of [primary, reviewer]) {
+      await runtime.registry.register({ graph });
+      await runtime.registry.promote(graph.id, graph.version);
+    }
+    const advisor = new AdvisorRuntime(runtime, {
+      advisorId: "example-risk-advisor",
+      mode: "steer",
+      reviewer: createFlowAdvisorReviewer({
+        runtime,
+        flowId: reviewer.id,
+        nodeId: "review_batch",
+      }),
+      triggerKinds: ["node_finished", "node_error", "run_failed"],
+    });
+    const result = await advisor.invoke({
+      flowId: primary.id,
+      input: { operation: "publish_release", riskLevel: "high" },
+    });
+    if (!result.succeeded) throw new Error("advisor primary example did not succeed");
+    const output = result.output as { receivedGuidance?: number } | undefined;
+    if (output?.receivedGuidance !== 1 || result.advisories.length !== 1) {
+      throw new Error(`advisor guidance was not delivered: ${JSON.stringify(result)}`);
+    }
+    return resultFor(primary, runtime.nodeTypeRegistry, "passed", result.output);
+  });
+}
+
+async function auditAdvisorReviewer(): Promise<ExampleFlowResult> {
+  const source = "apps/advisor-demo/reviewer.flow.ts";
+  return capture("advisor_demo_reviewer", source, true, async () => {
+    const runtime = createBrowserRuntime({
+      nodes: advisorDemoNodes,
+      generateRunId: () => "example_advisor_reviewer",
+    });
+    const graph = JSON.parse(advisorReviewerFlow.dump()) as FlowGraph;
+    await runtime.registry.register({ graph });
+    await runtime.registry.promote(graph.id, graph.version);
+    const result = await runtime.invocationRouter.invokeNode({
+      flowId: graph.id,
+      nodeId: "review_batch",
+      input: {
+        advisorId: "audit-advisor",
+        target: {
+          runId: "target-run",
+          flowId: "target-flow",
+          flowVersion: "1.0.0",
+        },
+        toEventId: "target-run:000001",
+        events: [{
+          eventId: "target-run:000001",
+          runId: "target-run",
+          flowId: "target-flow",
+          flowVersion: "1.0.0",
+          nodeId: "risk_probe",
+          seq: 2,
+          timestamp: new Date(0).toISOString(),
+          kind: "node_finished",
+          payload: {
+            output: {
+              assessment: {
+                operation: "publish_release",
+                riskLevel: "high",
+                requiresReview: true,
+              },
+            },
+          },
+        }],
+      },
+    });
+    if (!result.succeeded || !Array.isArray(result.output)) {
+      throw new Error(`advisor reviewer example failed: ${JSON.stringify(result)}`);
+    }
+    const note = result.output[0] as { severity?: string } | undefined;
+    if (note?.severity !== "blocker") {
+      throw new Error(`advisor reviewer did not emit blocker: ${JSON.stringify(result.output)}`);
+    }
+    return resultFor(graph, runtime.nodeTypeRegistry, "passed", result.output);
+  });
 }
 
 export function discoverBundledExampleFlowSources(): string[] {
@@ -250,6 +348,7 @@ function visit(directory: string, files: string[]): void {
       visit(path, files);
       continue;
     }
+    if (entry.name.endsWith(".env.json")) continue;
     const normalized = relative(root, path).replaceAll("\\", "/");
     if (entry.name.endsWith(".flow.ts") ||
         (extname(entry.name) === ".json" && normalized.includes("/flows/"))) {

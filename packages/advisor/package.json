@@ -1,0 +1,24 @@
+{
+  "name": "@ai-native-flow/advisor",
+  "version": "0.0.1",
+  "description": "Optional Run-level advisor supervision for AI Native Flow.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-native-flow/event-bus": "0.0.1",
+    "@ai-native-flow/runtime": "0.0.1"
+  },
+  "devDependencies": {
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/node-sdk": "0.0.1",
+    "vitest": "^4.1.8"
+  }
+}

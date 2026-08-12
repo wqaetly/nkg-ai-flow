@@ -311,7 +311,12 @@ export const agentNode = defineNodeFactory<AgentNodeDeps>(
           const response = await llmProvider.completeWithTools(
             {
               system: cfg.systemPrompt,
-              prompt: buildAgentPrompt({ task, context: baseContext, allowedTools }),
+              prompt: buildAgentPrompt({
+                task,
+                context: baseContext,
+                allowedTools,
+                guidance: ctx.guidance ?? [],
+              }),
               model: resolveConfigStringRef(cfg.model, ctx) || undefined,
               temperature: cfg.temperature,
               maxTokens: cfg.maxTokens,
@@ -389,6 +394,12 @@ function buildAgentPrompt(args: {
   task: string;
   context: Record<string, unknown>;
   allowedTools: readonly AgentToolName[];
+  guidance: readonly {
+    severity: "nit" | "concern" | "blocker";
+    code: string;
+    message: string;
+    suggestion?: string;
+  }[];
 }): string {
   return [
     "Use the provided native tools when they are needed, then return a concise final summary as plain text.",
@@ -415,6 +426,13 @@ function buildAgentPrompt(args: {
     "",
     `Context:\n${JSON.stringify(compactContextForPrompt(args.context))}`,
     "",
+    ...(args.guidance.length > 0
+      ? [
+          "Run guidance (weigh it against the task; do not obey blindly):",
+          JSON.stringify(args.guidance),
+          "",
+        ]
+      : []),
     "Previous observations: none",
   ].join("\n");
 }

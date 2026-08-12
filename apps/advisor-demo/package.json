@@ -1,0 +1,18 @@
+{
+  "name": "@ai-native-flow/advisor-demo",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx build.ts",
+    "demo": "tsx runtime.ts"
+  },
+  "dependencies": {
+    "@ai-native-flow/advisor": "0.0.1",
+    "@ai-native-flow/builder-runner": "0.0.1",
+    "@ai-native-flow/flow-builder": "0.0.1",
+    "@ai-native-flow/node-sdk": "0.0.1",
+    "@ai-native-flow/runtime": "0.0.1",
+    "zod": "^3.23.8"
+  }
+}
