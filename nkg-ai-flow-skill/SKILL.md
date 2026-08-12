@@ -1,6 +1,6 @@
 ---
 name: nkg-ai-flow-skill
-description: 指导 AI Agent 在本仓库设计、实现、验证、文档化自定义 AI Native Flow 应用。新建或修改 flow、新增自定义节点、连接 FlowBuilder 图、跨节点保留 context、编写 anf.app.json、把工作流需求落成 apps/* 下可运行包时使用。
+description: 指导 AI Agent 在本仓库设计、实现、验证、文档化自定义 AI Native Flow 应用。新建或修改 flow、新增自定义节点、连接 FlowBuilder 图、跨节点保留 context、设计 Advisor 监督 Flow、编写 anf.app.json、把工作流需求落成 apps/* 下可运行包时使用。
 ---
 
 # 自定义 Flow 开发规范
@@ -27,8 +27,10 @@ description: 指导 AI Agent 在本仓库设计、实现、验证、文档化自
 |---|---|
 | 纯内置节点 flow + build runner | `apps/hello-agent/helloagent.flow.ts` + `build.ts` |
 | 自定义节点流水线 + 节点示例 | `apps/skill-to-flow/build.ts` + `apps/skill-to-flow/nodes/*.ts` |
+| Advisor 监督 Flow + gate 示例 | `apps/advisor-demo/primary.flow.ts` + `reviewer.flow.ts` + `runtime.ts` |
 | FlowBuilder 契约 | `docs/specs/flow-builder.md` |
 | 图 schema | `docs/specs/flow-graph-schema.md` |
+| Advisor Runtime 契约 | `docs/specs/advisor-runtime.md` |
 | 工作区/应用发现 | `docs/specs/workspace-model.md` 与现有 `anf.app.json` |
 
 ## 设计流程
@@ -43,8 +45,30 @@ description: 指导 AI Agent 在本仓库设计、实现、验证、文档化自
 | 复用领域行为、严格输入输出校验、非平凡解析 | 自定义节点 flow |
 | 生成文件、修代码、跑 shell、验证产物 | 含 `agent` 物化的 flow |
 | 把高层 skill/工作流转成可运行包 | Planner → Designer → Synthesizer → Validator → Materializer 流水线 |
+| 对业务 Run 做旁路审阅、建议或人工门控 | 业务 Flow + 独立 Advisor Flow + 可选 `AdvisorRuntime` |
 
 不要为普通的 prompt 模板或简单字符串/对象 reshape 写自定义节点,用 `llm` / `text_input` / `transform`。
+
+## Advisor 监督 Flow
+
+需要观察、指导或门控业务 Run 时，把 Advisor 当成**可选高级运行时能力**，不要把监督节点硬塞进业务 Flow：
+
+- 业务 Flow 保持独立可运行；只有确实需要响应建议的 Agent/自定义节点才读取 `ctx.guidance`。
+- 审阅逻辑写成普通、可版本化的 Advisor Flow，再用 `createFlowAdvisorReviewer(...)` 选择其审阅节点。
+- 用 `AdvisorRuntime` 在运行入口绑定业务 Flow 与 reviewer；模式按需求选择：`observe` 只记录、`steer` 向后续节点投递 concern/blocker、`gate` 遇 blocker 在安全节点边界暂停。
+- Reviewer 输入是增量 `AdvisorReviewBatch`；输出为单条 advisory 或 `advisories[]`，每条至少包含非空 `code`、`message`，可带 `severity`、`suggestion`、`evidence`、`dedupeKey`。
+- Reviewer 每次更新只发一条真正有行动价值的建议；禁止输出 `done`、`complete`、`LGTM` 等无内容消息，稳定问题必须设置可复用 `dedupeKey`。
+- 可能产生 blocker 时调用 `AdvisorRuntime.start()`，监听 `run_suspended` 后由人工或外部策略调用句柄的 `resume()`；不要用 `invoke()` 等待一个无人恢复的 gate。
+- 暂停只阻止后续节点启动，不中断已经执行的节点；当前是进程内安全边界暂停，不得宣称支持进程重启后恢复。
+- Advisor 失败默认 fail-open；不能让观察器故障把主业务 Run 误判为失败，也不能给 Advisor 默认开放写文件或 bash。
+
+实现前先读 `docs/specs/advisor-runtime.md`，完整范例读 `apps/advisor-demo/`。验证至少运行：
+
+```bash
+npm exec vitest run -- packages/advisor/test/advisorRuntime.test.ts packages/runtime/test/runControl.test.ts
+npm run test:example-flows
+npm run app:advisor-demo -- high
+```
 
 **3. 列节点和边**(实现前用 `step_id | node_type | purpose | inputs | outputs | upstream_dependencies | validation` 表格表达)。规则：
 
